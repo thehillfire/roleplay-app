@@ -1,11 +1,17 @@
 import { useState } from 'react';
 import { api } from '../api.js';
+import { TEXT_SIZES, getTextSize, setTextSize } from '../textSize.js';
 
 export default function Account({ user, billing, onBack, onSignOut, onSignOutEverywhere, onDeleted, onOpenLegal }) {
   const [confirming, setConfirming] = useState(false);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [textSize, setSize] = useState(getTextSize);
+  const pickSize = (size) => {
+    setTextSize(size);
+    setSize(size);
+  };
 
   const buy = async () => {
     setBusy(true);
@@ -76,6 +82,17 @@ export default function Account({ user, billing, onBack, onSignOut, onSignOutEve
           )}
         </section>
       )}
+
+      <section className="card">
+        <h2 className="section-title" id="text-size-label">Chat text size</h2>
+        <div className="segmented" role="radiogroup" aria-labelledby="text-size-label">
+          {TEXT_SIZES.map((s) => (
+            <button key={s.id} type="button" role="radio" aria-checked={textSize === s.id} className={textSize === s.id ? 'seg active' : 'seg'} onClick={() => pickSize(s.id)}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section className="card rows">
         <a className="row link-row" href="/api/account/export" download>Download my data</a>

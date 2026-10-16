@@ -28,7 +28,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] PWA: installable (manifest, icons, service worker) and web push for new messages and connect requests (handle only, never message text)
 - [x] Back button / swipe-back navigation; load earlier messages
 - [x] Account deletion (password-confirmed; personal data scrubbed now, safety data purged after 90 days) and JSON data export
-- [ ] Accessibility pass; reduced motion; text size
+- [x] Accessibility pass; reduced motion; chat text size (Account → Chat text size, per device)
 - [x] Deployment: Dockerfile (tested: production mode, non-root, clean SIGTERM), Render Blueprint, docs/DEPLOY.md
 
 ## 5. Community & launch readiness

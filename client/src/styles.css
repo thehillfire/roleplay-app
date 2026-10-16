@@ -309,3 +309,9 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); box-sh
 .plus { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; border-color: rgba(186, 104, 200, 0.4); }
 .plus h2 { margin: 0; font-size: 18px; }
 .plus .hint { line-height: 1.55; }
+
+/* Chat text size (Account → Chat text size). */
+:root[data-text-size="large"] .bubble p, :root[data-text-size="large"] .composer textarea { font-size: 18px; }
+:root[data-text-size="larger"] .bubble p, :root[data-text-size="larger"] .composer textarea { font-size: 21px; }
+:root[data-text-size="large"] .bubble time { font-size: 12px; }
+:root[data-text-size="larger"] .bubble time { font-size: 13px; }
