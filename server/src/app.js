@@ -239,6 +239,15 @@ function createApp({
     res.json({ user: publicUser(user) });
   }));
 
+  // Ends every session on every device (e.g. after using a shared computer) and drops live sockets.
+  app.post('/api/auth/logout-all', auth.requireUser, asyncRoute(async (req, res) => {
+    await store.deleteAllSessions(req.user.id);
+    await store.deletePushSubscriptionsFor(req.user.id); // other devices shouldn't keep getting pushes
+    hub.disconnect(req.user.id);
+    await auth.endSession(req, res);
+    res.json({ ok: true });
+  }));
+
   app.post('/api/auth/logout', asyncRoute(async (req, res) => {
     await auth.endSession(req, res);
     res.json({ ok: true });

@@ -104,6 +104,10 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return userFromRow(row);
     },
 
+    async deleteAllSessions(userId) {
+      await db.query('DELETE FROM sessions WHERE user_id = $1', [userId]);
+    },
+
     async deleteSession(tokenHash) {
       await db.query('DELETE FROM sessions WHERE token_hash = $1', [tokenHash]);
     },
@@ -539,6 +543,10 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         extra = 'AND user_id = $2';
       }
       await db.query(`DELETE FROM push_subscriptions WHERE endpoint = $1 ${extra}`, params);
+    },
+
+    async deletePushSubscriptionsFor(userId) {
+      await db.query('DELETE FROM push_subscriptions WHERE user_id = $1', [userId]);
     },
 
     async pushSubscriptions(userId) {

@@ -123,3 +123,17 @@ test('health fails when the database is down', async (t) => {
   const res = await fetch(`${s.base}/api/health`);
   assert.equal(res.status, 503);
 });
+
+test('sign out everywhere ends every session', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const creds = adult();
+  const phone = client(s.base);
+  await phone('POST', '/api/auth/signup', creds);
+  const laptop = client(s.base);
+  await laptop('POST', '/api/auth/login', { email: creds.email, password: creds.password });
+  assert.ok((await laptop('GET', '/api/auth/me')).body.user);
+  assert.equal((await phone('POST', '/api/auth/logout-all', {})).status, 200);
+  assert.equal((await laptop('GET', '/api/auth/me')).body.user, null);
+  assert.equal((await phone('GET', '/api/auth/me')).body.user, null);
+});

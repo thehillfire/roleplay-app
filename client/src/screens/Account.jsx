@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api.js';
 
-export default function Account({ user, billing, onBack, onSignOut, onDeleted, onOpenLegal }) {
+export default function Account({ user, billing, onBack, onSignOut, onSignOutEverywhere, onDeleted, onOpenLegal }) {
   const [confirming, setConfirming] = useState(false);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -52,6 +52,9 @@ export default function Account({ user, billing, onBack, onSignOut, onDeleted, o
         <button className="row link-row" onClick={() => onOpenLegal('privacy')}>Privacy policy</button>
         <button className="row link-row" onClick={() => onOpenLegal('terms')}>Terms</button>
         <button className="row link-row" onClick={onSignOut}>Sign out</button>
+        <button className="row link-row" onClick={() => window.confirm('Sign out on every phone and computer, including this one?') && onSignOutEverywhere()}>
+          Sign out everywhere
+        </button>
         <button className="row link-row danger-text" onClick={() => setConfirming(true)}>Delete account</button>
       </section>
 

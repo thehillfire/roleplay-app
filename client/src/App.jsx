@@ -24,7 +24,7 @@ function Paused({ onSignOut }) {
   );
 }
 
-function Signedin({ user, billing, ads, pushKey, onSignOut, onDeleted, onPaused, onRefreshMe, onOpenLegal, initialNotice, externalNotice }) {
+function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere, onDeleted, onPaused, onRefreshMe, onOpenLegal, initialNotice, externalNotice }) {
   const [view, setView] = useState({ name: 'home' });
 
   // Browser history: home is the root entry; other screens are pushed on top so the
@@ -154,7 +154,7 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onDeleted, onPaused,
         />
       )}
       {view.name === 'moderate' && <Moderate onBack={goHome} />}
-      {view.name === 'account' && <Account user={user} billing={billing} onBack={goHome} onSignOut={onSignOut} onDeleted={onDeleted} onOpenLegal={onOpenLegal} />}
+      {view.name === 'account' && <Account user={user} billing={billing} onBack={goHome} onSignOut={onSignOut} onSignOutEverywhere={onSignOutEverywhere} onDeleted={onDeleted} onOpenLegal={onOpenLegal} />}
       {view.name === 'waiting' && <Waiting onCancel={cancel} error={matchError} />}
       {view.name === 'chat' && (
         <Chat
@@ -211,6 +211,13 @@ export default function App() {
   const signOut = async () => {
     await disablePushOnThisDevice(api.pushUnsubscribe).catch(() => {});
     await api.logout().catch(() => {});
+    window.history.replaceState(null, '', '/');
+    setUser(null);
+  };
+
+  const signOutEverywhere = async () => {
+    await disablePushOnThisDevice(api.pushUnsubscribe).catch(() => {});
+    await api.logoutAll().catch(() => {});
     window.history.replaceState(null, '', '/');
     setUser(null);
   };
@@ -282,6 +289,7 @@ export default function App() {
           initialNotice={checkoutNotice}
           externalNotice={verifyNotice}
           onSignOut={signOut}
+          onSignOutEverywhere={signOutEverywhere}
           onDeleted={deleted}
           onPaused={() => setUser({ ...user, status: 'review' })}
           onRefreshMe={refreshMeQuietly}

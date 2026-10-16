@@ -22,6 +22,7 @@ export const api = {
   signup: (fields) => request('POST', '/api/auth/signup', fields).then((d) => d.user),
   login: (email, password) => request('POST', '/api/auth/login', { email, password }).then((d) => d.user),
   logout: () => request('POST', '/api/auth/logout', {}),
+  logoutAll: () => request('POST', '/api/auth/logout-all', {}),
   verify: (token) => request('POST', '/api/auth/verify', { token }),
   resendVerification: () => request('POST', '/api/auth/resend-verification', {}),
   forgot: (email) => request('POST', '/api/auth/forgot', { email }),
