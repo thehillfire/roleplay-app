@@ -51,4 +51,10 @@ What's left between this repo and real users, in order. The code side is done an
 
 ## What's in the box
 
-Everything listed in the [README](../README.md): accounts, anonymous matching, realtime chat, safety screening, reports and appeals, moderator tools and dashboard, paid mutual connect, push notifications, daily check-ins, PWA install, privacy controls, deployment files, and 94 automated tests plus a two-browser end-to-end test running in CI.
+Everything listed in the [README](../README.md):
+- **Core:** accounts, anonymous matching, realtime chat (reactions, unsend, Seen), daily check-ins, PWA install.
+- **Listeners:** kind words, on-call notifications, a breathing exercise while you wait.
+- **Safety:** screening, reports and appeals, a moderator dashboard with handle lookup and a support inbox.
+- **Money:** paid mutual connect and Kindred Plus.
+- **Privacy:** push notifications that never show message text, data export and deletion.
+- **Shipping:** deployment files, 105 automated tests, and a two-browser end-to-end test running in CI.
