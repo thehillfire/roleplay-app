@@ -32,6 +32,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Deployment: Dockerfile (tested: production mode, non-root, clean SIGTERM), Render Blueprint, docs/DEPLOY.md
 
 ## 5. Community & launch readiness
+- [x] First-run onboarding (3 cards, once per device) and listener tips
 - [x] Owner dashboard on the Moderate screen: here now, active today, messages, matches, signups, members, "helped", connections, revenue
 - [x] Conversation openers, phone-friendly Enter, "End conversation", desktop chat layout
 - [x] Abuse resistance: daily cap on new matches; only reporters with day-old accounts count toward auto-pause

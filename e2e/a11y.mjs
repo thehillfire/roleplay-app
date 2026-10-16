@@ -9,6 +9,7 @@ const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 const BASE = process.env.BASE_URL || 'http://localhost:3000';
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
 let failures = 0;
+let onboardingAudited = false;
 
 async function audit(page, name) {
   await page.waitForTimeout(400);
@@ -37,6 +38,12 @@ const signUp = async (page) => {
   await page.getByLabel(/Birthdate/).fill('1990-01-01');
   await page.getByLabel(/I'm 18 or older/).check();
   await page.getByRole('button', { name: 'Create account' }).click();
+  await page.getByRole('dialog').waitFor();
+  if (!onboardingAudited) {
+    onboardingAudited = true;
+    await audit(page, 'onboarding');
+  }
+  await page.getByRole('button', { name: 'Skip' }).click();
   await page.getByRole('button', { name: 'Find someone' }).waitFor();
 };
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import HomeAd from '../components/HomeAd.jsx';
+import Onboarding, { shouldOnboard } from '../components/Onboarding.jsx';
 import { api } from '../api.js';
 
 function VerifyNudge() {
@@ -33,6 +34,7 @@ export function timeAgo(ts) {
 export default function Home({ user, conversations, listError, onRetry, onFind, onOpen, onAccount, connection, notice, onDismissNotice, onModerate, askPush, onEnablePush, onDismissPush, presence, ads }) {
   const [role, setRole] = useState('talk');
   const [topic, setTopic] = useState('');
+  const [onboarding, setOnboarding] = useState(shouldOnboard);
 
   return (
     <main className="screen">
@@ -75,6 +77,17 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
             </button>
           ))}
         </div>
+        {role === 'listen' && (
+          <details className="listen-tips">
+            <summary>How to be a good listener</summary>
+            <ul>
+              <li>Let them lead. Ask open questions like "what's been the hardest part?"</li>
+              <li>Reflect, don't fix: "that sounds exhausting" goes a long way.</li>
+              <li>No judging, no lectures, no sharing their story elsewhere.</li>
+              <li>If they mention ending their life, gently point them to 988 or findahelpline.com, and report if you're worried.</li>
+            </ul>
+          </details>
+        )}
         <button className="btn primary big" onClick={() => onFind({ role, topic })} disabled={connection !== 'online'}>
           {connection === 'online' ? 'Find someone' : 'Connecting…'}
         </button>
@@ -121,6 +134,8 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
       )}
 
       <HomeAd ads={ads} />
+
+      {onboarding && <Onboarding handle={user.handle} onDone={() => setOnboarding(false)} />}
 
       {conversations?.length === 0 && <p className="empty">Your conversations will appear here. Past matches stay anonymous, and you can pick up where you left off.</p>}
     </main>

@@ -36,7 +36,7 @@ jobs:
         run: npx playwright-core install --with-deps chromium
       - name: End-to-end smoke test
         run: |
-          PORT=3000 SQLITE_FILE=/tmp/e2e.db ADMIN_EMAILS=mod@e2e.test npm start > /tmp/server.log 2>&1 &
+          PORT=3000 SQLITE_FILE=/tmp/e2e.db ADMIN_EMAILS=mod@e2e.test AUTH_RATE_LIMIT=1000 npm start > /tmp/server.log 2>&1 &
           npx --yes wait-on@8 -t 30000 http://localhost:3000/api/health
           npm run e2e
           npm run a11y

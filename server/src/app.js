@@ -56,7 +56,7 @@ function connectionView(c, userId) {
 function createApp({
   store,
   hub,
-  authRateLimit = { max: 10, windowMs: 60000 },
+  authRateLimit = { max: Number(process.env.AUTH_RATE_LIMIT) || 10, windowMs: 60000 },
   messageRateLimit = { max: 30, windowMs: 60000 },
   staticDir,
   payments = createPayments(),

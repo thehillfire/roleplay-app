@@ -20,7 +20,7 @@ async function person(name) {
   return page;
 }
 
-async function signUp(page, { birthdate = '1990-06-01' } = {}) {
+async function signUp(page, { birthdate = '1990-06-01', expectOnboarding = true } = {}) {
   await page.goto(BASE);
   await page.getByRole('button', { name: 'Get started' }).click();
   await page.getByLabel('Email').fill(`e2e-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.com`);
@@ -28,6 +28,7 @@ async function signUp(page, { birthdate = '1990-06-01' } = {}) {
   await page.getByLabel(/Birthdate/).fill(birthdate);
   await page.getByLabel(/I'm 18 or older/).check();
   await page.getByRole('button', { name: 'Create account' }).click();
+  if (expectOnboarding) await page.getByRole('button', { name: 'Skip' }).click(); // first-run onboarding
 }
 
 // Legal pages: direct link and from the welcome screen
@@ -45,13 +46,29 @@ step('privacy and terms pages');
 
 // Minors are turned away at signup
 const kid = await person('kid');
-await signUp(kid, { birthdate: `${new Date().getUTCFullYear() - 15}-03-03` });
+await signUp(kid, { birthdate: `${new Date().getUTCFullYear() - 15}-03-03`, expectOnboarding: false });
 await kid.getByText(/for adults 18 and over/).waitFor();
 step('under-18 signup is refused');
 
 // Two adults sign up
 const alice = await person('alice');
 const bob = await person('bob');
+// Onboarding is shown once, then remembered on this device
+const newcomer = await person('newcomer');
+await newcomer.goto(BASE);
+await newcomer.getByRole('button', { name: 'Get started' }).click();
+await newcomer.getByLabel('Email').fill(`e2e-new-${Date.now()}@example.com`);
+await newcomer.getByLabel(/Password/).fill('quiet-harbor-9');
+await newcomer.getByLabel(/Birthdate/).fill('1992-02-02');
+await newcomer.getByLabel(/I'm 18 or older/).check();
+await newcomer.getByRole('button', { name: 'Create account' }).click();
+await newcomer.getByRole('heading', { name: 'Talk to someone, anytime' }).waitFor();
+await newcomer.getByRole('button', { name: 'Next' }).click();
+await newcomer.getByRole('button', { name: 'Next' }).click();
+await newcomer.getByRole('button', { name: "Let's go" }).click();
+await newcomer.reload();
+await newcomer.getByRole('button', { name: 'Find someone' }).waitFor();
+assert.equal(await newcomer.getByRole('dialog').count(), 0, 'onboarding not shown again');
 const pages = [alice, bob];
 await kid.shot('0-welcome');
 await signUp(alice);
@@ -197,6 +214,7 @@ if (process.env.MOD_EMAIL && process.env.MAIL_LOG) {
   await mod.getByLabel(/Birthdate/).fill('1980-01-01');
   await mod.getByLabel(/I'm 18 or older/).check();
   await mod.getByRole('button', { name: 'Create account' }).click();
+  await mod.getByRole('button', { name: 'Skip' }).click();
   await mod.getByRole('button', { name: 'Find someone' }).waitFor();
   assert.equal(await mod.getByRole('button', { name: 'Moderate' }).count(), 0, 'not a moderator until the email is confirmed');
   await mod.waitForTimeout(300);
