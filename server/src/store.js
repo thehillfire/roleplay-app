@@ -19,6 +19,7 @@ function userFromRow(row) {
     plusUntil: num(row.plus_until) || 0,
     listenerAlerts: Boolean(num(row.listener_alerts)),
     stripeCustomerId: row.stripe_customer_id || null,
+    plusSubscriptionId: row.plus_subscription_id || null,
     createdAt: num(row.created_at),
   };
 }
@@ -662,7 +663,8 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     async deleteAccount(userId) {
       const t = now();
       await db.query(
-        `UPDATE users SET email = $1, password_hash = '!', birthdate = '0000-00-00', status = 'deleted', role = 'member', email_verified_at = NULL, deleted_at = $2
+        `UPDATE users SET email = $1, password_hash = '!', birthdate = '0000-00-00', status = 'deleted', role = 'member', email_verified_at = NULL, deleted_at = $2,
+             plus_subscription_id = NULL, listener_alerts = 0
          WHERE id = $3`,
         [`deleted+${userId}@deleted.invalid`, t, userId],
       );
@@ -793,7 +795,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     },
 
     async endPlus(userId, until) {
-      await db.query('UPDATE users SET plus_until = $1, plus_subscription_id = NULL WHERE id = $2', [until, userId]);
+      await db.query('UPDATE users SET plus_until = CASE WHEN plus_until > $1 THEN $1 ELSE plus_until END, plus_subscription_id = NULL WHERE id = $2', [until, userId]);
     },
 
     async listHeldMessages({ limit = 50 } = {}) {

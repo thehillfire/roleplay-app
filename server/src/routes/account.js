@@ -3,7 +3,7 @@ const { verifyPassword } = require('../auth');
 const { str, badRequest } = require('../validate');
 const { httpError, asyncRoute } = require('./common');
 
-module.exports = function register(app, { store, hub, auth, push, authLimiter, member }) {
+module.exports = function register(app, { store, hub, auth, payments, push, authLimiter, member }) {
   // --- Appeals: paused or suspended people can explain their side ---
 
   const paused = (req, res, next) => auth.requireUser(req, res, () => {
@@ -33,6 +33,14 @@ module.exports = function register(app, { store, hub, auth, push, authLimiter, m
     const found = await store.findUserByEmail(req.user.email);
     if (typeof req.body.password !== 'string' || !(await verifyPassword(req.body.password, found?.passwordHash))) {
       throw httpError(401, 'Password is incorrect.');
+    }
+    // Stop Plus billing first: a deleted account can't reach the portal to cancel.
+    if (req.user.plusSubscriptionId && payments.enabled) {
+      try {
+        await payments.cancelSubscription(req.user.plusSubscriptionId);
+      } catch {
+        throw httpError(502, "We couldn't cancel your Kindred Plus subscription just now, so your account wasn't deleted. Try again in a minute.");
+      }
     }
     const conversations = await store.listConversations(req.user.id);
     await store.deleteAccount(req.user.id);

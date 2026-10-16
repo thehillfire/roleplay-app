@@ -1,6 +1,6 @@
 // Stripe webhook. Mounted before the JSON body parser: signatures need the raw body.
 const express = require('express');
-const { httpError, asyncRoute, DAY_MS, PLUS_MONTHLY_CREDITS } = require('./common');
+const { httpError, asyncRoute, PLUS_MONTHLY_CREDITS } = require('./common');
 
 module.exports = function register(app, { store, hub, payments }) {
   // A paid Plus invoice (first month or renewal): extend Plus to the end of the period and
@@ -12,13 +12,20 @@ module.exports = function register(app, { store, hub, payments }) {
     if (!subscriptionId) return;
     let user = await store.userBySubscription(subscriptionId);
     const metaUserId = details.metadata?.user_id;
-    if (!user && metaUserId && (user = await store.getUser(metaUserId))) {
-      await store.linkSubscription(user.id, { customerId: inv.customer, subscriptionId }); // invoice beat checkout
+    if (!user && metaUserId) {
+      // Invoice beat checkout. Never re-link over another live subscription or a deleted account.
+      const owner = await store.getUser(metaUserId);
+      if (owner && owner.status !== 'deleted' && !owner.plusSubscriptionId) {
+        await store.linkSubscription(owner.id, { customerId: inv.customer, subscriptionId });
+        user = owner;
+      }
     }
-    if (!user) return;
+    if (!user || user.status === 'deleted') return;
     const periodEnd = Math.max(0, ...((inv.lines?.data || []).map((l) => Number(l.period?.end) || 0)));
     await store.extendPlus(user.id, (periodEnd || Math.floor(Date.now() / 1000) + 31 * 86400) * 1000);
-    await store.recordPayment({ id: inv.id, userId: user.id, amountCents: inv.amount_paid || 0, credits: PLUS_MONTHLY_CREDITS });
+    // The month's credits come with the first invoice and each renewal, not with mid-cycle changes.
+    const monthly = !inv.billing_reason || ['subscription_create', 'subscription_cycle'].includes(inv.billing_reason);
+    await store.recordPayment({ id: inv.id, userId: user.id, amountCents: inv.amount_paid || 0, credits: monthly ? PLUS_MONTHLY_CREDITS : 0 });
     await store.flush();
     hub.push(user.id, { type: 'credits.updated' });
   }
@@ -31,16 +38,17 @@ module.exports = function register(app, { store, hub, payments }) {
     if (event.type === 'checkout.session.completed' && obj.mode === 'subscription') {
       // Plus started: remember the subscription; the first invoice.paid grants the month.
       const userId = obj.client_reference_id || obj.metadata?.user_id;
-      if (userId && obj.subscription && (await store.getUser(userId))) {
+      if (userId && obj.subscription && (await store.getUser(userId))?.status === 'active') {
         await store.linkSubscription(userId, { customerId: obj.customer, subscriptionId: obj.subscription });
       }
     } else if (event.type === 'invoice.paid') {
       await handlePlusInvoice(obj);
     } else if (event.type === 'customer.subscription.deleted') {
+      // Ends Plus when the subscription ended (now, at the latest). Never lengthens it: after failed
+      // renewals the period end belongs to a month nobody paid for.
       const user = await store.userBySubscription(obj.id);
-      const end = Number(obj.current_period_end ?? obj.items?.data?.[0]?.current_period_end) || 0;
       if (user) {
-        await store.endPlus(user.id, Math.min(end * 1000 || Date.now(), Date.now() + 31 * DAY_MS));
+        await store.endPlus(user.id, Math.min(Number(obj.ended_at) * 1000 || Date.now(), Date.now()));
         hub.push(user.id, { type: 'credits.updated' });
       }
     } else if (event.type === 'checkout.session.completed') {

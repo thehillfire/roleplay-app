@@ -48,6 +48,16 @@ function createPayments({
     return stripe('checkout/sessions', form);
   }
 
+  // Cancels a subscription right away (account deletion). Already gone counts as done.
+  async function cancelSubscription(subscriptionId) {
+    const res = await fetchImpl(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${secretKey}` },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok && res.status !== 404) throw Object.assign(new Error(`Stripe cancel failed (${res.status})`), { status: 502 });
+  }
+
   // Stripe-hosted page to update the card or cancel.
   function createPortal({ customerId, returnUrl }) {
     return stripe('billing_portal/sessions', new URLSearchParams({ customer: customerId, return_url: returnUrl }));
@@ -102,7 +112,7 @@ function createPayments({
     return `t=${t},v1=${v1}`;
   }
 
-  return { enabled, priceCents, plusPriceCents, currency, createCheckout, createSubscriptionCheckout, createPortal, verifyWebhook, sign };
+  return { enabled, priceCents, plusPriceCents, currency, createCheckout, createSubscriptionCheckout, createPortal, cancelSubscription, verifyWebhook, sign };
 }
 
 module.exports = { createPayments };

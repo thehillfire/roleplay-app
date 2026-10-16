@@ -6,7 +6,8 @@ const { createPayments } = require('../src/payments');
 function setup() {
   const calls = [];
   const fetchImpl = async (url, init) => {
-    calls.push({ url, form: new URLSearchParams(init.body) });
+    calls.push({ url, method: init.method, form: new URLSearchParams(init.body || '') });
+    if (calls.failNext) { calls.failNext = false; return { ok: false, status: 500, json: async () => ({}) }; }
     return { ok: true, status: 200, json: async () => ({ url: url.includes('portal') ? 'https://billing.stripe.com/p/session' : 'https://checkout.stripe.com/c/pay/cs_sub' }) };
   };
   return { calls, payments: createPayments({ secretKey: 'sk_test_x', webhookSecret: 'whsec_x', fetchImpl }) };
@@ -93,4 +94,69 @@ test('Plus members can meet more new people per day', async (t) => {
     await ows.close();
   }
   assert.ok(true, 'two matches with a base limit of 1');
+});
+
+async function plusMember(s, payments, { subscription = 'sub_x', periodEndSec = periodEnd() } = {}) {
+  const api = await signedUp(s.base);
+  const id = (await s.db.query('SELECT id FROM users WHERE handle = $1', [api.user.handle])).rows[0].id;
+  await hook(s, payments, { type: 'checkout.session.completed', data: { object: { id: `cs_${subscription}`, mode: 'subscription', client_reference_id: id, customer: `cus_${subscription}`, subscription } } });
+  await hook(s, payments, { type: 'invoice.paid', data: { object: { id: `in_${subscription}`, amount_paid: 499, subscription, billing_reason: 'subscription_create', lines: { data: [{ period: { end: periodEndSec } }] } } } });
+  return { api, id };
+}
+
+test('Plus: a cancellation after failed renewals never turns Plus back on', async (t) => {
+  const { payments } = setup();
+  const s = await start({ payments });
+  t.after(s.stop);
+  // Paid month already over; renewal failed, so Plus has lapsed.
+  const { api } = await plusMember(s, payments, { subscription: 'sub_lapsed', periodEndSec: Math.floor(Date.now() / 1000) - 60 });
+  assert.equal((await api('GET', '/api/auth/me')).body.user.plus, false);
+  // Stripe gives up and cancels; its period end is the unpaid month.
+  await hook(s, payments, { type: 'customer.subscription.deleted', data: { object: { id: 'sub_lapsed', current_period_end: periodEnd(), ended_at: Math.floor(Date.now() / 1000) } } });
+  const me = (await api('GET', '/api/auth/me')).body.user;
+  assert.equal(me.plus, false);
+  assert.equal(me.hasSubscription, false);
+});
+
+test('Plus: one subscription at a time, even while a renewal is failing', async (t) => {
+  const { payments } = setup();
+  const s = await start({ payments, publicUrl: 'https://kindred.example' });
+  t.after(s.stop);
+  const { api } = await plusMember(s, payments, { subscription: 'sub_pastdue', periodEndSec: Math.floor(Date.now() / 1000) - 60 });
+  const me = (await api('GET', '/api/auth/me')).body.user;
+  assert.equal(me.plus, false);
+  assert.equal(me.hasSubscription, true, 'the app can offer Manage subscription');
+  assert.equal((await api('POST', '/api/billing/plus', {})).status, 409);
+  assert.equal((await api('POST', '/api/billing/portal', {})).status, 200);
+});
+
+test('Plus: mid-cycle invoices extend Plus but grant no extra credits', async (t) => {
+  const { payments } = setup();
+  const s = await start({ payments });
+  t.after(s.stop);
+  const { api } = await plusMember(s, payments, { subscription: 'sub_upd' });
+  await hook(s, payments, { type: 'invoice.paid', data: { object: { id: 'in_upd2', amount_paid: 100, subscription: 'sub_upd', billing_reason: 'subscription_update', lines: { data: [{ period: { end: periodEnd() } }] } } } });
+  assert.equal((await api('GET', '/api/auth/me')).body.user.connectCredits, 3);
+});
+
+test('Plus: deleting the account cancels the subscription first, and later invoices are ignored', async (t) => {
+  const { calls, payments } = setup();
+  const s = await start({ payments });
+  t.after(s.stop);
+  const { api, id } = await plusMember(s, payments, { subscription: 'sub_del' });
+
+  calls.failNext = true;
+  const refused = await api('POST', '/api/account/delete', { password: 'quiet-harbor-9' });
+  assert.equal(refused.status, 502, "not deleted while we can't stop the billing");
+  assert.equal((await api('GET', '/api/auth/me')).body.user.handle, api.user.handle);
+
+  assert.equal((await api('POST', '/api/account/delete', { password: 'quiet-harbor-9' })).status, 200);
+  const cancel = calls.filter((c) => c.method === 'DELETE');
+  assert.equal(cancel.at(-1).url, 'https://api.stripe.com/v1/subscriptions/sub_del');
+
+  // A renewal that was already in flight finds nobody to credit.
+  await hook(s, payments, { type: 'invoice.paid', data: { object: { id: 'in_del2', amount_paid: 499, subscription: 'sub_del', subscription_details: { metadata: { user_id: id } }, billing_reason: 'subscription_cycle', lines: { data: [{ period: { end: periodEnd() } }] } } } });
+  const { rows } = await s.db.query('SELECT connect_credits, plus_subscription_id FROM users WHERE id = $1', [id]);
+  assert.equal(Number(rows[0].connect_credits), 3);
+  assert.equal(rows[0].plus_subscription_id, null);
 });

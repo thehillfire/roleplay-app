@@ -8,7 +8,10 @@ module.exports = function register(app, { payments, member, siteUrl }) {
     if (!payments.enabled) throw httpError(503, "Payments aren't set up yet.");
     const base = siteUrl(req);
     if (!base) throw httpError(503, 'Payments need PUBLIC_URL to be configured.');
-    if (req.user.plusUntil > Date.now() && req.user.stripeCustomerId) throw httpError(409, 'You already have Kindred Plus.');
+    // One subscription at a time, including one whose renewal is failing (Stripe still retries it).
+    if (req.user.plusSubscriptionId || (req.user.plusUntil > Date.now() && req.user.stripeCustomerId)) {
+      throw httpError(409, 'You already have a Kindred Plus subscription. Use Manage subscription to update it.');
+    }
     res.json(await payments.createSubscriptionCheckout({ userId: req.user.id, returnUrl: `${base}/`, customerId: req.user.stripeCustomerId }));
   }));
 

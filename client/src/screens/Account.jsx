@@ -92,6 +92,12 @@ export default function Account({ user, billing, pushKey, onUserChanged, onBack,
               <p className="hint">Active until {new Date(user.plusUntil).toLocaleDateString()} (renews automatically). Thank you for keeping Kindred free for everyone.</p>
               <button className="btn" onClick={() => goTo(api.billingPortal)} disabled={busy}>Manage subscription</button>
             </>
+          ) : user.hasSubscription ? (
+            <>
+              <h2>Kindred Plus is paused</h2>
+              <p className="hint">Your last payment didn't go through. Update your card and Plus comes right back.</p>
+              <button className="btn primary" onClick={() => goTo(api.billingPortal)} disabled={busy}>Manage subscription</button>
+            </>
           ) : (
             <>
               <h2>Kindred Plus</h2>
