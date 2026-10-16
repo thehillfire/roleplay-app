@@ -10,7 +10,8 @@ const GUIDELINES = [
 ];
 
 export default function Welcome({ onSignedIn, onOpenLegal }) {
-  const [mode, setMode] = useState(null); // null | 'signup' | 'login'
+  const [mode, setMode] = useState(null); // null | 'signup' | 'login' | 'forgot'
+  const [sent, setSent] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [birthdate, setBirthdate] = useState('');
@@ -18,6 +19,44 @@ export default function Welcome({ onSignedIn, onOpenLegal }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const signup = mode === 'signup';
+
+  const sendReset = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await api.forgot(email);
+      setSent(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (mode === 'forgot') {
+    return (
+      <main className="screen">
+        <button className="back" onClick={() => { setMode('login'); setSent(false); setError(''); }}>← Back</button>
+        <form className="card form" onSubmit={sendReset}>
+          <h1 className="find-title">Reset password</h1>
+          {sent ? (
+            <p role="status">If an account uses <strong>{email}</strong>, a reset link is on its way. It works once, for one hour.</p>
+          ) : (
+            <>
+              <p className="hint">Enter the email you signed up with and we'll send you a link.</p>
+              <label>
+                <span>Email</span>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+              </label>
+              {error && <p className="form-error" role="alert">{error}</p>}
+              <button className="btn primary" type="submit" disabled={busy}>{busy ? 'Sending…' : 'Send reset link'}</button>
+            </>
+          )}
+        </form>
+      </main>
+    );
+  }
 
   const submit = async (e) => {
     e.preventDefault();
@@ -101,6 +140,7 @@ export default function Welcome({ onSignedIn, onOpenLegal }) {
           </>
         )}
         {error && <p className="form-error" role="alert">{error}</p>}
+        {!signup && <button type="button" className="link forgot" onClick={() => { setMode('forgot'); setError(''); }}>Forgot password?</button>}
         <button className="btn primary" type="submit" disabled={busy || (signup && !agree)}>
           {busy ? 'One moment…' : signup ? 'Create account' : 'Sign in'}
         </button>

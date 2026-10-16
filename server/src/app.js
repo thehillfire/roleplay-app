@@ -6,6 +6,10 @@ const { parseCredentials, parseMessageBody, str, badRequest } = require('./valid
 const { screenMessage } = require('./moderation');
 const { createPayments } = require('./payments');
 const { createPush } = require('./push');
+const { createMailer } = require('./mailer');
+const crypto = require('crypto');
+
+const RESET_TTL_MS = 60 * 60 * 1000;
 
 const REPORT_REASONS = ['harassment', 'sexual', 'minor', 'hate', 'spam', 'self_harm', 'other'];
 // Auto-pause (pending human review) when this many different people report someone within a week.
@@ -56,6 +60,8 @@ function createApp({
   staticDir,
   payments = createPayments(),
   push = createPush(),
+  mailer = createMailer(),
+  publicUrl = process.env.PUBLIC_URL,
   adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
 } = {}) {
   if (!store || !hub) throw new Error('createApp requires a store and a hub');
@@ -155,6 +161,34 @@ function createApp({
 
   app.post('/api/auth/logout', asyncRoute(async (req, res) => {
     await auth.endSession(req, res);
+    res.json({ ok: true });
+  }));
+
+  // Always answers the same way, so it can't be used to find out who has an account.
+  app.post('/api/auth/forgot', authLimiter, asyncRoute(async (req, res) => {
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const found = email ? await store.findUserByEmail(email) : null;
+    if (found && found.status !== 'deleted') {
+      const token = crypto.randomBytes(32).toString('base64url');
+      await store.createPasswordReset(crypto.createHash('sha256').update(token).digest('hex'), found.id, RESET_TTL_MS);
+      const base = publicUrl || `${req.protocol}://${req.get('host')}`;
+      mailer.send({
+        to: email,
+        subject: 'Reset your Kindred password',
+        text: `Someone asked to reset the password for your Kindred account.\n\nChoose a new password here (the link works once, for one hour):\n${base}/reset#${token}\n\nIf this wasn't you, you can ignore this email.`,
+      }).catch((err) => console.error('reset email failed', err.message));
+    }
+    res.json({ ok: true });
+  }));
+
+  app.post('/api/auth/reset', authLimiter, asyncRoute(async (req, res) => {
+    const { token, password } = req.body;
+    if (typeof token !== 'string' || !token) throw badRequest('Reset link is invalid');
+    if (typeof password !== 'string' || password.length < 8 || password.length > 200) throw badRequest('Password must be at least 8 characters');
+    const userId = await store.usePasswordReset(crypto.createHash('sha256').update(token).digest('hex'), await hashPassword(password));
+    if (!userId) throw httpError(400, 'This reset link has expired or was already used. Request a new one.');
+    hub.disconnect(userId);
+    await auth.startSession(req, res, userId);
     res.json({ ok: true });
   }));
 

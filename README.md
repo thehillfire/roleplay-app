@@ -32,6 +32,7 @@ e2e/      Playwright test: two strangers sign up, match and chat
 ```
 
 - **Accounts:** email + password (scrypt), 18+ birthdate check and guidelines agreement at signup. Each user gets a random anonymous handle. Email is never sent to other users or back to the client. Sessions are random tokens in an httpOnly cookie, stored hashed.
+- **Password reset:** "Forgot password?" emails a single-use link valid for one hour, via Resend if `RESEND_API_KEY` is set, otherwise printed to the server log. The answer is the same whether or not the email has an account. The token travels after `#`, so it never reaches server logs. Resetting signs out every other session.
 - **Matching:** `I need to talk` pairs with `I can listen`; `Either` pairs with anyone. Two talkers (or two listeners) pair up after 30 seconds so nobody waits forever. Shared topics are preferred, new people are preferred over past partners, and blocked pairs never match.
 - **Conversations:** one thread per pair, so matching someone again (or opening them from your list) continues where you left off. Messages are sent over REST and pushed live over the WebSocket, along with typing and match events.
 - **Encouragement:** once both people have sent at least two messages, each sees "Did talking with them help?". A yes sends the listener a live thank-you, and home shows "You've helped N people" (distinct people). Home also shows how many people are here right now.
@@ -45,6 +46,7 @@ e2e/      Playwright test: two strangers sign up, match and chat
 ## API
 
 - `POST /api/auth/signup { email, password, birthdate, agree }`, `POST /api/auth/login | logout`, `GET /api/auth/me`
+- `POST /api/auth/forgot { email }`, `POST /api/auth/reset { token, password }`
 - `GET /api/conversations`: your threads, with partner handle, online flag, last message and unread count
 - `GET /api/conversations/:id?before=<ms>`: messages, newest 50
 - `POST /api/conversations/:id/messages { body }`, `POST /api/conversations/:id/read`

@@ -117,6 +117,14 @@ const MIGRATIONS = [
     )`,
     'CREATE INDEX IF NOT EXISTS feedback_ratee_idx ON feedback(ratee_id, helpful)',
   ],
+  // 7: password reset tokens (stored hashed, single use, short-lived)
+  [
+    `CREATE TABLE IF NOT EXISTS password_resets (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at BIGINT NOT NULL
+    )`,
+  ],
 ];
 
 async function migrate(db) {

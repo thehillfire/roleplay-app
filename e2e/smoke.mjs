@@ -3,6 +3,7 @@
 //   BASE_URL=http://localhost:3000 [CHROMIUM_PATH=...] [SHOTS_DIR=...] npm run e2e
 import { chromium } from 'playwright-core';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000';
 const SHOTS = process.env.SHOTS_DIR;
@@ -205,13 +206,36 @@ if (process.env.MOD_EMAIL) {
   pages.push(mod);
 }
 
+// Forgot password: with MAIL_LOG pointing at the server's output (no email provider),
+// read the reset link from the log and set a new password.
+if (process.env.MAIL_LOG) {
+  const bobEmail = await bob.evaluate(async () => (await (await fetch('/api/account/export')).json()).account.email);
+  await bob.goto(BASE);
+  await bob.getByRole('button', { name: 'Account' }).click();
+  await bob.getByRole('button', { name: 'Sign out' }).click();
+  await bob.getByRole('button', { name: 'I have an account' }).click();
+  await bob.getByRole('button', { name: 'Forgot password?' }).click();
+  await bob.getByLabel('Email').fill(bobEmail);
+  await bob.getByRole('button', { name: 'Send reset link' }).click();
+  await bob.getByText(/a reset link is on its way/).waitFor();
+  await bob.waitForTimeout(300);
+  const links = [...readFileSync(process.env.MAIL_LOG, 'utf8').matchAll(/(https?:\/\/\S+\/reset#[\w-]+)/g)];
+  assert.ok(links.length, 'reset link was logged');
+  await bob.goto(links[links.length - 1][1]);
+  await bob.getByLabel(/New password/).fill('a-fresh-start-7');
+  await bob.getByRole('button', { name: 'Save and sign in' }).click();
+  await bob.getByRole('button', { name: 'Find someone' }).waitFor();
+  assert.equal(new URL(bob.url()).pathname, '/');
+  step('forgot password and reset');
+}
+
 // Account: download data, then delete the account
 await bob.goto(BASE);
 await bob.getByRole('button', { name: 'Account' }).click();
 const exported = await bob.evaluate(async () => (await fetch('/api/account/export')).json());
 assert.equal(exported.account.handle, bobHandle);
 await bob.getByRole('button', { name: 'Delete account' }).click();
-await bob.getByLabel('Enter your password to confirm').fill('quiet-harbor-9');
+await bob.getByLabel('Enter your password to confirm').fill(process.env.MAIL_LOG ? 'a-fresh-start-7' : 'quiet-harbor-9');
 await bob.shot('9-delete');
 await bob.getByRole('button', { name: 'Delete forever' }).click();
 await bob.getByRole('button', { name: 'Get started' }).waitFor();

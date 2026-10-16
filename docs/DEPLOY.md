@@ -37,6 +37,10 @@ Use the connection string with SSL:
 - **Neon:** `postgres://…/neondb?sslmode=require`
 - **Supabase:** Project Settings → Database → connection string (session pooler or direct). Supabase uses its own certificate authority, so either append `?sslmode=no-verify` or set `DATABASE_SSL_NO_VERIFY=true`. Verifying with their CA is safer if you're comfortable downloading it.
 
+## Email (password reset)
+
+Create a [Resend](https://resend.com) account, verify your sending domain, and set `RESEND_API_KEY`, `MAIL_FROM` (for example `Kindred <no-reply@yourdomain.com>`) and `PUBLIC_URL` (your site's address, used in the emailed link). Without these, reset links are only printed to the server log, which is fine for testing but useless for real users.
+
 ## Payments (Connect)
 
 1. Create a Stripe account and copy the **secret key** into `STRIPE_SECRET_KEY`.
@@ -49,6 +53,7 @@ Both keys must be set for payments to turn on. Until then, connecting is free.
 ## Before inviting real users
 
 - [ ] HTTPS on your domain
+- [ ] Password reset email arrives (`RESEND_API_KEY`, `MAIL_FROM`, `PUBLIC_URL`)
 - [ ] `ADMIN_EMAILS` set, and you've signed in and seen **Moderate**
 - [ ] Someone is checking the moderation queue daily (reports of minors and threats first)
 - [ ] Database backups enabled (Render and Neon do daily backups on paid plans)

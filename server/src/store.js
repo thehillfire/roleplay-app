@@ -103,6 +103,24 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       await db.query('DELETE FROM sessions WHERE token_hash = $1', [tokenHash]);
     },
 
+    // --- password reset ---
+
+    async createPasswordReset(tokenHash, userId, ttlMs) {
+      await db.query('DELETE FROM password_resets WHERE user_id = $1', [userId]); // only the newest link works
+      await db.query('INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES ($1, $2, $3)', [tokenHash, userId, now() + ttlMs]);
+    },
+
+    // Consumes a reset token: sets the new password, signs out every session. Returns the user id or null.
+    async usePasswordReset(tokenHash, passwordHash) {
+      const { rows } = await db.query('SELECT user_id, expires_at FROM password_resets WHERE token_hash = $1', [tokenHash]);
+      await db.query('DELETE FROM password_resets WHERE token_hash = $1', [tokenHash]);
+      const row = rows[0];
+      if (!row || num(row.expires_at) < now()) return null;
+      await db.query("UPDATE users SET password_hash = $1 WHERE id = $2 AND status <> 'deleted'", [passwordHash, row.user_id]);
+      await db.query('DELETE FROM sessions WHERE user_id = $1', [row.user_id]);
+      return row.user_id;
+    },
+
     // --- blocks ---
 
     // Everyone this user must never be matched or messaged with, in either direction.

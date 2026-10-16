@@ -22,6 +22,8 @@ export const api = {
   signup: (fields) => request('POST', '/api/auth/signup', fields).then((d) => d.user),
   login: (email, password) => request('POST', '/api/auth/login', { email, password }).then((d) => d.user),
   logout: () => request('POST', '/api/auth/logout', {}),
+  forgot: (email) => request('POST', '/api/auth/forgot', { email }),
+  reset: (token, password) => request('POST', '/api/auth/reset', { token, password }),
 
   conversations: () => request('GET', '/api/conversations').then((d) => d.conversations),
   conversation: (id, before) => request('GET', `/api/conversations/${enc(id)}${before ? `?before=${before}` : ''}`),

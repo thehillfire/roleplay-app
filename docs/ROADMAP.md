@@ -32,6 +32,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Deployment: Dockerfile (tested: production mode, non-root, clean SIGTERM), Render Blueprint, docs/DEPLOY.md
 
 ## 5. Community & launch readiness
+- [x] Forgot password: emailed single-use, one-hour reset link (Resend, or the server log in development); signs out other sessions
 - [x] "Did this help?" after chatting: thanks count ("You've helped 12 people") and a live thank-you for the listener
 - [x] Live "people here now" count on home and in the waiting room
 - [x] Privacy policy and terms pages at /privacy and /terms (DRAFTS: need legal review and the bracketed details filled in before launch)

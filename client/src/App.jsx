@@ -8,6 +8,7 @@ import Chat from './screens/Chat.jsx';
 import Moderate from './screens/Moderate.jsx';
 import Account from './screens/Account.jsx';
 import Legal from './screens/Legal.jsx';
+import ResetPassword from './screens/ResetPassword.jsx';
 import { disablePushOnThisDevice, enablePush, pushSupported, syncPush } from './notifications.js';
 
 function Paused({ onSignOut }) {
@@ -213,6 +214,13 @@ export default function App() {
     return path === '/privacy' || path === '/terms' ? path.slice(1) : null;
   };
   const [legal, setLegal] = useState(legalFromPath);
+  // Reset links look like /reset#<token>; the token stays out of server logs and referrers.
+  const [resetToken, setResetToken] = useState(() => (window.location.pathname === '/reset' ? window.location.hash.slice(1) || '' : null));
+  const finishReset = () => {
+    window.history.replaceState(null, '', '/');
+    setResetToken(null);
+    refreshMe().catch(() => setUser(null));
+  };
   useEffect(() => {
     const onPop = () => setLegal(legalFromPath());
     window.addEventListener('popstate', onPop);
@@ -234,7 +242,8 @@ export default function App() {
     <div className="app">
       <div className="sky" aria-hidden="true" />
       {legal && <Legal doc={legal} onBack={closeLegal} />}
-      <div hidden={Boolean(legal)}>
+      {resetToken !== null && !legal && <ResetPassword token={resetToken} onDone={finishReset} />}
+      <div hidden={Boolean(legal) || resetToken !== null}>
       {user === undefined && <main className="screen"><p className="loading">One moment…</p></main>}
       {user === null && <Welcome onSignedIn={(u) => refreshMe().catch(() => setUser(u))} onOpenLegal={openLegal} />}
       {user && user.status !== 'active' && <Paused onSignOut={signOut} />}
