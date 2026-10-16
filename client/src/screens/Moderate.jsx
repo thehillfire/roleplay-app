@@ -5,7 +5,10 @@ const REASON_LABELS = {
   harassment: 'Harassment', sexual: 'Sexual messages', minor: 'Possibly under 18', hate: 'Hate or threats',
   spam: 'Spam or scam', self_harm: 'Safety concern', other: 'Other',
 };
-const FLAG_LABELS = { contact: 'Contact info', age_probe: 'Asked age', minor: 'Said under 18', minor_maybe: 'Maybe under 18', sexual: 'Sexual', crisis: 'Crisis' };
+const FLAG_LABELS = {
+  contact: 'Contact info', age_probe: 'Asked age', minor: 'Said under 18', minor_maybe: 'Maybe under 18',
+  sexual: 'Sexual', crisis: 'Crisis', minor_sexual: 'Sexual + minors', threat: 'Threat', hate: 'Hate', harassment: 'Harassment',
+};
 
 const when = (ts) => new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 

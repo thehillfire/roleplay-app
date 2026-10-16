@@ -19,7 +19,7 @@ function Privacy() {
       <h2>How long we keep things</h2>
       <p>Messages are deleted automatically after one year. When a conversation is reported, moderators get a copy of its recent messages; that copy is erased 90 days after the report is resolved. Deleted accounts are erased as described below.</p>
       <h2>How messages are checked</h2>
-      <p>Every message is automatically screened before delivery to keep the community safe. The screening holds back contact details (until you both connect), questions about age, sexual content and messages suggesting a user is under 18. It also shows crisis resources when someone may be at risk. Trained moderators can read a conversation when it's reported or when a message is held.</p>
+      <p>Every message is automatically screened before delivery to keep the community safe. The screening holds back contact details (until you both connect), questions about age, sexual content and messages suggesting a user is under 18. It also shows crisis resources when someone may be at risk. [If you enable MODERATION_PROVIDER=openai: messages are also checked by OpenAI's moderation service, which processes the text to classify it and does not use it to train models. Say so here.] Trained moderators can read a conversation when it's reported or when a message is held.</p>
       <h2>Who sees what</h2>
       <p>The people you chat with see your anonymous name and your messages. Moderators see reported conversations and held messages. We don't sell your data. [List any analytics or ad partners here, and what they receive.]</p>
       <h2>Your choices</h2>

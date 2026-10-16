@@ -6,10 +6,14 @@ export const HELD_NOTES = {
   sexual: "Not sent. Sexual content isn't allowed on Kindred.",
   minor: 'Not sent.',
   minor_maybe: 'Not sent. Kindred is for adults 18 and over.',
+  minor_sexual: 'Not sent.',
+  threat: "Not sent. Threats aren't allowed on Kindred.",
+  hate: "Not sent. Hate isn't allowed on Kindred.",
+  harassment: 'Not sent. Please keep it kind, even when it\'s hard.',
 };
 
 export function heldNote(flags = []) {
-  const key = ['minor', 'minor_maybe', 'sexual', 'age_probe', 'contact'].find((f) => flags.includes(f));
+  const key = ['minor', 'minor_sexual', 'minor_maybe', 'threat', 'hate', 'sexual', 'harassment', 'age_probe', 'contact'].find((f) => flags.includes(f));
   return HELD_NOTES[key] || 'Not sent. This message breaks the community guidelines.';
 }
 

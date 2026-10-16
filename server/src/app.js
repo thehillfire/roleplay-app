@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const { createAuth, hashPassword, verifyPassword, hashToken } = require('./auth');
 const { parseCredentials, parseMessageBody, str, badRequest } = require('./validate');
 const { screenMessage } = require('./moderation');
+const { createClassifier } = require('./classifier');
 const { createPayments } = require('./payments');
 const { createPush } = require('./push');
 const { createMailer } = require('./mailer');
@@ -66,6 +67,7 @@ function createApp({
   staticDir,
   log = process.env.NODE_ENV === 'test' || process.env.REQUEST_LOG === 'off' ? null : console,
   payments = createPayments(),
+  classifier = createClassifier(),
   autoPauseMinReporterAgeMs = AUTO_PAUSE.minReporterAgeMs,
   push = createPush(),
   mailer = createMailer(),
@@ -473,6 +475,20 @@ function createApp({
     if (ctx.partnerStatus === 'deleted') throw httpError(403, 'This person has left Kindred.');
 
     const screen = screenMessage(body, { connected: ctx.connected });
+    // Optional ML second opinion for what rules can't see (only when the rules let it through).
+    if (screen.deliver && classifier.enabled) {
+      const verdict = await classifier.classify(body);
+      if (verdict) {
+        if (verdict.flags.length) {
+          screen.deliver = false;
+          screen.flags.push(...verdict.flags.filter((f) => !screen.flags.includes(f)));
+        }
+        if (verdict.crisis && !screen.crisis) {
+          screen.crisis = true;
+          screen.flags.push('crisis');
+        }
+      }
+    }
     const message = await store.addMessage({
       conversationId: id,
       senderId: req.user.id,
@@ -489,6 +505,8 @@ function createApp({
       alertOnce(`${req.user.id}:auto_minor`, () => alertModerators(req, 'Possible minor paused', `An account was paused after saying they're under 18 (${req.user.handle}).`));
       hub.push(partnerId, { type: 'conversation.ended', conversationId: id });
       setImmediate(() => hub.disconnect(req.user.id));
+    } else if (!screen.deliver && screen.flags.includes('minor_sexual')) {
+      alertOnce(`${req.user.id}:minor_sexual`, () => alertModerators(req, 'Held: sexual content involving minors', `A message from ${req.user.handle} was held as sexual content involving minors. Review it now.`));
     } else if (screen.deliver) {
       hub.push(partnerId, { type: 'message', message: { ...out, fromMe: false, ...(screen.crisis ? { crisis: true } : {}) } });
       // Not looking at the app: notify their devices (handle only, never the text).
