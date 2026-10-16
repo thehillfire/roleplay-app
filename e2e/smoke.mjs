@@ -370,6 +370,14 @@ if (process.env.MAIL_LOG) {
 // Nobody around: Carol leaves a message for the next listener; Dave picks it up later
 const carol = await person('carol');
 await signUp(carol);
+// Cancel, then browser Forward, never lands in a waiting room that isn't searching.
+await carol.getByRole('button', { name: 'Find someone' }).click();
+await carol.locator('.waiting').waitFor();
+await carol.getByRole('button', { name: 'Cancel' }).click();
+await carol.getByRole('button', { name: 'Find someone' }).waitFor();
+await carol.goForward();
+await carol.getByRole('button', { name: 'Find someone' }).waitFor();
+assert.equal(await carol.locator('.waiting').count(), 0);
 await carol.getByRole('button', { name: 'Find someone' }).click();
 await carol.getByRole('button', { name: 'Leave a message for the next listener' }).click({ timeout: 25000 });
 await carol.getByLabel(/What's on your mind/).fill('Long week. Could use someone to talk to when you get a minute.');

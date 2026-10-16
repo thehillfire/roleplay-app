@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import useDialog from '../useDialog.js';
 
 export const HELD_NOTES = {
   contact: "Not sent. Contact details (numbers, emails, socials, links) can't be shared unless you both choose to connect.",
@@ -45,6 +46,7 @@ const REASONS = [
 ];
 
 export function ReportSheet({ handle, onSubmit, onClose }) {
+  const dialog = useDialog(onClose);
   const [reason, setReason] = useState('');
   const [details, setDetails] = useState('');
   const [busy, setBusy] = useState(false);
@@ -64,7 +66,7 @@ export function ReportSheet({ handle, onSubmit, onClose }) {
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" role="dialog" aria-modal="true" aria-label={`Report ${handle}`} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label={`Report ${handle}`} ref={dialog} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         <form className="sheet-form" onSubmit={submit}>
         <h2>Report {handle}</h2>
         <p className="hint">A moderator will review the recent messages. You won't be matched with them again.</p>

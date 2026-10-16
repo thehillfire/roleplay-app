@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import useDialog from '../useDialog.js';
 import { api } from '../api.js';
 
 const money = (cents, currency) => new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(cents / 100);
@@ -41,6 +42,7 @@ export function ConnectBanner({ connection, handle, onAccept, onDecline, onCance
 
 // Collects what to reveal; buys a credit first when payments are on and none is left.
 export function ConnectSheet({ handle, accepting, billing, credits, onSubmit, onClose }) {
+  const dialog = useDialog(onClose);
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [busy, setBusy] = useState(false);
@@ -76,7 +78,7 @@ export function ConnectSheet({ handle, accepting, billing, credits, onSubmit, on
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" role="dialog" aria-modal="true" aria-label={`Connect with ${handle}`} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label={`Connect with ${handle}`} ref={dialog} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         <form className="sheet-form" onSubmit={submit}>
         <h2>{accepting ? `Connect with ${handle}` : `Ask ${handle} to connect`}</h2>
         <p className="hint">

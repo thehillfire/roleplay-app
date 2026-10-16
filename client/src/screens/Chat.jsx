@@ -63,16 +63,23 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
   const lastTypingSent = useRef(0);
 
   const crisisChecked = useRef(false);
+  const loadedOnce = useRef(false);
+  // Screen readers hear new incoming messages, not every re-render of the list.
+  const [announce, setAnnounce] = useState('');
   const load = useCallback(() => {
     setError('');
     api.conversation(id).then((d) => {
       setConvo(d.conversation);
       // Merge rather than replace: a message pushed live while this request was in flight
       // (e.g. their first line, sent the moment you matched) isn't in this response yet.
+      // A reconnect reloads the latest page: keep earlier pages already loaded above it.
       setMessages((prev) => {
         const ids = new Set(d.messages.map((m) => m.id));
+        const oldest = d.messages.length ? d.messages[0].createdAt : Infinity;
         const newest = d.messages.length ? d.messages[d.messages.length - 1].createdAt : 0;
-        return [...d.messages, ...prev.filter((m) => !ids.has(m.id) && m.createdAt >= newest)];
+        const earlier = prev.filter((m) => !ids.has(m.id) && m.createdAt < oldest);
+        const later = prev.filter((m) => !ids.has(m.id) && m.createdAt >= newest);
+        return [...earlier, ...d.messages, ...later];
       });
       // Opening a chat whose recent messages from them mention crisis: show listener guidance once.
       if (!crisisChecked.current) {
@@ -80,7 +87,8 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
         if (d.messages.slice(-10).some((m) => !m.fromMe && m.crisis)) setCrisis((c) => c || 'listener');
       }
       setPartnerReadAt(d.conversation.partnerReadAt || 0);
-      setHasMore(d.messages.length >= PAGE);
+      if (!loadedOnce.current) setHasMore(d.messages.length >= PAGE); // a reconnect keeps the earlier pages
+      loadedOnce.current = true;
       markReadIfVisible(id);
     }, (err) => setError(err.message));
   }, [id]);
@@ -92,6 +100,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     const offMessage = socket.on('message', ({ message }) => {
       if (message.conversationId !== id) return;
       setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
+      setAnnounce(`New message: ${message.body}`);
       setPartnerTyping(false);
       if (message.crisis) setCrisis('listener');
       markReadIfVisible(id);
@@ -158,14 +167,16 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
   };
 
   const send = async () => {
-    const body = draft.trim();
+    const typed = draft;
+    const body = typed.trim();
     if (!body || sending) return;
     setSending(true);
     setSendError('');
     try {
       const res = await api.send(id, body);
-      setMessages((prev) => [...prev, res.message]);
-      setDraft('');
+      setMessages((prev) => (prev.some((m) => m.id === res.message.id) ? prev : [...prev, res.message]));
+      // Keep anything typed while it was sending.
+      setDraft((d) => (d.startsWith(typed) ? d.slice(typed.length).trimStart() : d));
       if (res.crisis) setCrisis('sender');
       if (res.paused) onPaused();
     } catch (err) {
@@ -254,10 +265,25 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     }
   };
 
-  // Escape or a tap elsewhere closes the options menu.
+  // Escape or a tap elsewhere closes the options menu. Opening it focuses the first item;
+  // arrow keys move between items; Escape returns focus to the ⋯ button.
+  const menuButton = useRef(null);
+  const menuRef = useRef(null);
   useEffect(() => {
     if (!menuOpen) return undefined;
-    const onKey = (e) => e.key === 'Escape' && setMenuOpen(false);
+    const items = () => [...(menuRef.current?.querySelectorAll('[role="menuitem"]') || [])];
+    items()[0]?.focus();
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setMenuOpen(false);
+        menuButton.current?.focus();
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const list = items();
+        const i = list.indexOf(document.activeElement);
+        list[(i + (e.key === 'ArrowDown' ? 1 : list.length - 1)) % list.length]?.focus();
+      }
+    };
     const onClick = (e) => !e.target.closest('.menu-wrap') && setMenuOpen(false);
     document.addEventListener('keydown', onKey);
     document.addEventListener('click', onClick);
@@ -346,9 +372,9 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
         )}
         {convo && (
           <div className="menu-wrap">
-            <button className="icon-btn" aria-label="Conversation options" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>⋯</button>
+            <button ref={menuButton} className="icon-btn" aria-label="Conversation options" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>⋯</button>
             {menuOpen && (
-              <div className="menu" role="menu">
+              <div className="menu" role="menu" ref={menuRef}>
                 {convo.connection?.status === 'none' && (
                   <button role="menuitem" onClick={() => { setMenuOpen(false); setConnectSheet('request'); }}>Connect…</button>
                 )}
@@ -374,7 +400,8 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
       )}
       {crisis && <CrisisCard role={crisis === 'sender' ? 'sender' : 'listener'} onDismiss={() => setCrisis(null)} />}
 
-      <div className="messages" aria-live="polite">
+      <p className="sr-only" aria-live="polite">{announce}</p>
+      <div className="messages" role="region" aria-label="Conversation history">
         {hasMore && (
           <button className="link earlier" onClick={loadEarlier} disabled={loadingMore}>
             {loadingMore ? 'Loading…' : 'Load earlier messages'}

@@ -39,9 +39,15 @@ export function createSocket({ onStatus = () => {} } = {}) {
     };
   }
 
-  open();
-
   return {
+    // Started (and stopped) by the component that owns it, so React's development double
+    // effects can stop and restart it cleanly.
+    start() {
+      if (ws && !closed) return;
+      closed = false;
+      attempt = 0;
+      open();
+    },
     on(type, fn) {
       if (!listeners.has(type)) listeners.set(type, new Set());
       listeners.get(type).add(fn);

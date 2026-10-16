@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import useDialog from '../useDialog.js';
 
 const KEY = 'kindred.onboarded.v1';
 
@@ -35,11 +36,12 @@ export default function Onboarding({ handle, onDone }) {
     }
     onDone();
   };
+  const dialog = useDialog(finish);
   const card = CARDS[i];
   const last = i === CARDS.length - 1;
   return (
     <div className="sheet-backdrop onboarding">
-      <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="onboard-title" onKeyDown={(e) => e.key === 'Escape' && finish()}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="onboard-title" ref={dialog} tabIndex={-1}>
         <p className="hint">{i === 0 ? `Welcome, ${handle}.` : `${i + 1} of ${CARDS.length}`}</p>
         <h2 id="onboard-title">{card.title}</h2>
         <p className="onboard-body">{card.body}</p>

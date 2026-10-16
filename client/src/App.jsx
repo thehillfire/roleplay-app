@@ -61,7 +61,17 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
   // phone's back button (and swipe back) returns to the previous screen instead of leaving.
   useEffect(() => {
     window.history.replaceState({ view: { name: 'home' } }, '');
-    const onPop = (e) => { if (!e.state?.legal) setView(e.state?.view || { name: 'home' }); };
+    const onPop = (e) => {
+      if (e.state?.legal) return;
+      const next = e.state?.view || { name: 'home' };
+      // Back/forward into the waiting room would show a search that isn't running: go home.
+      if (next.name === 'waiting') {
+        window.history.replaceState({ view: { name: 'home' } }, '');
+        setView({ name: 'home' });
+        return;
+      }
+      setView(next);
+    };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
@@ -91,7 +101,10 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
   const viewRef = useRef(view);
   viewRef.current = view;
 
-  useEffect(() => () => socket.close(), [socket]);
+  useEffect(() => {
+    socket.start();
+    return () => socket.close();
+  }, [socket]);
 
   // Live "people here now": fetched when home opens, then kept current by 'presence' pushes.
   const [presence, setPresence] = useState(null);
@@ -128,7 +141,14 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
       socket.on('match.error', ({ error }) => setMatchError(error)),
       // New messages elsewhere update the list (unread counts, ordering).
       socket.on('message', () => { if (viewRef.current.name === 'home') refresh(); }),
-      socket.on('open', () => { if (viewRef.current.name === 'home') refresh(); }),
+      socket.on('open', () => {
+        if (viewRef.current.name === 'home') refresh();
+        // A dropped connection took us out of the queue: rejoin with the same choice.
+        if (viewRef.current.name === 'waiting' && lastFind.current) {
+          setMatchError('');
+          socket.send({ type: 'match.join', ...lastFind.current });
+        }
+      }),
       socket.on('close', () => { if (viewRef.current.name === 'waiting') setMatchError('Connection lost. Reconnecting…'); }),
       socket.on('credits.updated', onRefreshMe),
       socket.on('presence', ({ online, waiting, waitingToTalk }) => setPresence({ online, waiting, waitingToTalk })),
@@ -163,11 +183,13 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
   }, [conversations, view.name]);
 
   const [findRole, setFindRole] = useState('talk');
+  const lastFind = useRef(null);
   const find = ({ role, topic }) => {
-    setMatchError('');
+    lastFind.current = { role, topic };
+    setMatchError(connection === 'online' ? '' : 'Connecting…');
     setFindRole(role);
     navigate({ name: 'waiting' });
-    socket.send({ type: 'match.join', role, topic });
+    socket.send({ type: 'match.join', role, topic }); // if offline, the reconnect below re-sends it
   };
 
   const cancel = goHome;
@@ -272,20 +294,20 @@ export default function App() {
   const signOut = async () => {
     await disablePushOnThisDevice(api.pushUnsubscribe).catch(() => {});
     await api.logout().catch(() => {});
-    window.history.replaceState(null, '', '/');
-    setUser(null);
+    // A fresh page: the next person's Back button can't walk into the previous account's screens.
+    window.location.replace('/');
   };
 
   const signOutEverywhere = async () => {
     await disablePushOnThisDevice(api.pushUnsubscribe).catch(() => {});
     await api.logoutAll().catch(() => {});
-    window.history.replaceState(null, '', '/');
-    setUser(null);
+    // A fresh page: the next person's Back button can't walk into the previous account's screens.
+    window.location.replace('/');
   };
 
   const deleted = () => {
-    window.history.replaceState(null, '', '/');
-    setUser(null);
+    // A fresh page: the next person's Back button can't walk into the previous account's screens.
+    window.location.replace('/');
   };
 
   // /privacy and /terms are readable signed in or out. They overlay the app
