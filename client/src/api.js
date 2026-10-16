@@ -34,6 +34,8 @@ export const api = {
   unsend: (id, messageId) => request('POST', `/api/conversations/${enc(id)}/messages/${enc(messageId)}/unsend`, {}),
   send: (id, body) => request('POST', `/api/conversations/${enc(id)}/messages`, { body }),
   feedback: (id, helpful) => request('POST', `/api/conversations/${enc(id)}/feedback`, { helpful }),
+  checkins: () => request('GET', '/api/checkins').then((d) => d.checkins),
+  checkin: (day, mood) => request('POST', '/api/checkins', { day, mood }).then((d) => d.checkins),
   presence: () => request('GET', '/api/presence'),
   connect: (id, name, contact) => request('POST', `/api/conversations/${enc(id)}/connect`, { name, contact: contact || undefined }),
   declineConnect: (id) => request('POST', `/api/conversations/${enc(id)}/connect/decline`, {}),

@@ -138,6 +138,16 @@ const MIGRATIONS = [
   [
     'ALTER TABLE messages ADD COLUMN reaction TEXT',
   ],
+  // 10: private daily mood check-ins (one per person per day)
+  [
+    `CREATE TABLE IF NOT EXISTS checkins (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      day TEXT NOT NULL,
+      mood INTEGER NOT NULL,
+      created_at BIGINT NOT NULL,
+      PRIMARY KEY (user_id, day)
+    )`,
+  ],
 ];
 
 async function migrate(db) {

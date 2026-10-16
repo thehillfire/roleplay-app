@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import HomeAd from '../components/HomeAd.jsx';
 import Onboarding, { shouldOnboard } from '../components/Onboarding.jsx';
+import CheckIn from '../components/CheckIn.jsx';
 import { api } from '../api.js';
 
 function VerifyNudge() {
@@ -102,6 +103,8 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
           <button className="icon-btn" aria-label="Not now" onClick={onDismissPush}>×</button>
         </div>
       )}
+
+      <CheckIn onWantToTalk={() => { setRole('talk'); onFind({ role: 'talk', topic }); }} />
 
       {listError && <div className="card error"><p>{listError}</p><button className="btn" onClick={onRetry}>Try again</button></div>}
 

@@ -13,6 +13,7 @@ function Privacy() {
         <li><strong>Safety records:</strong> reports, blocks, and messages our filters held back. If you unsend a message it disappears for both of you, but moderators can still see it if the conversation is reported.</li>
         <li><strong>Connect:</strong> the name and contact you chose to share with a specific person, only after you both agreed.</li>
         <li><strong>Payments:</strong> handled by Stripe. We store that a payment happened and its amount, never your card.</li>
+        <li><strong>Daily check-ins:</strong> the mood you log each day. Only you can see it; it's deleted immediately if you delete your account.</li>
         <li><strong>Notifications:</strong> if you turn them on, a push address for your device. Notifications never include message text.</li>
       </ul>
       <h2>How messages are checked</h2>

@@ -333,6 +333,22 @@ function createApp({
     res.json({ ok: true });
   }));
 
+  // --- Private daily check-in ---
+
+  app.get('/api/checkins', member, asyncRoute(async (req, res) => {
+    res.json({ checkins: await store.recentCheckins(req.user.id) });
+  }));
+
+  app.post('/api/checkins', member, asyncRoute(async (req, res) => {
+    const { day, mood } = req.body;
+    if (!Number.isInteger(mood) || mood < 1 || mood > 5) throw badRequest('mood must be 1-5');
+    // The client's local date, sanity-checked to be within a day of the server's.
+    const parsed = typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day) ? Date.parse(`${day}T12:00:00Z`) : NaN;
+    if (!Number.isFinite(parsed) || Math.abs(parsed - Date.now()) > 36 * 60 * 60 * 1000) throw badRequest('day must be your local date');
+    await store.saveCheckin(req.user.id, day, mood);
+    res.json({ checkins: await store.recentCheckins(req.user.id) });
+  }));
+
   // --- Push notifications ---
 
   app.post('/api/push/subscribe', member, asyncRoute(async (req, res) => {

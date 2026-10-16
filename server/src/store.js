@@ -126,6 +126,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
 
     async createEmailVerification(tokenHash, userId, ttlMs) {
       await db.query('DELETE FROM email_verifications WHERE user_id = $1', [userId]);
+      await db.query('DELETE FROM checkins WHERE user_id = $1', [userId]); // private, no safety value
       await db.query('INSERT INTO email_verifications (token_hash, user_id, expires_at) VALUES ($1, $2, $3)', [tokenHash, userId, now() + ttlMs]);
     },
 
@@ -151,7 +152,8 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
 
     async createPasswordReset(tokenHash, userId, ttlMs) {
       await db.query('DELETE FROM password_resets WHERE user_id = $1', [userId]);
-      await db.query('DELETE FROM email_verifications WHERE user_id = $1', [userId]); // only the newest link works
+      await db.query('DELETE FROM email_verifications WHERE user_id = $1', [userId]);
+      await db.query('DELETE FROM checkins WHERE user_id = $1', [userId]); // private, no safety value // only the newest link works
       await db.query('INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES ($1, $2, $3)', [tokenHash, userId, now() + ttlMs]);
     },
 
@@ -510,6 +512,22 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return rowCount === 1;
     },
 
+    // --- private daily check-ins ---
+
+    // `day` is the person's local date (YYYY-MM-DD) so "today" matches their clock.
+    async saveCheckin(userId, day, mood) {
+      await db.query(
+        `INSERT INTO checkins (user_id, day, mood, created_at) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (user_id, day) DO UPDATE SET mood = $3`,
+        [userId, day, mood, now()],
+      );
+    },
+
+    async recentCheckins(userId, limit = 14) {
+      const { rows } = await db.query('SELECT day, mood FROM checkins WHERE user_id = $1 ORDER BY day DESC LIMIT $2', [userId, limit]);
+      return rows.map((r) => ({ day: r.day, mood: Number(r.mood) })).reverse();
+    },
+
     // --- feedback ---
 
     // Returns true if this was a new "helpful" vote (so the listener can be thanked live).
@@ -602,11 +620,13 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         });
       }
       const { rows: reports } = await db.query('SELECT reason, details, created_at, status FROM reports WHERE reporter_id = $1', [userId]);
+      const checkins = await store.recentCheckins(userId, 10000);
       return {
         exportedAt: new Date(now()).toISOString(),
         account: { handle: user.handle, email: user.email, birthdate: raw.birthdate, createdAt: new Date(user.createdAt).toISOString(), connectCredits: user.connectCredits },
         conversations: threads,
         reportsYouFiled: reports.map((r) => ({ reason: r.reason, details: r.details, status: r.status, at: new Date(num(r.created_at)).toISOString() })),
+        dailyCheckins: checkins,
       };
     },
 
@@ -623,6 +643,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       await db.query('DELETE FROM push_subscriptions WHERE user_id = $1', [userId]);
       await db.query('DELETE FROM password_resets WHERE user_id = $1', [userId]);
       await db.query('DELETE FROM email_verifications WHERE user_id = $1', [userId]);
+      await db.query('DELETE FROM checkins WHERE user_id = $1', [userId]); // private, no safety value
       await db.query("UPDATE connections SET requester_name = '(deleted)', requester_contact = NULL WHERE requester_id = $1", [userId]);
       await db.query(
         `UPDATE connections SET accepter_name = '(deleted)', accepter_contact = NULL

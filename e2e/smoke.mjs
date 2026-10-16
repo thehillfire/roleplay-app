@@ -69,6 +69,13 @@ await newcomer.getByRole('button', { name: "Let's go" }).click();
 await newcomer.reload();
 await newcomer.getByRole('button', { name: 'Find someone' }).waitFor();
 assert.equal(await newcomer.getByRole('dialog').count(), 0, 'onboarding not shown again');
+// Private daily check-in: a low day offers a listener
+await newcomer.getByRole('radio', { name: 'Low' }).click();
+await newcomer.getByRole('heading', { name: 'Today: low' }).waitFor();
+await newcomer.getByRole('button', { name: 'Talk to someone now' }).waitFor();
+await newcomer.reload();
+await newcomer.getByRole('heading', { name: 'Today: low' }).waitFor();
+step('onboarding once; private daily check-in');
 const pages = [alice, bob];
 await kid.shot('0-welcome');
 await signUp(alice);

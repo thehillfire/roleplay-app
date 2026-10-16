@@ -281,3 +281,16 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); box-sh
 .reaction-picker { display: flex; gap: 4px; margin-top: 6px; }
 .reaction-picker button { background: var(--bg); border: 1px solid var(--line); border-radius: 999px; font-size: 18px; padding: 2px 8px; }
 .reaction-picker button[aria-pressed="true"] { border-color: var(--accent); }
+
+/* --- daily check-in --- */
+.checkin { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; }
+.checkin-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.checkin h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.checkin .hint { font-size: 12px; }
+.moods { display: flex; justify-content: space-between; gap: 6px; }
+.mood { flex: 1; font-size: 26px; padding: 6px 0; border-radius: 14px; background: var(--bg); border: 1px solid var(--line); transition: transform 0.15s, border-color 0.2s; }
+.mood:hover { transform: translateY(-2px); }
+.mood.on { border-color: var(--accent); background: rgba(100, 181, 246, 0.12); }
+.mood-strip { list-style: none; margin: 0; padding: 0; display: flex; align-items: flex-end; gap: 4px; height: 36px; }
+.mood-strip li { flex: 1; max-width: 18px; height: var(--h); min-height: 4px; border-radius: 4px; background: linear-gradient(to top, rgba(100, 181, 246, 0.35), rgba(129, 199, 132, 0.6)); }
+.checkin-nudge { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text); }
