@@ -1,5 +1,8 @@
 const { WebSocketServer } = require('ws');
-const { createMatchmaker } = require('./matchmaker');
+const { createMatchmaker, MODES } = require('./matchmaker');
+
+// Live game moves a client may send: deal the next Cringe Duel card, or "I smiled" in Don't Smile.
+const GAME_EVENTS = new Set(['card', 'smiled']);
 const { readCookie, hashToken, COOKIE } = require('./auth');
 const { envInt } = require('./env');
 
@@ -102,13 +105,13 @@ function attachRealtime({
           }
           return;
         }
-        const convo = await store.openConversation(a.userId, b.userId);
+        const convo = await store.openConversation(a.userId, b.userId, { mode: a.mode });
         // Matched live: any message either left for the next listener is no longer needed
         // (only now, so a failed match doesn't throw their message away).
         const withdrawn = await Promise.all([store.withdrawBottle(a.userId), store.withdrawBottle(b.userId)]);
         if (withdrawn.some(Boolean)) refreshBottles();
-        hub.push(a.userId, { type: 'match.found', conversationId: convo.id, partner: { handle: ub.handle }, isNew: convo.isNew });
-        hub.push(b.userId, { type: 'match.found', conversationId: convo.id, partner: { handle: ua.handle }, isNew: convo.isNew });
+        hub.push(a.userId, { type: 'match.found', conversationId: convo.id, partner: { handle: ub.handle }, isNew: convo.isNew, mode: a.mode });
+        hub.push(b.userId, { type: 'match.found', conversationId: convo.id, partner: { handle: ua.handle }, isNew: convo.isNew, mode: a.mode });
       })().catch((err) => {
         log.error('match failed', err);
         for (const id of [a.userId, b.userId]) hub.push(id, { type: 'match.error', error: 'Matching hiccuped. Try again.' });
@@ -258,6 +261,7 @@ function attachRealtime({
     const handleJoin = async (msg) => {
       const leavesAtStart = leaves.get(user.id) || 0;
       const role = typeof msg.role === 'string' ? msg.role : 'either';
+      const mode = MODES.includes(msg.mode) ? msg.mode : 'talk';
       const topic = typeof msg.topic === 'string' ? msg.topic.trim().toLowerCase().slice(0, TOPIC_MAX) : '';
       const [blocked, known, today, ageBand] = await Promise.all([
         store.blockedIds(user.id),
@@ -276,8 +280,10 @@ function attachRealtime({
       if (ws.readyState !== ws.OPEN) return;
       if ((leaves.get(user.id) || 0) !== leavesAtStart) return; // they pressed Cancel meanwhile
       ws.send(JSON.stringify({ type: 'match.waiting' }));
-      const matched = matchmaker.join({ userId: user.id, role, topic, ageBand, blocked, known });
+      const matched = matchmaker.join({ userId: user.id, role, mode, topic, ageBand, blocked, known });
       presenceChanged();
+      // Listener alerts and messages left for a listener belong to the support mode only.
+      if (mode !== 'talk') return;
       if (!matched && role === 'talk') scheduleListenerAlert(user.id, blocked);
       if (!matched && (role === 'listen' || role === 'either')) await answerBottle(user, blocked);
     };
@@ -303,6 +309,13 @@ function attachRealtime({
           leaves.set(user.id, (leaves.get(user.id) || 0) + 1);
           if (matchmaker.leave(user.id)) presenceChanged();
           ws.send(JSON.stringify({ type: 'match.left' }));
+        } else if (msg.type === 'game' && typeof msg.conversationId === 'string' && GAME_EVENTS.has(msg.kind)) {
+          // Game moves (next card, "I smiled") go to the partner as-is; nothing is stored.
+          const m = await store.getMembership(user.id, msg.conversationId);
+          if (m && !(await store.isBlocked(user.id, m.partnerId))) {
+            const card = Number.isInteger(msg.card) && msg.card >= 0 && msg.card < 1000 ? msg.card : undefined;
+            hub.push(m.partnerId, { type: 'game', conversationId: m.id, kind: msg.kind, card });
+          }
         } else if (msg.type === 'typing' && typeof msg.conversationId === 'string') {
           const m = await store.getMembership(user.id, msg.conversationId);
           if (m && !(await store.isBlocked(user.id, m.partnerId))) {

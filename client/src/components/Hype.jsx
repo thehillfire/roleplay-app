@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { HYPE_EVENT } from '../hype.js';
 
-const TITLES = { match: 'Matched', connected: 'Connected', thanks: 'You helped' };
+const TITLES = { match: 'Matched', connected: 'Connected', thanks: 'You helped', gotem: "Got 'em", cracked: 'You cracked' };
+const BIG = { thanks: '+1', gotem: '+1', cracked: '😬' };
 
 // Decorative: the same news is also shown or announced in the screen underneath,
 // so the splash stays out of the accessibility tree and never blocks taps.
@@ -24,10 +25,10 @@ export default function Hype({ you }) {
   return (
     <div key={shown.key} className={`hype hype-${shown.kind}`} aria-hidden="true">
       <div className="hype-slash" />
-      {shown.kind === 'thanks' ? (
+      {BIG[shown.kind] ? (
         <div className="hype-center">
-          <span className="hype-big">+1</span>
-          <span className="hype-title">{TITLES.thanks}</span>
+          <span className="hype-big">{BIG[shown.kind]}</span>
+          <span className="hype-title">{TITLES[shown.kind]}</span>
         </div>
       ) : (
         <div className="hype-versus">

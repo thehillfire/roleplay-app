@@ -98,3 +98,21 @@ test('counts who is waiting in each role', () => {
   mm.join({ userId: 'b', role: 'talk' });
   assert.deepEqual(mm.waitingByRole(), { talk: 2, listen: 0, either: 0 });
 });
+
+test('game modes only match people in the same mode, and ignore talk/listen', () => {
+  const { mm, matches } = setup();
+  assert.equal(mm.join({ userId: 'a', mode: 'cringe' }), false);
+  assert.equal(mm.join({ userId: 'b', mode: 'talk', role: 'either' }), false, 'support mode never meets a game');
+  assert.equal(mm.join({ userId: 'c', mode: 'nosmile' }), false);
+  assert.equal(mm.join({ userId: 'd', mode: 'cringe', role: 'talk' }), true, 'roles do not matter in a game');
+  assert.deepEqual(matches, [['a', 'd']]);
+  assert.deepEqual(mm.waitingByMode(), { talk: 1, cringe: 0, nosmile: 1 });
+  assert.deepEqual(mm.waitingByRole(), { talk: 0, listen: 0, either: 1 }, 'listener counts are support mode only');
+});
+
+test('an unknown mode falls back to the support mode', () => {
+  const { mm, matches } = setup();
+  mm.join({ userId: 'a', mode: 'bogus', role: 'talk' });
+  mm.join({ userId: 'b', role: 'listen' });
+  assert.deepEqual(matches, [['a', 'b']]);
+});

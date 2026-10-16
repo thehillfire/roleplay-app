@@ -69,7 +69,8 @@ function createApp({
         'font-src': ["'self'", 'https://fonts.gstatic.com'],
         'style-src': ["'self'", 'https://fonts.googleapis.com', "'unsafe-inline'"],
         'connect-src': ["'self'", ...adHosts, ...captchaHosts],
-        'script-src': ["'self'", ...adHosts, ...captchaHosts],
+        // wasm-unsafe-eval: the Don't Smile game's on-device face model is WebAssembly (served from here).
+        'script-src': ["'self'", "'wasm-unsafe-eval'", ...adHosts, ...captchaHosts],
         'frame-src': ["'self'", ...adHosts, ...captchaHosts],
         'img-src': ["'self'", 'data:', ...adHosts],
       },

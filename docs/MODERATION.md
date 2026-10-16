@@ -12,6 +12,12 @@ A playbook for whoever opens **Moderate** (at first, that's you). It covers what
 
 Urgent items also arrive by email: possible minors (including a new signup from a browser where an under-18 signup was just refused), people at risk, possible ban evasion. Those can't wait for the daily pass.
 
+## Game modes
+
+Besides *Talk it out* (support), people can match for **Cringe Duel** (both get the same awkward-scenario card and riff on it) or **Don't Smile** (try to make the other person smile). The chat header and the report transcript show which. Every rule still applies in a game: the same screening, the same reports. "It was just the game" never excuses insults, sexual messages or contact-fishing. Cringe Duel is about the situation on the card, never about the other person.
+
+Don't Smile can use the player's own camera to notice their own smile. That runs on their phone only; no video or image ever reaches the server, so there's nothing to review there.
+
 ## Held messages
 
 The screener holds a message before delivery and tells the sender why. Each held message shows up to three messages from just before it, which is usually enough to tell a parent talking about their kid from someone fishing. Suspending from here asks first, because it bans their devices too. Labels you'll see:

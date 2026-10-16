@@ -316,6 +316,10 @@ const MIGRATIONS = [
     )`,
     'CREATE INDEX IF NOT EXISTS connect_asks_idx ON connect_asks(user_id, conversation_id, created_at)',
   ],
+  // 29: game modes: what the pair matched for last ('talk', 'cringe', 'nosmile')
+  [
+    "ALTER TABLE conversations ADD COLUMN mode TEXT NOT NULL DEFAULT 'talk'",
+  ],
 ];
 
 async function migrate(db) {

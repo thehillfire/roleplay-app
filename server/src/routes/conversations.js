@@ -77,7 +77,8 @@ module.exports = function register(app, { store, hub, payments, classifier, push
       req.conversation.partnerReadAt,
     ]);
     // Ask "did this help?" once a real exchange has happened.
-    const canRate = counts.mine >= 2 && counts.theirs >= 2;
+    // (Support chats only: a game isn't something that "helped".)
+    const canRate = req.conversation.mode === 'talk' && counts.mine >= 2 && counts.theirs >= 2;
     res.json({
       conversation: {
         id: req.conversation.id,
@@ -85,6 +86,7 @@ module.exports = function register(app, { store, hub, payments, classifier, push
         connection,
         partnerReadAt,
         muted: req.conversation.muted,
+        mode: req.conversation.mode,
         ended: Boolean(endedReason),
         endedReason,
         feedback: { canRate, helpful: feedback },

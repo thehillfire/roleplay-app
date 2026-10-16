@@ -28,6 +28,7 @@
     "ws": "^8.22.0"
   },
   "devDependencies": {
+    "@mediapipe/tasks-vision": "1.0.1",
     "@vitejs/plugin-react": "^4.7.0",
     "axe-core": "^4.14.0",
     "concurrently": "^10.0.6",

@@ -204,16 +204,16 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     // --- conversations ---
 
     // One thread per pair: matching with someone again continues the same conversation.
-    async openConversation(a, b) {
+    async openConversation(a, b, { mode = 'talk' } = {}) {
       const key = pairKey(a, b);
       const t = now();
       const inserted = await db.query(
-        `INSERT INTO conversations (id, pair_key, user_a, user_b, created_at, last_message_at)
-         VALUES ($1, $2, $3, $4, $5, $5) ON CONFLICT (pair_key) DO NOTHING`,
-        [newId(), key, a < b ? a : b, a < b ? b : a, t],
+        `INSERT INTO conversations (id, pair_key, user_a, user_b, created_at, last_message_at, mode)
+         VALUES ($1, $2, $3, $4, $5, $5, $6) ON CONFLICT (pair_key) DO NOTHING`,
+        [newId(), key, a < b ? a : b, a < b ? b : a, t, mode],
       );
-      // Matched again: the conversation comes back for anyone who had hidden it.
-      if (inserted.rowCount === 0) await db.query('UPDATE conversations SET hidden_a = 0, hidden_b = 0 WHERE pair_key = $1', [key]);
+      // Matched again: the conversation comes back for anyone who had hidden it, in the new mode.
+      if (inserted.rowCount === 0) await db.query('UPDATE conversations SET hidden_a = 0, hidden_b = 0, mode = $2 WHERE pair_key = $1', [key, mode]);
       const { rows } = await db.query('SELECT id FROM conversations WHERE pair_key = $1', [key]);
       return { id: rows[0].id, isNew: inserted.rowCount === 1 };
     },
@@ -231,7 +231,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
 
     // Returns { id, partnerId } if the user is in the conversation, else null.
     async getMembership(userId, conversationId) {
-      const { rows } = await db.query('SELECT user_a, user_b, read_a, read_b, muted_a, muted_b FROM conversations WHERE id = $1', [conversationId]);
+      const { rows } = await db.query('SELECT user_a, user_b, read_a, read_b, muted_a, muted_b, mode FROM conversations WHERE id = $1', [conversationId]);
       const row = rows[0];
       if (!row || (row.user_a !== userId && row.user_b !== userId)) return null;
       const iAmA = row.user_a === userId;
@@ -240,6 +240,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         partnerId: iAmA ? row.user_b : row.user_a,
         partnerReadAt: num(iAmA ? row.read_b : row.read_a),
         muted: Number(iAmA ? row.muted_a : row.muted_b) === 1,
+        mode: row.mode || 'talk',
       };
     },
 
@@ -285,7 +286,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     async listConversations(userId, { visibleOnly = false, limit } = {}) {
       const visible = visibleOnly ? 'AND (CASE WHEN c.user_a = $1 THEN c.hidden_a ELSE c.hidden_b END) < c.last_message_at' : '';
       const { rows } = await db.query(
-        `SELECT c.id, c.last_message_at, c.created_at,
+        `SELECT c.id, c.last_message_at, c.created_at, c.mode,
                 CASE WHEN c.user_a = $1 THEN c.read_a ELSE c.read_b END AS my_read,
                 p.id AS partner_id, p.handle AS partner_handle,
                 (SELECT COUNT(*) FROM messages m
@@ -312,6 +313,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         id: r.id,
         partner: { id: r.partner_id, handle: r.partner_handle },
         unread: Number(r.unread),
+        mode: r.mode || 'talk',
         lastMessage: r.last_body === null || r.last_body === undefined ? null : { body: r.last_body, fromMe: r.last_sender === userId },
         lastMessageAt: num(r.last_message_at),
         createdAt: num(r.created_at),

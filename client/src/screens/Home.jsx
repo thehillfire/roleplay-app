@@ -5,6 +5,7 @@ import CheckIn from '../components/CheckIn.jsx';
 import KindWords from '../components/KindWords.jsx';
 import WaitingMessage from '../components/WaitingMessage.jsx';
 import { api } from '../api.js';
+import { MODES, modeInfo } from '../games.js';
 
 function VerifyNudge() {
   const [state, setState] = useState('idle'); // idle | sent | hidden
@@ -35,8 +36,10 @@ export function timeAgo(ts) {
 }
 
 export default function Home({ user, conversations, listError, onRetry, onFind, onOpen, onAccount, connection, notice, onDismissNotice, onModerate, askPush, onEnablePush, onDismissPush, presence, ads }) {
+  const [mode, setMode] = useState('talk');
   const [role, setRole] = useState('talk');
   const [topic, setTopic] = useState('');
+  const talking = mode === 'talk';
   const [onboarding, setOnboarding] = useState(shouldOnboard);
 
   // Your own message for the next listener counts in the presence numbers; don't show it back to you.
@@ -69,30 +72,38 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
       <WaitingMessage refreshKey={notice} onChange={setMineWaiting} />
 
       <section className="card find">
-        <h1 className="find-title">Talk to someone</h1>
-        <p className="hint">A random, anonymous match. Stay as long as you like.</p>
+        <h1 className="find-title">{talking ? 'Talk to someone' : modeInfo(mode).label}</h1>
+        <div className="modes" role="radiogroup" aria-label="Mode">
+          {MODES.map((m) => (
+            <button key={m.id} type="button" role="radio" aria-checked={mode === m.id} className={mode === m.id ? 'mode active' : 'mode'} onClick={() => setMode(m.id)}>
+              <span className="mode-tag">{m.tag}</span>
+              <span className="mode-label">{m.label}</span>
+            </button>
+          ))}
+        </div>
+        <p className="hint">{talking ? 'A random, anonymous match. Stay as long as you like.' : `${modeInfo(mode).blurb} You only meet people who picked this too.`}</p>
         {presence?.online > 1 && <p className="presence"><span className="dot" aria-hidden="true" /> {presence.online} people here now</p>}
-        {waitingForOthers > 0 && (
+        {talking && waitingForOthers > 0 && (
           <div className="need-listener">
             <p>💙 {waitingForOthers === 1 ? 'Someone is' : `${waitingForOthers} people are`} waiting for someone to listen.</p>
             <button className="btn" onClick={() => { setRole('listen'); onFind({ role: 'listen', topic: '' }); }}>Be a listener</button>
           </div>
         )}
-        <div className="segmented" role="radiogroup" aria-label="What do you need?">
+        {talking && <div className="segmented" role="radiogroup" aria-label="What do you need?">
           {ROLES.map((r) => (
             <button key={r.id} type="button" role="radio" aria-checked={role === r.id} className={role === r.id ? 'seg active' : 'seg'} onClick={() => setRole(r.id)}>
               {r.label}
             </button>
           ))}
-        </div>
-        <div className="topics" aria-label="Topic (optional)">
+        </div>}
+        {talking && <div className="topics" aria-label="Topic (optional)">
           {TOPICS.map((t) => (
             <button key={t} type="button" className={topic === t ? 'chip active' : 'chip'} aria-pressed={topic === t} onClick={() => setTopic(topic === t ? '' : t)}>
               {t}
             </button>
           ))}
-        </div>
-        {role === 'listen' && (
+        </div>}
+        {talking && role === 'listen' && (
           <details className="listen-tips">
             <summary>How to be a good listener</summary>
             <ul>
@@ -103,7 +114,7 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
             </ul>
           </details>
         )}
-        <button className="btn primary big" onClick={() => onFind({ role, topic })} disabled={connection !== 'online'}>
+        <button className="btn primary big" onClick={() => onFind(talking ? { role, topic, mode } : { role: 'either', topic: '', mode })} disabled={connection !== 'online'}>
           {connection === 'online' ? 'Find someone' : 'Connecting…'}
         </button>
       </section>
@@ -135,6 +146,7 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
                       <span className="convo-name">
                         {c.partner.handle}
                         {c.partner.online && <span className="dot" title="Online" aria-label="online" />}
+                        {c.mode && c.mode !== 'talk' && <span className="mode-tag">{modeInfo(c.mode).tag}</span>}
                       </span>
                       <span className="convo-time">{timeAgo(c.lastMessageAt)}</span>
                     </span>

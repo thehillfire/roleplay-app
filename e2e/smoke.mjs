@@ -7,7 +7,11 @@ import { readFileSync } from 'node:fs';
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000';
 const SHOTS = process.env.SHOTS_DIR;
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
+// A fake camera, so the Don't Smile game can start its on-device face model in CI.
+const browser = await chromium.launch({
+  executablePath: process.env.CHROMIUM_PATH || undefined,
+  args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
+});
 const errors = [];
 const step = (name) => console.log(`✓ ${name}`);
 
@@ -16,7 +20,9 @@ async function person(name) {
   const page = await context.newPage();
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
   page.on('dialog', (d) => d.accept()); // confirmations (suspend, block, sign out everywhere): say yes
-  page.on('console', (m) => m.type() === 'error' && !/status of 4\d\d/.test(m.text()) && errors.push(`${name}: ${m.text()}`));
+  // Expected noise: 4xx responses the app handles, and the face model's engine (an info line,
+  // and its built-in usage ping to Google, which our CSP blocks on purpose).
+  page.on('console', (m) => m.type() === 'error' && !/status of 4\d\d|odml\.pa\.googleapis\.com|XNNPACK delegate/.test(m.text()) && errors.push(`${name}: ${m.text()}`));
   page.shot = async (file) => SHOTS && (await page.waitForTimeout(500), await page.screenshot({ path: `${SHOTS}/${file}.png` }));
   return page;
 }
@@ -402,6 +408,43 @@ await dave.evaluate(() => fetch('/api/auth/logout-all', { method: 'POST', header
 await dave.getByText('You were signed out. Sign in again').waitFor();
 await dave.getByRole('button', { name: 'Sign in', exact: true }).waitFor();
 step('a session ended elsewhere goes to sign-in');
+
+// Game modes: only people in the same mode meet; Cringe Duel cards stay in sync; Don't Smile scores.
+const eve = await person('eve');
+const finn = await person('finn');
+await signUp(eve);
+await signUp(finn);
+await eve.context().grantPermissions(['camera']);
+await eve.getByRole('radio', { name: /Cringe Duel/ }).click();
+await eve.getByRole('button', { name: 'Find someone' }).click();
+await eve.getByText('#cringeduel').waitFor();
+await finn.getByRole('radio', { name: /Cringe Duel/ }).click();
+await finn.getByRole('button', { name: 'Find someone' }).click();
+await eve.getByText(/Card 1\/\d+/).waitFor();
+await finn.getByText(/Card 1\/\d+/).waitFor();
+assert.equal(await eve.locator('.game-card').textContent(), await finn.locator('.game-card').textContent(), 'both see the same card');
+await eve.getByRole('button', { name: 'Next card' }).click();
+await finn.getByText(/Card 2\/\d+/).waitFor();
+assert.equal(await eve.locator('.game-card').textContent(), await finn.locator('.game-card').textContent(), 'the next card reaches both');
+await eve.shot('10-cringe');
+step('Cringe Duel: matched by mode, the same cards for both');
+
+for (const p of [eve, finn]) await p.getByRole('button', { name: 'Back to conversations' }).click();
+await eve.getByRole('radio', { name: /Don't Smile/ }).click();
+await eve.getByRole('button', { name: 'Find someone' }).click();
+await finn.getByRole('radio', { name: /Don't Smile/ }).click();
+await finn.getByRole('button', { name: 'Find someone' }).click();
+await eve.getByText('You 0 · Them 0').waitFor();
+await finn.getByRole('button', { name: 'I smiled 😬' }).click();
+await eve.getByText('You 1 · Them 0').waitFor();
+await finn.getByText('You 0 · Them 1').waitFor();
+await eve.getByRole('button', { name: 'Use my camera' }).click();
+await eve.getByRole('button', { name: 'Turn camera off' }).waitFor({ timeout: 30000 });
+await eve.shot('11-dont-smile');
+await eve.getByRole('button', { name: 'Turn camera off' }).click();
+await eve.getByRole('button', { name: 'Use my camera' }).waitFor();
+pages.push(eve, finn);
+step("Don't Smile: smiles score for the other player; the on-device camera check starts and stops");
 
 // Account: download data, then delete the account
 await bob.goto(BASE);

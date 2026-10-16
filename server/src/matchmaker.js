@@ -8,6 +8,8 @@
 // waits forever when the queue is lopsided.
 
 const ROLES = ['talk', 'listen', 'either'];
+// Modes: 'talk' is the support mode (roles apply). The game modes match anyone in the same mode.
+const MODES = ['talk', 'cringe', 'nosmile'];
 
 function rolesFit(a, b) {
   if (a === 'either' || b === 'either') return true;
@@ -20,6 +22,7 @@ function createMatchmaker({ onMatch, now = Date.now, sameRoleAfterMs = 30000 }) 
   function score(a, b, t) {
     if (a.userId === b.userId) return -Infinity;
     if (a.blocked.has(b.userId) || b.blocked.has(a.userId)) return -Infinity;
+    if (a.mode !== b.mode) return -Infinity; // only people playing the same thing
     const fit = rolesFit(a.role, b.role);
     if (!fit && (t - a.joinedAt < sameRoleAfterMs || t - b.joinedAt < sameRoleAfterMs)) return -Infinity;
     let s = fit ? 10 : 0;
@@ -51,9 +54,12 @@ function createMatchmaker({ onMatch, now = Date.now, sameRoleAfterMs = 30000 }) 
   }
 
   return {
-    join({ userId, role = 'either', topic = '', ageBand = '', blocked = new Set(), known = new Set() }) {
+    join({ userId, role = 'either', mode = 'talk', topic = '', ageBand = '', blocked = new Set(), known = new Set() }) {
       queue.delete(userId);
-      const entry = { userId, role: ROLES.includes(role) ? role : 'either', topic, ageBand, blocked, known, joinedAt: now() };
+      const m = MODES.includes(mode) ? mode : 'talk';
+      // Games have no talker/listener: everyone fits everyone.
+      const r = m === 'talk' && ROLES.includes(role) ? role : 'either';
+      const entry = { userId, role: r, mode: m, topic, ageBand, blocked, known, joinedAt: now() };
       const partner = bestPartner(entry, entry.joinedAt);
       if (partner) {
         pair(partner, entry);
@@ -84,10 +90,16 @@ function createMatchmaker({ onMatch, now = Date.now, sameRoleAfterMs = 30000 }) 
     },
 
     isQueued: (userId) => queue.has(userId),
-    // How many are waiting in each role (for "people are waiting for a listener").
+    // How many are waiting in each support role (for "people are waiting for a listener").
     waitingByRole() {
       const counts = { talk: 0, listen: 0, either: 0 };
-      for (const e of queue.values()) counts[e.role] += 1;
+      for (const e of queue.values()) if (e.mode === 'talk') counts[e.role] += 1;
+      return counts;
+    },
+    // How many are waiting in each mode (so a game screen can say "2 people looking").
+    waitingByMode() {
+      const counts = Object.fromEntries(MODES.map((m) => [m, 0]));
+      for (const e of queue.values()) counts[e.mode] += 1;
       return counts;
     },
     get size() {
@@ -96,4 +108,4 @@ function createMatchmaker({ onMatch, now = Date.now, sameRoleAfterMs = 30000 }) 
   };
 }
 
-module.exports = { createMatchmaker, ROLES };
+module.exports = { createMatchmaker, ROLES, MODES };

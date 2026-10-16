@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { hype } from '../hype.js';
+import { modeInfo } from '../games.js';
+import CringeDeck from '../components/CringeDeck.jsx';
+import NoSmile from '../components/NoSmile.jsx';
 import { CrisisCard, ReportSheet, heldNote } from '../components/Safety.jsx';
 import { ConnectBanner, ConnectSheet } from '../components/Connect.jsx';
 
@@ -396,7 +399,7 @@ export default function Chat({ id, socket, unreadElsewhere = 0, onBack, onLeft, 
             <span className="avatar" aria-hidden="true">{convo.partner.handle.slice(0, 1)}</span>
             <span>
               <h1 className="chat-name">{convo.partner.handle}</h1>
-              <small>{partnerTyping ? 'typing…' : convo.partner.online ? 'online' : 'anonymous'}{convo.muted && <span aria-label=", notifications muted"> · 🔕</span>}</small>
+              <small>{partnerTyping ? 'typing…' : convo.partner.online ? 'online' : 'anonymous'}{convo.mode !== 'talk' && <span className="mode-tag"> · {modeInfo(convo.mode).tag}</span>}{convo.muted && <span aria-label=", notifications muted"> · 🔕</span>}</small>
             </span>
           </div>
         )}
@@ -431,6 +434,8 @@ export default function Chat({ id, socket, unreadElsewhere = 0, onBack, onLeft, 
         />
       )}
       {crisis && <CrisisCard role={crisis === 'sender' ? 'sender' : 'listener'} onDismiss={() => setCrisis(null)} />}
+      {convo && !convo.ended && convo.mode === 'cringe' && <CringeDeck conversationId={id} socket={socket} />}
+      {convo && !convo.ended && convo.mode === 'nosmile' && <NoSmile key={id} conversationId={id} socket={socket} />}
 
       <p className="sr-only" aria-live="polite">{announce}</p>
       <div className="messages" role="region" aria-label="Conversation history">
@@ -439,7 +444,12 @@ export default function Chat({ id, socket, unreadElsewhere = 0, onBack, onLeft, 
             {loadingMore ? 'Loading…' : 'Load earlier messages'}
           </button>
         )}
-        {convo && messages.length === 0 && (
+        {convo && messages.length === 0 && convo.mode !== 'talk' && (
+          <div className="openers">
+            <p className="empty">You matched with {convo.partner.handle} for {modeInfo(convo.mode).label}. You go first.</p>
+          </div>
+        )}
+        {convo && messages.length === 0 && convo.mode === 'talk' && (
           <div className="openers">
             <p className="empty">You're connected with {convo.partner.handle}. Say hi, share what's on your mind, or ask how their day is going.</p>
             <div className="opener-chips">

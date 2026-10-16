@@ -241,12 +241,14 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
 
   const [findRole, setFindRole] = useState('talk');
   const lastFind = useRef(null);
-  const find = ({ role, topic }) => {
-    lastFind.current = { role, topic };
+  const [findMode, setFindMode] = useState('talk');
+  const find = ({ role, topic, mode = 'talk' }) => {
+    lastFind.current = { role, topic, mode };
     setMatchError(connection === 'online' ? '' : 'Connecting…');
     setFindRole(role);
+    setFindMode(mode);
     navigate({ name: 'waiting' });
-    socket.send({ type: 'match.join', role, topic }); // if offline, the reconnect below re-sends it
+    socket.send({ type: 'match.join', role, topic, mode }); // if offline, the reconnect below re-sends it
   };
 
   const cancel = goHome;
@@ -280,8 +282,9 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
           onCancel={cancel}
           error={matchError}
           presence={presence}
-          canLeaveMessage={findRole !== 'listen'}
-          listening={findRole === 'listen'}
+          mode={findMode}
+          canLeaveMessage={findMode === 'talk' && findRole !== 'listen'}
+          listening={findMode === 'talk' && findRole === 'listen'}
           pushKey={pushKey}
           onCall={user.listenerAlerts}
           onWentOnCall={() => {
