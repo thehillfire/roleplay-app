@@ -54,6 +54,7 @@ function createApp({
   messageRateLimit = { max: 30, windowMs: 60000 },
   staticDir,
   payments = createPayments(),
+  adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
 } = {}) {
   if (!store || !hub) throw new Error('createApp requires a store and a hub');
   const app = express();
@@ -124,8 +125,12 @@ function createApp({
 
   app.post('/api/auth/signup', authLimiter, asyncRoute(async (req, res) => {
     const { email, password, birthdate } = parseCredentials(req.body, { signup: true });
-    const user = await store.createUser({ email, birthdate, passwordHash: await hashPassword(password) });
+    let user = await store.createUser({ email, birthdate, passwordHash: await hashPassword(password) });
     if (!user) throw httpError(409, 'An account with that email already exists.');
+    if (adminEmails.includes(email)) {
+      await store.setUserRole(email, 'admin');
+      user = { ...user, role: 'admin' };
+    }
     await auth.startSession(req, res, user.id);
     res.status(201).json({ user: publicUser(user) });
   }));
@@ -135,6 +140,10 @@ function createApp({
     const found = await store.findUserByEmail(email);
     const ok = await verifyPassword(password, found?.passwordHash);
     if (!found || !ok) throw httpError(401, 'Email or password is incorrect.');
+    if (adminEmails.includes(email) && found.role !== 'admin') {
+      await store.setUserRole(email, 'admin');
+      found.role = 'admin';
+    }
     await auth.startSession(req, res, found.id);
     res.json({ user: publicUser(found) });
   }));

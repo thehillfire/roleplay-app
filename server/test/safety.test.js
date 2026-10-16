@@ -138,3 +138,13 @@ test('moderators review reports and held messages; members cannot', async (t) =>
   await mod('POST', `/api/admin/users/${aliceId}/status`, { status: 'active' });
   assert.equal((await alice('GET', '/api/auth/me')).body.user.status, 'active');
 });
+
+test('ADMIN_EMAILS accounts become moderators on signup', async (t) => {
+  const s = await start({ adminEmails: ['boss@example.com'] });
+  t.after(s.stop);
+  const boss = await signedUp(s.base, { email: 'Boss@Example.com' });
+  assert.equal(boss.user.role, 'admin');
+  assert.equal((await boss('GET', '/api/admin/reports')).status, 200);
+  const member = await signedUp(s.base);
+  assert.equal(member.user.role, 'member');
+});

@@ -5,6 +5,7 @@ import Welcome from './screens/Welcome.jsx';
 import Home from './screens/Home.jsx';
 import Waiting from './screens/Waiting.jsx';
 import Chat from './screens/Chat.jsx';
+import Moderate from './screens/Moderate.jsx';
 
 function Paused({ onSignOut }) {
   return (
@@ -81,8 +82,10 @@ function Signedin({ user, billing, onSignOut, onPaused, onRefreshMe, initialNoti
           connection={connection}
           notice={notice}
           onDismissNotice={() => setNotice('')}
+          onModerate={user.role === 'admin' ? () => setView({ name: 'moderate' }) : undefined}
         />
       )}
+      {view.name === 'moderate' && <Moderate onBack={() => setView({ name: 'home' })} />}
       {view.name === 'waiting' && <Waiting onCancel={cancel} error={matchError} />}
       {view.name === 'chat' && (
         <Chat

@@ -30,6 +30,12 @@ export const api = {
   declineConnect: (id) => request('POST', `/api/conversations/${enc(id)}/connect/decline`, {}),
   cancelConnect: (id) => request('POST', `/api/conversations/${enc(id)}/connect/cancel`, {}),
   checkout: () => request('POST', '/api/billing/checkout', {}),
+  admin: {
+    reports: (status = 'open') => request('GET', `/api/admin/reports?status=${status}`).then((d) => d.reports),
+    resolve: (id, resolution) => request('POST', `/api/admin/reports/${enc(id)}/resolve`, { resolution }),
+    held: () => request('GET', '/api/admin/held').then((d) => d.messages),
+    setStatus: (userId, status) => request('POST', `/api/admin/users/${enc(userId)}/status`, { status }),
+  },
   block: (id) => request('POST', `/api/conversations/${enc(id)}/block`, {}),
   report: (id, reason, details) => request('POST', `/api/conversations/${enc(id)}/report`, { reason, details }),
   markRead: (id) => request('POST', `/api/conversations/${enc(id)}/read`, {}),

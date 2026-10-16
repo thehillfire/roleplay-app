@@ -38,6 +38,7 @@ step('under-18 signup is refused');
 // Two adults sign up
 const alice = await person('alice');
 const bob = await person('bob');
+const pages = [alice, bob];
 await kid.shot('0-welcome');
 await signUp(alice);
 await signUp(bob);
@@ -135,7 +136,34 @@ assert.equal(await bob.locator('.convo').count(), 0);
 await alice.getByText('This conversation has ended.').waitFor();
 step('report blocks and ends the chat for both');
 
-for (const page of [alice, bob]) {
+// Moderator (MOD_EMAIL must be in the server's ADMIN_EMAILS) reviews the report and suspends
+if (process.env.MOD_EMAIL) {
+  const mod = await person('mod');
+  await mod.goto(BASE);
+  await mod.getByRole('button', { name: 'Get started' }).click();
+  await mod.getByLabel('Email').fill(process.env.MOD_EMAIL);
+  await mod.getByLabel(/Password/).fill('quiet-harbor-9');
+  await mod.getByLabel(/Birthdate/).fill('1980-01-01');
+  await mod.getByLabel(/I'm 18 or older/).check();
+  await mod.getByRole('button', { name: 'Create account' }).click();
+  await mod.getByRole('button', { name: 'Moderate' }).click();
+  const card = mod.locator('.report', { hasText: aliceHandle }).first();
+  await card.waitFor();
+  assert.match(await card.innerText(), /Harassment/);
+  assert.match(await card.innerText(), /Rent is due Friday/);
+  await mod.getByRole('tab', { name: /Held messages/ }).click();
+  await mod.locator('.report', { hasText: aliceHandle }).filter({ hasText: '555 123 4567' }).first().waitFor();
+  await mod.getByRole('tab', { name: /Reports/ }).click();
+  await mod.shot('8-moderate');
+  await card.getByRole('button', { name: `Suspend ${aliceHandle}` }).click();
+  await mod.getByText('No open reports.').waitFor();
+  await alice.reload();
+  await alice.getByText('Your account is paused').waitFor();
+  step('moderator reviewed the report and suspended the account');
+  pages.push(mod);
+}
+
+for (const page of pages) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   assert.equal(overflow, false, 'page scrolls horizontally on a phone');
 }

@@ -17,7 +17,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Crisis language shows the sender crisis resources (988 / findahelpline.com) without blocking them
 - [x] Auto-suspend after reports from several different people; rate limits on matching and messaging
 - [x] Moderator API (admin role): reports, held messages, suspend/restore; `npm run make-admin -- email`
-- [ ] Moderator screen in the app
+- [x] Moderator screen in the app (reports with transcripts, held messages, suspend/restore); `ADMIN_EMAILS` config
 
 ## 3. Connect (the paid feature)
 - [x] Either person can request to connect; reveal only when both have
