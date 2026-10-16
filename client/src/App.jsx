@@ -90,7 +90,7 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
   // Live "people here now": fetched when home opens, then kept current by 'presence' pushes.
   const [presence, setPresence] = useState(null);
   useEffect(() => {
-    if (view.name === 'home') api.presence().then(setPresence, () => {});
+    if (view.name === 'home' || view.name === 'waiting') api.presence().then(setPresence, () => {});
   }, [view.name]);
 
   const [askPush, setAskPush] = useState(() => Boolean(pushKey) && pushSupported() && Notification.permission === 'default');
@@ -183,7 +183,7 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
       )}
       {view.name === 'moderate' && <Moderate onBack={goHome} />}
       {view.name === 'account' && <Account user={user} billing={billing} pushKey={pushKey} onUserChanged={onRefreshMe} onBack={goHome} onSignOut={onSignOut} onSignOutEverywhere={onSignOutEverywhere} onDeleted={onDeleted} onOpenLegal={onOpenLegal} />}
-      {view.name === 'waiting' && <Waiting onCancel={cancel} error={matchError} />}
+      {view.name === 'waiting' && <Waiting onCancel={cancel} error={matchError} presence={presence} />}
       {view.name === 'chat' && (
         <Chat
           key={view.id}

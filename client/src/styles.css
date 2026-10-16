@@ -335,3 +335,13 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); box-sh
 .kind-words blockquote::after { content: '”'; }
 .kind-note input { flex: 1 1 220px; min-width: 0; padding: 8px 12px; font-size: 15px; }
 .kind-note .form-error { flex-basis: 100%; text-align: center; }
+
+/* Waiting: optional paced breathing (4s in, 6s out). */
+.breath { width: 120px; height: 120px; display: grid; place-items: center; }
+.breath span { width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, rgba(100, 181, 246, 0.35), rgba(100, 181, 246, 0.08)); border: 2px solid var(--accent); }
+.breath .in { animation: breath-in 4s ease-in-out forwards; }
+.breath .out { animation: breath-out 6s ease-in-out forwards; }
+@keyframes breath-in { from { transform: scale(0.55); } to { transform: scale(1); } }
+@keyframes breath-out { from { transform: scale(1); } to { transform: scale(0.55); } }
+.waiting-actions { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+@media (prefers-reduced-motion: reduce) { .breath span { animation: none !important; transform: scale(0.8); } }

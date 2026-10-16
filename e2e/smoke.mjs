@@ -100,6 +100,9 @@ await alice.getByRole('radio', { name: 'I need to talk' }).click();
 await alice.getByRole('button', { name: 'Money' }).click();
 await alice.getByRole('button', { name: 'Find someone' }).click();
 await alice.locator('.waiting').waitFor();
+await alice.getByRole('button', { name: 'Breathe with me' }).click();
+await alice.getByRole('status').filter({ hasText: 'Breathe in' }).waitFor();
+await alice.getByRole('status').filter({ hasText: 'Breathe out' }).waitFor({ timeout: 6000 });
 await alice.shot('2-waiting');
 // Bob sees (live, no reload) that someone is waiting for a listener and steps up
 await bob.getByText('Someone is waiting for someone to listen.').waitFor({ timeout: 10000 });
