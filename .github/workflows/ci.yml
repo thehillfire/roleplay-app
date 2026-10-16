@@ -44,3 +44,13 @@ jobs:
           BASE_URL: http://localhost:3000
           MOD_EMAIL: mod@e2e.test
           MAIL_LOG: /tmp/server.log
+      - name: End-to-end smoke test (Postgres)
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE kindred_e2e'
+          PORT=3001 DATABASE_URL=postgres://postgres:postgres@localhost:5432/kindred_e2e ADMIN_EMAILS=mod@e2e.test AUTH_RATE_LIMIT=1000 npm start > /tmp/server-pg.log 2>&1 &
+          npx --yes wait-on@8 -t 30000 http://localhost:3001/api/health
+          npm run e2e
+        env:
+          BASE_URL: http://localhost:3001
+          MOD_EMAIL: mod@e2e.test
+          MAIL_LOG: /tmp/server-pg.log
