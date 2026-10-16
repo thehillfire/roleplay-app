@@ -4,36 +4,53 @@
 
 // Each migration runs once, in order; never edit one that has shipped, add a new one.
 const MIGRATIONS = [
-  // 1: accounts, sessions, stories
+  // 1: accounts, sessions, conversations, messages, blocks
   [
-  `CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    email TEXT UNIQUE NOT NULL,
-    display_name TEXT NOT NULL,
-    password_hash TEXT NOT NULL,
-    created_at BIGINT NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS sessions (
-    token_hash TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at BIGINT NOT NULL
-  )`,
-  'CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id)',
-  `CREATE TABLE IF NOT EXISTS stories (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    hero TEXT NOT NULL,
-    history TEXT NOT NULL,
-    choices TEXT NOT NULL,
-    actions INTEGER NOT NULL DEFAULT 0,
-    version INTEGER NOT NULL DEFAULT 0,
-    created_at BIGINT NOT NULL,
-    updated_at BIGINT NOT NULL
-  )`,
-  'CREATE INDEX IF NOT EXISTS stories_user_idx ON stories(user_id, updated_at)',
+    `CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      handle TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      birthdate TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member',
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at BIGINT NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS sessions (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at BIGINT NOT NULL
+    )`,
+    'CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id)',
+    `CREATE TABLE IF NOT EXISTS conversations (
+      id TEXT PRIMARY KEY,
+      pair_key TEXT UNIQUE NOT NULL,
+      user_a TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_b TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      read_a BIGINT NOT NULL DEFAULT 0,
+      read_b BIGINT NOT NULL DEFAULT 0,
+      created_at BIGINT NOT NULL,
+      last_message_at BIGINT NOT NULL
+    )`,
+    'CREATE INDEX IF NOT EXISTS conversations_a_idx ON conversations(user_a, last_message_at)',
+    'CREATE INDEX IF NOT EXISTS conversations_b_idx ON conversations(user_b, last_message_at)',
+    `CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+      sender_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      body TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'delivered',
+      flags TEXT,
+      created_at BIGINT NOT NULL
+    )`,
+    'CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages(conversation_id, created_at)',
+    `CREATE TABLE IF NOT EXISTS blocks (
+      blocker_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      blocked_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at BIGINT NOT NULL,
+      PRIMARY KEY (blocker_id, blocked_id)
+    )`,
   ],
-  // 2: game state (HP, inventory, quest)
-  ['ALTER TABLE stories ADD COLUMN state TEXT'],
 ];
 
 async function migrate(db) {
@@ -99,7 +116,7 @@ function createPostgres(url) {
   };
 }
 
-async function createDb({ url = process.env.DATABASE_URL, sqliteFile = process.env.SQLITE_FILE || 'data/loreforge.db' } = {}) {
+async function createDb({ url = process.env.DATABASE_URL, sqliteFile = process.env.SQLITE_FILE || 'data/kindred.db' } = {}) {
   let db;
   if (url) {
     db = createPostgres(url);

@@ -1,25 +1,33 @@
-# Roadmap
+# Kindred: roadmap
 
-Working order for turning LoreForge into an app a real user base can use. Each item ships tested and pushed.
+Anonymous 1:1 texting for adults who need to talk. Tap "Talk to someone", get matched with a stranger, vent or listen. Keep chatting with past matches by their anonymous handle. Nobody learns who anyone is unless **both** people choose to connect.
 
-## Now
-- [x] Accounts: sign up / log in / log out (scrypt hashes, httpOnly session cookie). Guests keep playing locally.
-- [x] Server-owned stories for signed-in players (the server holds history, so progress can't be tampered with and works across devices).
-- [x] Import guest stories into an account on first sign-in.
-- [x] Storage: SQLite by default (built into Node), Postgres via `DATABASE_URL` (works with Supabase/Neon/Render).
+Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before growth features.
 
-## Next
-- [x] Game depth: HP, inventory and quest log updated by the narrator; d20 checks rolled on the server for risky actions.
-- [ ] Story settings: genre/tone picker (cozy fantasy, mystery, sci-fi, horror-lite).
-- [ ] Streaming narration so text appears as it is written.
-- [ ] Per-user daily turn quota + abuse limits.
-- [ ] Share a story as a read-only link.
-- [ ] Endings and an epilogue; archive finished stories.
+## 1. Core (tonight, first)
+- [x] Accounts with an anonymous handle (e.g. QuietHeron42), 18+ birthdate check and guidelines agreement at signup
+- [x] Matchmaking queue: "I need to talk" / "I can listen" / "Either", optional topic; never re-match blocked pairs
+- [x] Conversations + messages stored in the database; one thread per pair, so past matches can be continued
+- [x] Realtime delivery over WebSocket (messages, typing, match found); REST for sending and history
+- [x] Client: home, waiting room, chat, past conversations with unread counts
 
-## Polish
-- [ ] PWA: manifest, icons, offline shell, installable on phones.
-- [ ] Accessibility pass (focus order, contrast, reduced motion, screen reader labels).
-- [x] GitHub Actions CI (tests on SQLite + Postgres, build, browser smoke test).
-- [ ] Client unit tests (Vitest).
-- [ ] Compact sticky HP/quest bar so vitals stay visible in long stories.
-- [ ] Settings: text size, sound, account deletion and data export.
+## 2. Safety
+- [ ] Block (ends chat, never matched again) and report (reason + conversation snapshot)
+- [ ] Message screening before delivery: contact info (phones, emails, @handles, links) held back until connected; age probing flagged; self-disclosed under-18 suspends the account for review
+- [ ] Crisis language shows the sender crisis resources (988 / findahelpline.com) without blocking them
+- [ ] Auto-suspend after reports from several different people; rate limits on matching and messaging
+- [ ] Moderator review queue (admin role): reports, flagged messages, suspend/restore
+
+## 3. Connect (the paid feature)
+- [ ] Either person can request to connect; reveal only when both have
+- [ ] Reveal shows a profile each person chose to share (name + optional contact), never email
+- [ ] Payment behind an interface; Stripe Checkout when keys exist, free in development
+
+## 4. Polish
+- [ ] PWA: installable, notification permission for new messages
+- [ ] Account deletion and data export
+- [ ] Accessibility pass; reduced motion; text size
+- [ ] Deployment guide (needs a host with WebSockets: Render, Fly.io, Railway; Postgres via Supabase/Neon)
+
+## Known limits
+- Matchmaking and realtime run in one Node process. Past ~1 server, add Redis pub/sub.

@@ -1,53 +1,48 @@
-# LoreForge
+# Kindred
 
-A calm, AI-narrated roleplay app. Roll a class from theme, role and rarity, or describe yourself, then play a story one action at a time. Rebuilt from scratch, borrowing ideas from LoreForgeRPG, TESTINGRPG and AIRolePlayCalm.
+Anonymous 1:1 texting for adults who need to talk. Tap **Talk to someone**, get matched with a kind stranger, vent or listen. Keep chatting with past matches by their anonymous handle (like `QuietHeron42`). Nobody learns who anyone is unless both people choose to connect.
+
+Roadmap and status: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Quick start
 
 ```bash
 npm install
-cp .env.example .env      # optional: add GEMINI_API_KEY for real AI stories
-npm run dev               # API on :3000, app on http://localhost:5173
+npm run dev        # API + WebSocket on :3000, app on http://localhost:5173
 ```
 
-The app works without a key: the **offline narrator** gives simple placeholder prose so you can develop and test without spending anything. Add `GEMINI_API_KEY` (from Google AI Studio) to get real stories.
+No keys needed. Data goes to SQLite at `data/kindred.db` unless `DATABASE_URL` points at Postgres.
 
 | Script | What it does |
 | --- | --- |
-| `npm run dev` | API server (auto-restart) + Vite dev server with `/api` proxied |
+| `npm run dev` | Server (auto-restart) + Vite dev server, proxying `/api` and `/ws` |
 | `npm run build` | Builds the web app into `dist/` |
-| `npm start` | Serves the API and the built app from one port (3000) |
-| `npm test` | Server test suite (`node --test`, in-memory SQLite) |
-| `npm run test:pg` | Account tests against Postgres (`TEST_DATABASE_URL=postgres://…`) |
-| `npm run e2e` | Browser smoke test against a running server (`BASE_URL`, `CHROMIUM_PATH`) |
+| `npm start` | Serves API, WebSocket and the built app on one port (3000) |
+| `npm test` | Server tests on in-memory SQLite |
+| `npm run test:pg` | Same tests on Postgres (`TEST_DATABASE_URL=postgres://…`) |
+| `npm run e2e` | Two-browser smoke test against a running server (`BASE_URL`, `CHROMIUM_PATH`) |
 
-## How it fits together
+## How it works
 
 ```
-client/   React + Vite web app (mobile-first).
-server/   Express API. Owns every prompt, validates input, rate-limits, talks to Gemini, stores accounts and stories.
-api/      Vercel serverless entry that wraps the same Express app.
-e2e/      Playwright smoke test of the full guest → account flow.
+client/   React + Vite web app (mobile-first)
+server/   Express API + WebSocket server, matchmaking, storage
+e2e/      Playwright test: two strangers sign up, match and chat
 ```
 
-**Guests and players.** Anyone can play as a guest; guest stories live in that browser. Creating an account (email + password) moves guest stories to the server, where they're available on any device. Passwords are hashed with scrypt; sessions are random tokens in an httpOnly cookie, stored hashed.
+- **Accounts:** email + password (scrypt), 18+ birthdate check and guidelines agreement at signup. Each user gets a random anonymous handle. Email is never sent to other users or back to the client. Sessions are random tokens in an httpOnly cookie, stored hashed.
+- **Matching:** `I need to talk` pairs with `I can listen`; `Either` pairs with anyone. Two talkers (or two listeners) pair up after 30 seconds so nobody waits forever. Shared topics are preferred, new people are preferred over past partners, and blocked pairs never match.
+- **Conversations:** one thread per pair, so matching someone again (or opening them from your list) continues where you left off. Messages are sent over REST and pushed live over the WebSocket, along with typing and match events.
+- **Security:** JSON-only mutating requests (CSRF guard), origin check on the WebSocket handshake, rate limits on auth and messages, per-socket flood guard, and conversation membership checked on every read and write.
 
-**Database.** SQLite (built into Node, file at `data/loreforge.db`) works out of the box for a single server. Set `DATABASE_URL` to use Postgres (Supabase, Neon, Render…). Tables are created automatically on start.
+## API
 
-**API**
+- `POST /api/auth/signup { email, password, birthdate, agree }`, `POST /api/auth/login | logout`, `GET /api/auth/me`
+- `GET /api/conversations`: your threads, with partner handle, online flag, last message and unread count
+- `GET /api/conversations/:id?before=<ms>`: messages, newest 50
+- `POST /api/conversations/:id/messages { body }`, `POST /api/conversations/:id/read`
+- WebSocket `/ws`. Send `match.join { role, topic }`, `match.leave`, `typing { conversationId }`. Receive `match.waiting`, `match.found`, `message`, `typing`.
 
-- `GET /api/health` → `{ status, narrator: "gemini" | "offline" }`
-- `POST /api/class` → `{ class: { name, description, rarity, theme, role } }`. The server rolls the rarity (weighted: Common 45% … Eternal 0.5%), theme and role; the narrator names and describes it.
-- `POST /api/story` with `{ hero, history, action? }` → `{ passage, choices }`. Guest play: leave out `history`/`action` to open a story; send `action` to continue one.
-- `POST /api/auth/signup | login | logout`, `GET /api/auth/me`
-- Signed-in play (server keeps the history): `GET/POST /api/stories`, `GET/DELETE /api/stories/:id`, `POST /api/stories/:id/turns { action, version }`, `POST /api/stories/import`
+## Deploying
 
-The client sends **data, never prompts**, which is the main difference from the old apps: you can't use the backend as a free Gemini proxy, and every field has a length limit.
-
-## Deploy (Vercel)
-
-Import the repo into Vercel and set `GEMINI_API_KEY`, `DATABASE_URL` (required on Vercel: its disk is wiped between requests) and optionally `GEMINI_MODEL` (default `gemini-2.5-flash`) in the project's environment variables. `vercel.json` builds the app into `dist/` and sends `/api/*` to the Express app.
-
-## Not carried over (yet)
-
-Chat/contacts, inventory and background music from the older apps. Each one is its own feature; add them when you want them.
+Kindred needs a host that keeps a Node process running with WebSockets, such as Render, Fly.io or Railway. Serverless platforms like Vercel can't hold the sockets. Set `DATABASE_URL` to a Postgres database (Supabase, Neon, Render Postgres). Tables are created on first start. Matchmaking and live delivery run inside one server process; to run several, add Redis pub/sub (see roadmap).

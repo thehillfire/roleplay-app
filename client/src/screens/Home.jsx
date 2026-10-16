@@ -1,87 +1,87 @@
-import Rarity from '../components/Rarity.jsx';
-import { progressFromActions } from '../game.js';
+import { useState } from 'react';
 
-function timeAgo(ts) {
+const ROLES = [
+  { id: 'talk', label: 'I need to talk' },
+  { id: 'listen', label: 'I can listen' },
+  { id: 'either', label: 'Either' },
+];
+const TOPICS = ['Money', 'Work', 'Family', 'Relationships', 'Loneliness', 'Health', 'Just vent'];
+
+export function timeAgo(ts) {
   const mins = Math.round((Date.now() - ts) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
   const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
+  if (hours < 24) return `${hours}h`;
+  return `${Math.round(hours / 24)}d`;
 }
 
-export default function Home({
-  user, stories, listError, onRetryList, notice, onDismissNotice,
-  onRoll, onImagine, onOpen, onDelete, onSignIn, onSignOut,
-}) {
+export default function Home({ user, conversations, listError, onRetry, onFind, onOpen, onSignOut, connection }) {
+  const [role, setRole] = useState('talk');
+  const [topic, setTopic] = useState('');
+
   return (
     <main className="screen">
       <nav className="topbar">
-        {user ? (
-          <>
-            <span className="who">{user.displayName}</span>
-            <button className="link" onClick={onSignOut}>Sign out</button>
-          </>
-        ) : (
-          <button className="link" onClick={onSignIn}>Sign in to save stories</button>
-        )}
+        <span className="who">You are <strong>{user.handle}</strong></span>
+        <button className="link" onClick={onSignOut}>Sign out</button>
       </nav>
 
-      <header className="hero">
-        <h1>LoreForge</h1>
-        <p className="tagline">A realm of infinite, quiet stories</p>
-      </header>
+      {connection === 'offline' && <p className="banner" role="status">Reconnecting…</p>}
 
-      {notice && (
-        <div className="notice" role="status">
-          <p>{notice}</p>
-          <button className="icon-btn" aria-label="Dismiss" onClick={onDismissNotice}>×</button>
+      <section className="card find">
+        <h1 className="find-title">Talk to someone</h1>
+        <p className="hint">A random, anonymous match. Stay as long as you like.</p>
+        <div className="segmented" role="radiogroup" aria-label="What do you need?">
+          {ROLES.map((r) => (
+            <button key={r.id} type="button" role="radio" aria-checked={role === r.id} className={role === r.id ? 'seg active' : 'seg'} onClick={() => setRole(r.id)}>
+              {r.label}
+            </button>
+          ))}
         </div>
-      )}
-
-      <section className="paths">
-        <button className="path" onClick={onRoll}>
-          <span className="path-title">Roll a Class</span>
-          <span className="path-desc">Let fate weave a hero from theme, role and rarity.</span>
-        </button>
-        <button className="path" onClick={onImagine}>
-          <span className="path-title">Imagine Yourself</span>
-          <span className="path-desc">Describe who you are and step into your own tale.</span>
+        <div className="topics" aria-label="Topic (optional)">
+          {TOPICS.map((t) => (
+            <button key={t} type="button" className={topic === t ? 'chip active' : 'chip'} aria-pressed={topic === t} onClick={() => setTopic(topic === t ? '' : t)}>
+              {t}
+            </button>
+          ))}
+        </div>
+        <button className="btn primary big" onClick={() => onFind({ role, topic })} disabled={connection !== 'online'}>
+          {connection === 'online' ? 'Find someone' : 'Connecting…'}
         </button>
       </section>
 
-      {listError && (
-        <div className="card error"><p>{listError}</p><button className="btn" onClick={onRetryList}>Try again</button></div>
-      )}
+      {listError && <div className="card error"><p>{listError}</p><button className="btn" onClick={onRetry}>Try again</button></div>}
 
-      {user && !stories && !listError && <p className="loading">Gathering your stories…</p>}
-
-      {stories?.length > 0 && (
+      {conversations?.length > 0 && (
         <section>
-          <h2 className="section-title">{user ? 'Your stories' : 'Stories on this device'}</h2>
-          <ul className="saved">
-            {stories.map((s) => (
-              <li key={s.id} className="saved-item">
-                <button className="saved-open" onClick={() => onOpen(s.id)}>
-                  <span className="saved-name">{s.hero.name} <Rarity rarity={s.hero.rarity} /></span>
-                  <span className="saved-meta">
-                    {s.ended ? 'Tale ended' : `Level ${progressFromActions(s.actions).level}`} · {s.actions} {s.actions === 1 ? 'action' : 'actions'} · {timeAgo(s.updatedAt)}
+          <h2 className="section-title">Your conversations</h2>
+          <ul className="convos">
+            {conversations.map((c) => (
+              <li key={c.id}>
+                <button className="convo" onClick={() => onOpen(c.id)}>
+                  <span className="avatar" aria-hidden="true">{c.partner.handle.slice(0, 1)}</span>
+                  <span className="convo-main">
+                    <span className="convo-top">
+                      <span className="convo-name">
+                        {c.partner.handle}
+                        {c.partner.online && <span className="dot" title="Online" aria-label="online" />}
+                      </span>
+                      <span className="convo-time">{timeAgo(c.lastMessageAt)}</span>
+                    </span>
+                    <span className={c.unread ? 'convo-preview unread' : 'convo-preview'}>
+                      {c.lastMessage ? `${c.lastMessage.fromMe ? 'You: ' : ''}${c.lastMessage.body}` : 'Say hello'}
+                    </span>
                   </span>
-                </button>
-                <button
-                  className="icon-btn"
-                  aria-label={`Delete ${s.hero.name}`}
-                  onClick={() => {
-                    if (window.confirm(`Let "${s.hero.name}" fade from memory?`)) onDelete(s.id);
-                  }}
-                >
-                  ×
+                  {c.unread > 0 && <span className="count" aria-label={`${c.unread} unread`}>{c.unread}</span>}
                 </button>
               </li>
             ))}
           </ul>
         </section>
       )}
+
+      {conversations?.length === 0 && <p className="empty">Your conversations will appear here. Past matches stay anonymous, and you can pick up where you left off.</p>}
     </main>
   );
 }

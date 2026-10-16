@@ -74,4 +74,4 @@ function createAuth(store) {
   };
 }
 
-module.exports = { createAuth, hashPassword, verifyPassword, COOKIE };
+module.exports = { createAuth, hashPassword, verifyPassword, readCookie, hashToken, COOKIE };
