@@ -246,3 +246,15 @@ test('review regressions: parents, survivors and storytellers are not held', () 
   }
   assert.equal(screenMessage('I just turned 16').suspend, true);
 });
+
+// Real-sounding messages that must always go through: parents, ages in stories, places, work,
+// relationships. Add to the file whenever a false positive turns up.
+test('the venting corpus is never held or paused', () => {
+  const lines = require('fs').readFileSync(require('path').join(__dirname, 'fixtures/venting.txt'), 'utf8').split('\n').filter(Boolean);
+  assert.ok(lines.length >= 50);
+  for (const text of lines) {
+    const r = screenMessage(text);
+    assert.equal(r.deliver, true, text);
+    assert.equal(r.suspend, false, text);
+  }
+});
