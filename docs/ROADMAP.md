@@ -67,7 +67,17 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Spanish in the screener (contact details, age questions, minors, sexual content, crisis) and Spanish 988 info on the crisis card
 - [x] Held queue: moderators can Deliver anyway (false positive) or Keep held; reviewed messages leave the queue
 - [x] Leave a message for the next listener: async matching for quiet hours (screened, one per person, 24h, withdrawable; counts toward the waiting banner; push when picked up)
+- [x] Screener hardening: asking for contacts, dodged spellings, invisible characters and look-alike letters, location and meetup requests, slurs, "kys", crisis slang, chat-style ages; a 60-message venting corpus that must always pass; linear-time patterns
+- [x] Close the loop on reports (reporter hears it was reviewed; a warning reaches the person); dashboard queue numbers; moderator playbook (docs/MODERATION.md)
+- [x] Security audit fixes: moderator rights only via password reset; per-address email cooldown; TRUST_PROXY; push endpoint allowlist; blocks stop reactions/reads; no sign-in links in production logs; duplicate subscriptions cancelled and refunded; under-18 refusals flag the browser
+- [x] Optional error alerts to Slack/Discord (ERROR_WEBHOOK_URL)
 - [ ] Scale past one server: Redis pub/sub for realtime + shared queue (only needed beyond several thousand concurrent chatters)
 
 ## Known limits
 - Matchmaking and realtime run in one Node process. Past ~1 server, add Redis pub/sub.
+
+## Decisions for the owner
+- **Email-first signup.** Signup still says when an email already has an account (the owner gets a heads-up email). Hiding it completely means confirming the email before the account exists: safer, but more friction at the moment someone needs to talk.
+- **Spanish UI.** The screener already handles Spanish, and the crisis card has Spanish 988 instructions. A Spanish interface plus language-aware matching would open the app to Spanish speakers.
+- **Real age assurance** (Yoti, Persona, Stripe Identity) once there's traction; see LAUNCH.md.
+- **Pricing** (LAUNCH.md recommends $4.99 connect and $4.99/month Plus).
