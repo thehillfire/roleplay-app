@@ -137,3 +137,18 @@ test('sign out everywhere ends every session', async (t) => {
   assert.equal((await laptop('GET', '/api/auth/me')).body.user, null);
   assert.equal((await phone('GET', '/api/auth/me')).body.user, null);
 });
+
+test('a password reset lifts the account lockout', async (t) => {
+  const sent = [];
+  const s = await start({ authRateLimit: { max: 1000, windowMs: 60000 }, mailer: { enabled: true, send: async (m) => { sent.push(m); } } });
+  t.after(s.stop);
+  const creds = adult();
+  await client(s.base)('POST', '/api/auth/signup', creds);
+  for (let i = 0; i < 10; i += 1) await client(s.base)('POST', '/api/auth/login', { email: creds.email, password: 'nope' });
+  assert.equal((await client(s.base)('POST', '/api/auth/login', { email: creds.email, password: creds.password })).status, 429);
+  await client(s.base)('POST', '/api/auth/forgot', { email: creds.email });
+  await new Promise((r) => setTimeout(r, 20));
+  const token = sent.find((m) => /Reset/.test(m.subject)).text.match(/reset#([\w-]+)/)[1];
+  await client(s.base)('POST', '/api/auth/reset', { token, password: 'brand-new-pass' });
+  assert.equal((await client(s.base)('POST', '/api/auth/login', { email: creds.email, password: 'brand-new-pass' })).status, 200);
+});

@@ -81,3 +81,34 @@ test('paused people can appeal; moderators grant or deny', async (t) => {
   assert.deepEqual((await mod('GET', '/api/admin/appeals')).body.appeals, []);
   assert.equal((await mod('GET', '/api/admin/log')).body.actions[0].action, 'appeal_granted');
 });
+
+test('appeals are decided once, and a deleted account is logged honestly', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const mod = await moderator(s, 'mod-appeal2@example.com');
+  const person = await signedUp(s.base);
+  const personId = (await s.db.query('SELECT id FROM users WHERE handle = $1', [person.user.handle])).rows[0].id;
+  await s.store.setUserStatus(personId, 'review');
+  await person('POST', '/api/appeal', { message: 'please look again' });
+  const [appeal] = (await mod('GET', '/api/admin/appeals')).body.appeals;
+  await person('POST', '/api/account/delete', { password: 'quiet-harbor-9' });
+  const first = await mod('POST', `/api/admin/appeals/${appeal.id}/resolve`, { restore: true });
+  assert.equal(first.body.action, 'appeal_closed_account_deleted');
+  assert.equal((await mod('POST', `/api/admin/appeals/${appeal.id}/resolve`, { restore: false })).status, 404, 'no second decision');
+});
+
+test('the audit log survives purging the accounts it mentions', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const mod = await moderator(s, 'mod-purge@example.com');
+  const target = await signedUp(s.base);
+  const targetId = (await s.db.query('SELECT id FROM users WHERE handle = $1', [target.user.handle])).rows[0].id;
+  await mod('POST', `/api/admin/users/${targetId}/status`, { status: 'suspended' });
+  await target('POST', '/api/account/delete', { password: 'quiet-harbor-9' }).catch(() => {});
+  await s.store.deleteAccount(targetId);
+  await s.store.purgeDeleted(Date.now() + 1000);
+  const [entry] = (await mod('GET', '/api/admin/log')).body.actions;
+  assert.equal(entry.action, 'suspend');
+  assert.equal(entry.target, target.user.handle, 'still says who it was about');
+  assert.equal(entry.moderator, mod.user.handle);
+});

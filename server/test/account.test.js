@@ -90,3 +90,18 @@ test('old messages are purged; report snapshots keep their copy', async (t) => {
   const [report] = await s.store.listReports();
   assert.ok(report.snapshot.length > 0, 'the report still shows what was said');
 });
+
+test('resolved reports lose their transcript copy after the retention period', async (t) => {
+  const s = await start({ autoPauseMinReporterAgeMs: 0 });
+  t.after(s.stop);
+  const c = await chatting(s);
+  t.after(c.close);
+  await c.bob('POST', `/api/conversations/${c.id}/report`, { reason: 'harassment', details: 'mean', block: false });
+  const [report] = await s.store.listReports();
+  await s.store.resolveReport(report.id, 'dismissed');
+  assert.equal(await s.store.scrubResolvedReports(Date.now() - 60000), 0, 'too recent');
+  assert.equal(await s.store.scrubResolvedReports(Date.now() + 1000), 1);
+  const after = await s.store.getReport(report.id);
+  assert.deepEqual(after.snapshot, []);
+  assert.equal(after.details, null);
+});

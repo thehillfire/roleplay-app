@@ -46,6 +46,12 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
   const [partnerReadAt, setPartnerReadAt] = useState(0);
   const [reactingTo, setReactingTo] = useState(null); // message id with the picker open
   const [selected, setSelected] = useState(null); // tapped message: shows its actions
+  // Ticks so time-limited actions (Unsend) disappear on time even in an idle chat.
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(t);
+  }, []);
   const [loadingMore, setLoadingMore] = useState(false);
   const endRef = useRef(null);
   const typingTimer = useRef(null);
@@ -351,7 +357,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
                 {!m.fromMe && m.status === 'delivered' && (
                   <span className="msg-actions"> · <button className="link unsend" aria-expanded={reactingTo === m.id} onClick={() => setReactingTo(reactingTo === m.id ? null : m.id)}>React</button></span>
                 )}
-                {m.fromMe && Date.now() - m.createdAt < UNSEND_WINDOW_MS && (
+                {m.fromMe && m.status === 'delivered' && now - m.createdAt < UNSEND_WINDOW_MS - 5000 && (
                   <span className="msg-actions"> · <button className="link unsend" onClick={() => unsend(m.id)}>Unsend</button></span>
                 )}
               </time>

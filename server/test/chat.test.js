@@ -295,3 +295,20 @@ test('queue changes broadcast presence to everyone online', async (t) => {
   const after = await bws.next('presence');
   assert.equal(after.waitingToTalk, 0);
 });
+
+test('held messages cannot be unsent (they stay for moderators)', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const alice = await signedUp(s.base);
+  const bob = await signedUp(s.base);
+  const aws = await alice.socket();
+  const bws = await bob.socket();
+  t.after(() => Promise.all([aws.close(), bws.close()]));
+  aws.send({ type: 'match.join', role: 'talk' });
+  await aws.next('match.waiting');
+  bws.send({ type: 'match.join', role: 'listen' });
+  const { conversationId: id } = await aws.next('match.found');
+  const held = (await alice('POST', `/api/conversations/${id}/messages`, { body: 'text me 555 123 4567' })).body.message;
+  assert.equal((await alice('POST', `/api/conversations/${id}/messages/${held.id}/unsend`, {})).status, 409);
+  assert.equal((await s.store.listHeldMessages()).length, 1);
+});

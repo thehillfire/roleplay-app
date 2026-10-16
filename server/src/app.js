@@ -156,7 +156,15 @@ function createApp({
     const t = Date.now();
     const e = failedLogins.get(email);
     if (!e || t > e.resetAt) {
-      if (failedLogins.size > 50000) failedLogins.clear(); // crude bound on memory
+      // Bound memory by dropping expired entries, then the oldest; never wipe everything
+      // (that would let a flood of junk emails reset a targeted account's counter).
+      if (failedLogins.size > 50000) {
+        for (const [k, v] of failedLogins) if (t > v.resetAt) failedLogins.delete(k);
+        for (const k of failedLogins.keys()) {
+          if (failedLogins.size <= 45000) break;
+          failedLogins.delete(k);
+        }
+      }
       failedLogins.set(email, { count: 1, resetAt: t + LOGIN_FAILS.windowMs });
     } else {
       e.count += 1;
@@ -195,6 +203,15 @@ function createApp({
       subject: `[Kindred] ${subject}`,
       text: `${line}\n\nOpen the moderation queue: ${base ? `${base}/` : '(set PUBLIC_URL)'} → Account menu → Moderate.`,
     }).catch((err) => console.error('moderator alert failed', err.message))));
+  };
+  // At most one alert per person and reason per hour, and never in the request's way.
+  const recentAlerts = new Map();
+  const alertOnce = (key, send) => {
+    const t = Date.now();
+    if (recentAlerts.get(key) > t - 60 * 60 * 1000) return;
+    recentAlerts.set(key, t);
+    if (recentAlerts.size > 5000) for (const [k, v] of recentAlerts) if (v < t - 60 * 60 * 1000) recentAlerts.delete(k);
+    Promise.resolve().then(send).catch((err) => console.error('moderator alert failed', err.message));
   };
   const messageLimiter = createRateLimiter({ ...messageRateLimit, key: (req) => req.user.id });
 
@@ -309,7 +326,8 @@ function createApp({
     if (!userId) throw httpError(400, 'This reset link has expired or was already used. Request a new one.');
     // Opening the emailed link proves the inbox, so this also confirms the email.
     await store.markEmailVerified(userId);
-    await promoteIfAdmin(await store.getUser(userId));
+    const resetUser = await promoteIfAdmin(await store.getUser(userId));
+    failedLogins.delete(resetUser.email); // the owner just proved who they are
     hub.disconnect(userId);
     await auth.startSession(req, res, userId);
     res.json({ ok: true });
@@ -467,7 +485,7 @@ function createApp({
       // Someone said they're under 18: pause the account until a moderator looks.
       await store.setUserStatus(req.user.id, 'review');
       await store.logModAction({ targetId: req.user.id, action: 'auto_pause', detail: 'Message said they are under 18' });
-      alertModerators(req, 'Possible minor paused', `An account was paused after saying they're under 18 (${req.user.handle}).`).catch(() => {});
+      alertOnce(`${req.user.id}:auto_minor`, () => alertModerators(req, 'Possible minor paused', `An account was paused after saying they're under 18 (${req.user.handle}).`));
       hub.push(partnerId, { type: 'conversation.ended', conversationId: id });
       setImmediate(() => hub.disconnect(req.user.id));
     } else if (screen.deliver) {
@@ -582,7 +600,7 @@ function createApp({
     ]);
     if (reason === 'minor' || reason === 'self_harm') {
       const label = reason === 'minor' ? 'Report: possibly under 18' : 'Report: someone may be at risk';
-      alertModerators(req, label, `New urgent report (${reason}) about ${(await store.getUser(partnerId))?.handle}.`).catch(() => {});
+      alertOnce(`${partnerId}:${reason}`, () => store.getUser(partnerId).then((u) => alertModerators(req, label, `New urgent report (${reason}) about ${u?.handle}.`)));
     }
     if (all >= AUTO_PAUSE.reporters || minor >= AUTO_PAUSE.minorReporters) {
       const reported = await store.getUser(partnerId);
@@ -612,11 +630,12 @@ function createApp({
 
   app.post('/api/admin/appeals/:id/resolve', admin, asyncRoute(async (req, res) => {
     const userId = await store.resolveAppeal(req.params.id);
-    if (!userId) throw httpError(404, 'Open appeal not found.');
+    if (!userId) throw httpError(404, 'Open appeal not found (it may have just been answered).');
     const restore = req.body.restore === true;
-    if (restore) await store.setUserStatus(userId, 'active');
-    await store.logModAction({ moderatorId: req.user.id, targetId: userId, action: restore ? 'appeal_granted' : 'appeal_denied' });
-    res.json({ ok: true });
+    const restored = restore ? await store.setUserStatus(userId, 'active') : false;
+    const action = !restore ? 'appeal_denied' : restored ? 'appeal_granted' : 'appeal_closed_account_deleted';
+    await store.logModAction({ moderatorId: req.user.id, targetId: userId, action });
+    res.json({ ok: true, action });
   }));
 
   app.get('/api/admin/stats', admin, asyncRoute(async (req, res) => {

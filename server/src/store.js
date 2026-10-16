@@ -125,8 +125,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     // --- email verification ---
 
     async createEmailVerification(tokenHash, userId, ttlMs) {
-      await db.query('DELETE FROM email_verifications WHERE user_id = $1', [userId]);
-      await db.query('DELETE FROM checkins WHERE user_id = $1', [userId]); // private, no safety value
+      await db.query('DELETE FROM email_verifications WHERE user_id = $1', [userId]); // only the newest link works
       await db.query('INSERT INTO email_verifications (token_hash, user_id, expires_at) VALUES ($1, $2, $3)', [tokenHash, userId, now() + ttlMs]);
     },
 
@@ -151,9 +150,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     // --- password reset ---
 
     async createPasswordReset(tokenHash, userId, ttlMs) {
-      await db.query('DELETE FROM password_resets WHERE user_id = $1', [userId]);
-      await db.query('DELETE FROM email_verifications WHERE user_id = $1', [userId]);
-      await db.query('DELETE FROM checkins WHERE user_id = $1', [userId]); // private, no safety value // only the newest link works
+      await db.query('DELETE FROM password_resets WHERE user_id = $1', [userId]); // only the newest link works
       await db.query('INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES ($1, $2, $3)', [tokenHash, userId, now() + ttlMs]);
     },
 
@@ -334,11 +331,11 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return rowCount === 1;
     },
 
-    // The sender can take a message back for a short while. Returns false if it's not theirs or too old.
+    // The sender can take a delivered message back for a short while (held ones stay for moderators). Returns false if it's not theirs or too old.
     async unsendMessage(userId, conversationId, messageId, windowMs) {
       const { rowCount } = await db.query(
         `UPDATE messages SET status = 'unsent'
-          WHERE id = $1 AND conversation_id = $2 AND sender_id = $3 AND status IN ('delivered', 'held') AND created_at >= $4`,
+          WHERE id = $1 AND conversation_id = $2 AND sender_id = $3 AND status = 'delivered' AND created_at >= $4`,
         [messageId, conversationId, userId, now() - windowMs],
       );
       return rowCount === 1;
@@ -658,6 +655,15 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return rowCount;
     },
 
+    // Erases the transcript copy on reports resolved before `before` (the report record stays).
+    async scrubResolvedReports(before) {
+      const { rowCount } = await db.query(
+        "UPDATE reports SET snapshot = '[]', details = NULL WHERE status = 'resolved' AND resolved_at < $1 AND snapshot <> '[]'",
+        [before],
+      );
+      return rowCount;
+    },
+
     // Fully removes accounts deleted before `before` (cascades to their messages, chats and reports).
     async purgeDeleted(before) {
       const { rowCount } = await db.query("DELETE FROM users WHERE status = 'deleted' AND deleted_at < $1", [before]);
@@ -685,23 +691,23 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
 
     // --- moderation operations ---
 
+    // Handles are copied in so the log still reads correctly after accounts are purged.
     async logModAction({ moderatorId, targetId, action, detail }) {
+      const handleOf = async (id) => (id ? (await store.getUser(id))?.handle || null : null);
+      const [moderatorHandle, targetHandle] = await Promise.all([handleOf(moderatorId), handleOf(targetId)]);
       await db.query(
-        'INSERT INTO mod_actions (id, moderator_id, target_id, action, detail, created_at) VALUES ($1, $2, $3, $4, $5, $6)',
-        [newId(), moderatorId || null, targetId || null, action, detail || null, now()],
+        `INSERT INTO mod_actions (id, moderator_id, moderator_handle, target_id, target_handle, action, detail, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [newId(), moderatorId || null, moderatorHandle, targetId || null, targetHandle, action, detail || null, now()],
       );
     },
 
     async listModActions(limit = 50) {
-      const { rows } = await db.query(
-        `SELECT a.*, m.handle AS moderator_handle, t.handle AS target_handle FROM mod_actions a
-           LEFT JOIN users m ON m.id = a.moderator_id LEFT JOIN users t ON t.id = a.target_id
-          ORDER BY a.created_at DESC LIMIT $1`,
-        [limit],
-      );
+      const { rows } = await db.query('SELECT * FROM mod_actions ORDER BY created_at DESC LIMIT $1', [limit]);
       return rows.map((r) => ({
         id: r.id, action: r.action, detail: r.detail, createdAt: num(r.created_at),
-        moderator: r.moderator_handle || 'system', target: r.target_handle || null,
+        moderator: r.moderator_id ? r.moderator_handle || '(former moderator)' : 'system',
+        target: r.target_handle || null,
       }));
     },
 
@@ -724,11 +730,12 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return rows.map((r) => ({ id: r.id, message: r.message, createdAt: num(r.created_at), user: { id: r.user_id, handle: r.handle, status: r.user_status } }));
     },
 
+    // Closes an open appeal exactly once (two moderators clicking at once can't both decide).
     async resolveAppeal(id) {
-      const { rows } = await db.query("SELECT user_id FROM appeals WHERE id = $1 AND status = 'open'", [id]);
+      const { rows } = await db.query('SELECT user_id FROM appeals WHERE id = $1', [id]);
       if (!rows[0]) return null;
-      await db.query("UPDATE appeals SET status = 'resolved', resolved_at = $1 WHERE id = $2", [now(), id]);
-      return rows[0].user_id;
+      const { rowCount } = await db.query("UPDATE appeals SET status = 'resolved', resolved_at = $1 WHERE id = $2 AND status = 'open'", [now(), id]);
+      return rowCount === 1 ? rows[0].user_id : null;
     },
 
     async moderatorEmails() {

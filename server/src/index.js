@@ -24,6 +24,8 @@ boot({ staticDir }).then(({ listen, db, store }) => {
     try {
       const accounts = await store.purgeDeleted(Date.now() - RETENTION_DAYS * DAY_MS);
       if (accounts) console.log(`Purged ${accounts} deleted account(s)`);
+      const scrubbed = await store.scrubResolvedReports(Date.now() - RETENTION_DAYS * DAY_MS);
+      if (scrubbed) console.log(`Erased transcripts on ${scrubbed} long-resolved report(s)`);
       if (MESSAGE_RETENTION_DAYS > 0) {
         const messages = await store.purgeOldMessages(Date.now() - MESSAGE_RETENTION_DAYS * DAY_MS);
         if (messages) console.log(`Deleted ${messages} message(s) older than ${MESSAGE_RETENTION_DAYS} days`);

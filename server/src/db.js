@@ -168,6 +168,25 @@ const MIGRATIONS = [
       resolved_at BIGINT
     )`,
   ],
+  // 12: the audit log must outlive the accounts it mentions: no cascading deletes, keep handles
+  [
+    `CREATE TABLE IF NOT EXISTS mod_actions_v2 (
+      id TEXT PRIMARY KEY,
+      moderator_id TEXT,
+      moderator_handle TEXT,
+      target_id TEXT,
+      target_handle TEXT,
+      action TEXT NOT NULL,
+      detail TEXT,
+      created_at BIGINT NOT NULL
+    )`,
+    `INSERT INTO mod_actions_v2 (id, moderator_id, moderator_handle, target_id, target_handle, action, detail, created_at)
+       SELECT a.id, a.moderator_id, m.handle, a.target_id, t.handle, a.action, a.detail, a.created_at
+         FROM mod_actions a LEFT JOIN users m ON m.id = a.moderator_id LEFT JOIN users t ON t.id = a.target_id`,
+    'DROP TABLE mod_actions',
+    'ALTER TABLE mod_actions_v2 RENAME TO mod_actions',
+    'CREATE INDEX IF NOT EXISTS mod_actions_created_idx2 ON mod_actions(created_at)',
+  ],
 ];
 
 async function migrate(db) {

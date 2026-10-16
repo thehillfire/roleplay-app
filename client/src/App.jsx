@@ -87,14 +87,10 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
 
   useEffect(() => () => socket.close(), [socket]);
 
-  // Live "people here now", refreshed while the home screen is visible.
+  // Live "people here now": fetched when home opens, then kept current by 'presence' pushes.
   const [presence, setPresence] = useState(null);
   useEffect(() => {
-    if (view.name !== 'home') return undefined;
-    const tick = () => api.presence().then(setPresence, () => {});
-    tick();
-    const t = setInterval(tick, 20000);
-    return () => clearInterval(t);
+    if (view.name === 'home') api.presence().then(setPresence, () => {});
   }, [view.name]);
 
   const [askPush, setAskPush] = useState(() => Boolean(pushKey) && pushSupported() && Notification.permission === 'default');
