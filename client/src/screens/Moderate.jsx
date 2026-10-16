@@ -26,6 +26,19 @@ export default function Moderate({ onBack }) {
   const [log, setLog] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
+  const [query, setQuery] = useState('');
+  const [found, setFound] = useState(null);
+
+  const lookup = async (e) => {
+    e?.preventDefault();
+    setError('');
+    try {
+      setFound(await api.admin.lookup(query.trim()));
+    } catch (err) {
+      setFound(null);
+      setError(err.message);
+    }
+  };
 
   const load = useCallback(() => {
     setError('');
@@ -46,6 +59,7 @@ export default function Moderate({ onBack }) {
     try {
       await fn();
       load();
+      if (found) setFound(await api.admin.lookup(found.handle));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -84,6 +98,9 @@ export default function Moderate({ onBack }) {
         </button>
         <button role="tab" aria-selected={tab === 'appeals'} className={tab === 'appeals' ? 'tab active' : 'tab'} onClick={() => setTab('appeals')}>
           Appeals {appeals ? `(${appeals.length})` : ''}
+        </button>
+        <button role="tab" aria-selected={tab === 'lookup'} className={tab === 'lookup' ? 'tab active' : 'tab'} onClick={() => setTab('lookup')}>
+          Look up
         </button>
         <button role="tab" aria-selected={tab === 'log'} className={tab === 'log' ? 'tab active' : 'tab'} onClick={() => setTab('log')}>
           Log
@@ -156,6 +173,46 @@ export default function Moderate({ onBack }) {
           </div>
         </article>
       ))}
+
+      {tab === 'lookup' && (
+        <form className="lookup" onSubmit={lookup}>
+          <input aria-label="Handle" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Handle, e.g. QuietHeron42" autoComplete="off" spellCheck={false} />
+          <button className="btn" type="submit" disabled={!query.trim()}>Look up</button>
+        </form>
+      )}
+      {tab === 'lookup' && found && (
+        <article className="card report">
+          <header>
+            <strong>{found.handle} <StatusTag status={found.status} /></strong>
+            <small>joined {when(found.createdAt)}</small>
+          </header>
+          <p className="meta">
+            <span>Reports against: <strong>{found.reportsOpen} open</strong> · {found.reportsTotal} total</span>
+            <span>Reports made: {found.reportsMade}</span>
+            <span>Held messages: {found.held}</span>
+            {found.role === 'admin' && <span>Moderator</span>}
+            {found.plus && <span>Kindred Plus</span>}
+          </p>
+          {found.actions.length > 0 && (
+            <ol className="modlog">
+              {found.actions.map((e) => (
+                <li key={e.id}>
+                  <small>{when(e.createdAt)}</small>
+                  <span><strong>{e.moderator}</strong> · {e.action.replace(/_/g, ' ')}{e.detail ? ` (${e.detail})` : ''}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+          <div className="actions">
+            {found.status === 'active' && found.role !== 'admin' && (
+              <button className="btn danger" disabled={!!busy} onClick={() => window.confirm(`Suspend ${found.handle}?`) && act(`l-${found.id}`, () => api.admin.setStatus(found.id, 'suspended'))}>Suspend</button>
+            )}
+            {['review', 'suspended'].includes(found.status) && (
+              <button className="btn" disabled={!!busy} onClick={() => act(`l-${found.id}`, () => api.admin.setStatus(found.id, 'active'))}>Restore</button>
+            )}
+          </div>
+        </article>
+      )}
 
       {tab === 'log' && (
         <ol className="modlog">

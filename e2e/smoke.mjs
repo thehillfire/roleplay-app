@@ -273,6 +273,12 @@ if (process.env.MOD_EMAIL && process.env.MAIL_LOG) {
   await mod.getByText('No open appeals.').waitFor();
   await mod.getByRole('tab', { name: 'Log' }).click();
   await mod.locator('.modlog li', { hasText: 'appeal granted' }).waitFor();
+  await mod.getByRole('tab', { name: 'Look up' }).click();
+  await mod.getByLabel('Handle').fill(aliceHandle.toLowerCase());
+  await mod.getByRole('button', { name: 'Look up', exact: true }).click();
+  const profile = mod.locator('.report', { hasText: aliceHandle });
+  await profile.getByText('appeal granted').waitFor();
+  assert.match(await profile.innerText(), /Reports against: 0 open · 1 total/);
   await alice.reload();
   await alice.getByRole('button', { name: 'Find someone' }).waitFor();
   step('appeal granted and logged; account restored');

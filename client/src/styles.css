@@ -321,3 +321,7 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); box-sh
 .switch-row > span { display: flex; flex-direction: column; gap: 4px; }
 .switch-row small { font-size: 13px; }
 .switch-row input[type="checkbox"] { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
+
+/* Moderator lookup by handle. */
+.lookup { display: flex; gap: 8px; }
+.lookup input { flex: 1; min-width: 0; }

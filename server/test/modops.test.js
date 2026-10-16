@@ -112,3 +112,32 @@ test('the audit log survives purging the accounts it mentions', async (t) => {
   assert.equal(entry.target, target.user.handle, 'still says who it was about');
   assert.equal(entry.moderator, mod.user.handle);
 });
+
+test('moderators can look someone up by handle, without seeing their email', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const mod = await moderator(s, 'mod-lookup@example.com');
+  const a = await signedUp(s.base, { email: 'private-person@example.com' });
+  const b = await signedUp(s.base);
+  const c = await matched(a, b);
+  t.after(c.close);
+  await a('POST', `/api/conversations/${c.id}/messages`, { body: 'text me at 555-123-4567' });
+  await b('POST', `/api/conversations/${c.id}/report`, { reason: 'harassment', block: false });
+
+  const res = await mod('GET', `/api/admin/users?handle=${encodeURIComponent(`@${a.user.handle.toLowerCase()}`)}`);
+  assert.equal(res.status, 200);
+  const { user } = res.body;
+  assert.equal(user.handle, a.user.handle, 'case-insensitive, leading @ ignored');
+  assert.equal(user.status, 'active');
+  assert.deepEqual([user.reportsOpen, user.reportsTotal, user.reportsMade, user.held], [1, 1, 0, 1]);
+  assert.ok(!JSON.stringify(res.body).includes('private-person'), 'no email');
+
+  await mod('POST', `/api/admin/users/${user.id}/status`, { status: 'suspended' });
+  const after = (await mod('GET', `/api/admin/users?handle=${a.user.handle}`)).body.user;
+  assert.equal(after.status, 'suspended');
+  assert.equal(after.actions[0].action, 'suspend');
+
+  assert.equal((await mod('GET', '/api/admin/users?handle=NoSuchPerson99')).status, 404);
+  assert.equal((await mod('GET', '/api/admin/users')).status, 400);
+  assert.equal((await b('GET', `/api/admin/users?handle=${a.user.handle}`)).status, 403);
+});

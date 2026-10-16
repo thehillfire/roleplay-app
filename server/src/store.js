@@ -734,6 +734,30 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       );
     },
 
+    // A moderator's view of one account by its handle (case-insensitive). Never the email:
+    // anonymity holds for moderators too.
+    async adminUserByHandle(handle) {
+      const { rows: [u] } = await db.query('SELECT * FROM users WHERE LOWER(handle) = LOWER($1)', [handle]);
+      if (!u) return null;
+      const count = async (sql) => Number((await db.query(sql, [u.id])).rows[0].n);
+      const [reportsOpen, reportsTotal, reportsMade, held] = await Promise.all([
+        count("SELECT COUNT(*) AS n FROM reports WHERE reported_id = $1 AND status = 'open'"),
+        count('SELECT COUNT(*) AS n FROM reports WHERE reported_id = $1'),
+        count('SELECT COUNT(*) AS n FROM reports WHERE reporter_id = $1'),
+        count("SELECT COUNT(*) AS n FROM messages WHERE sender_id = $1 AND status = 'held'"),
+      ]);
+      const { rows: actions } = await db.query(
+        'SELECT id, action, detail, moderator_id, moderator_handle, created_at FROM mod_actions WHERE target_id = $1 ORDER BY created_at DESC LIMIT 20',
+        [u.id],
+      );
+      return {
+        id: u.id, handle: u.handle, status: u.status, role: u.role, createdAt: num(u.created_at),
+        plus: (num(u.plus_until) || 0) > now(),
+        reportsOpen, reportsTotal, reportsMade, held,
+        actions: actions.map((r) => ({ id: r.id, action: r.action, detail: r.detail, createdAt: num(r.created_at), moderator: r.moderator_id ? r.moderator_handle || '(former moderator)' : 'system' })),
+      };
+    },
+
     async listModActions(limit = 50) {
       const { rows } = await db.query('SELECT * FROM mod_actions ORDER BY created_at DESC LIMIT $1', [limit]);
       return rows.map((r) => ({

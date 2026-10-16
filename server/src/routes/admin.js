@@ -54,6 +54,14 @@ module.exports = function register(app, { store, hub, member }) {
     res.json({ messages: await store.listHeldMessages() });
   }));
 
+  app.get('/api/admin/users', admin, asyncRoute(async (req, res) => {
+    const handle = typeof req.query.handle === 'string' ? req.query.handle.trim().replace(/^@/, '') : '';
+    if (!handle || handle.length > 40) throw badRequest('Enter a handle.');
+    const user = await store.adminUserByHandle(handle);
+    if (!user) throw httpError(404, `Nobody is called ${handle}.`);
+    res.json({ user });
+  }));
+
   app.post('/api/admin/users/:id/status', admin, asyncRoute(async (req, res) => {
     const { status } = req.body;
     if (!['active', 'suspended'].includes(status)) throw badRequest('status must be active or suspended');
