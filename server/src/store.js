@@ -206,6 +206,29 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return new Set(rows.map((r) => r.id));
     },
 
+    // Everything the send path needs in one round trip. Null if the user isn't in the conversation.
+    async sendContext(userId, conversationId) {
+      const { rows } = await db.query(
+        `SELECT CASE WHEN c.user_a = $1 THEN c.user_b ELSE c.user_a END AS partner_id,
+                p.status AS partner_status,
+                EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = $1 AND b.blocked_id = p.id) OR (b.blocker_id = p.id AND b.blocked_id = $1)) AS blocked,
+                (SELECT status FROM connections WHERE conversation_id = c.id) AS connection_status
+           FROM conversations c
+           JOIN users p ON p.id = CASE WHEN c.user_a = $1 THEN c.user_b ELSE c.user_a END
+          WHERE c.id = $2 AND (c.user_a = $1 OR c.user_b = $1)`,
+        [userId, conversationId],
+      );
+      const r = rows[0];
+      if (!r) return null;
+      return {
+        id: conversationId,
+        partnerId: r.partner_id,
+        partnerStatus: r.partner_status,
+        blocked: r.blocked === true || Number(r.blocked) === 1,
+        connected: r.connection_status === 'accepted',
+      };
+    },
+
     async listConversations(userId) {
       const { rows } = await db.query(
         `SELECT c.id, c.last_message_at, c.created_at,
@@ -262,9 +285,15 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         'INSERT INTO messages (id, conversation_id, sender_id, body, status, flags, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',
         [message.id, conversationId, senderId, body, status, flags ? JSON.stringify(flags) : null, t],
       );
-      if (status === 'delivered') {
-        await db.query('UPDATE conversations SET last_message_at = $1 WHERE id = $2', [t, conversationId]);
-      }
+      // Bump the conversation (if delivered) and mark it read for the sender in the same statement.
+      await db.query(
+        `UPDATE conversations SET
+           last_message_at = CASE WHEN $4 = 1 THEN $1 ELSE last_message_at END,
+           read_a = CASE WHEN user_a = $3 AND read_a < $1 THEN $1 ELSE read_a END,
+           read_b = CASE WHEN user_b = $3 AND read_b < $1 THEN $1 ELSE read_b END
+         WHERE id = $2`,
+        [t, conversationId, senderId, status === 'delivered' ? 1 : 0],
+      );
       return message;
     },
 

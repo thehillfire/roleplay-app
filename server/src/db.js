@@ -160,7 +160,13 @@ function createSqlite(file) {
   const { DatabaseSync } = require('node:sqlite');
   const db = new DatabaseSync(file);
   db.exec('PRAGMA foreign_keys = ON');
-  if (file !== ':memory:') db.exec('PRAGMA journal_mode = WAL');
+  if (file !== ':memory:') {
+    // WAL + synchronous=NORMAL is SQLite's recommended pairing: commits don't fsync
+    // (checkpoints do), which keeps the single Node thread from stalling under load.
+    db.exec('PRAGMA journal_mode = WAL');
+    db.exec('PRAGMA synchronous = NORMAL');
+    db.exec('PRAGMA busy_timeout = 5000');
+  }
   const toSqlite = (sql) => sql.replace(/\$(\d+)/g, '?$1');
   return {
     kind: 'sqlite',

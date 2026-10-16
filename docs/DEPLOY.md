@@ -51,6 +51,22 @@ Create a [Resend](https://resend.com) account, verify your sending domain, and s
 
 Both keys must be set for payments to turn on. Until then, connecting is free.
 
+## How much one server handles
+
+`scripts/load-test.js` signs up N simulated people, matches them in pairs and has everyone send messages as fast as they can. On a small cloud container (one server process, local Postgres with a 10-connection pool), 200 people sending 2,000 messages flat out gave:
+
+| Database | Messages/second | Median send | p95 | p99 |
+| --- | --- | --- | --- | --- |
+| Postgres | ~710 | 254 ms | 540 ms | 807 ms |
+| SQLite (WAL) | ~780 | 165 ms | 334 ms | ~2 s (checkpoint stalls) |
+
+That's a worst case. Real people send about one message every 10 seconds, so one server comfortably covers **several thousand people chatting at the same time**. Use Postgres in production (no stalls, backups, managed). If median send time creeps up under load, raise `DATABASE_POOL_MAX` (default 5) to 10–20. Run it yourself:
+
+```bash
+DAILY_MATCH_LIMIT=1000 npm start            # in one terminal
+node scripts/load-test.js http://localhost:3000 200 10
+```
+
 ## Before inviting real users
 
 - [ ] HTTPS on your domain

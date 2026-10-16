@@ -338,14 +338,16 @@ function createApp({
     });
   }));
 
-  app.post('/api/conversations/:id/messages', member, messageLimiter, conversation, asyncRoute(async (req, res) => {
+  app.post('/api/conversations/:id/messages', member, messageLimiter, asyncRoute(async (req, res) => {
     const body = parseMessageBody(req.body.body);
-    const { id, partnerId } = req.conversation;
-    if (await store.isBlocked(req.user.id, partnerId)) throw httpError(403, "You can't message this person.");
-    if ((await store.getUser(partnerId))?.status === 'deleted') throw httpError(403, 'This person has left Kindred.');
+    // One query for membership, partner status, blocks and connect state (this is the hot path).
+    const ctx = await store.sendContext(req.user.id, req.params.id);
+    if (!ctx) throw httpError(404, 'Conversation not found.');
+    const { id, partnerId } = ctx;
+    if (ctx.blocked) throw httpError(403, "You can't message this person.");
+    if (ctx.partnerStatus === 'deleted') throw httpError(403, 'This person has left Kindred.');
 
-    const connected = (await store.getConnection(id))?.status === 'accepted';
-    const screen = screenMessage(body, { connected });
+    const screen = screenMessage(body, { connected: ctx.connected });
     const message = await store.addMessage({
       conversationId: id,
       senderId: req.user.id,
@@ -353,7 +355,6 @@ function createApp({
       status: screen.deliver ? 'delivered' : 'held',
       flags: screen.flags.length ? screen.flags : undefined,
     });
-    await store.markRead(req.user.id, id, message.createdAt);
     const { senderId, flags, ...out } = message; // eslint-disable-line no-unused-vars
 
     if (screen.suspend) {
