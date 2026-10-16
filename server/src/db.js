@@ -272,6 +272,21 @@ const MIGRATIONS = [
   [
     'ALTER TABLE users ADD COLUMN notice TEXT',
   ],
+  // 24: payment records must outlive the accounts that made them (accounting, disputes, revenue):
+  // rebuilt without the cascading delete. They hold no personal data beyond an account id.
+  [
+    `CREATE TABLE IF NOT EXISTS payments_v2 (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      amount_cents INTEGER NOT NULL,
+      credits INTEGER NOT NULL,
+      created_at BIGINT NOT NULL
+    )`,
+    'INSERT INTO payments_v2 (id, user_id, amount_cents, credits, created_at) SELECT id, user_id, amount_cents, credits, created_at FROM payments',
+    'DROP TABLE payments',
+    'ALTER TABLE payments_v2 RENAME TO payments',
+    'CREATE INDEX IF NOT EXISTS payments_user_idx ON payments(user_id)',
+  ],
 ];
 
 async function migrate(db) {

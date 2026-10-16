@@ -105,3 +105,16 @@ test('resolved reports lose their transcript copy after the retention period', a
   assert.deepEqual(after.snapshot, []);
   assert.equal(after.details, null);
 });
+
+test('payment records outlive a purged account (accounting and disputes)', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const { signedUp } = require('./helpers');
+  const a = await signedUp(s.base);
+  const id = (await s.db.query('SELECT id FROM users WHERE handle = $1', [a.user.handle])).rows[0].id;
+  await s.store.recordPayment({ id: 'cs_keep', userId: id, amountCents: 999, credits: 1 });
+  await a('POST', '/api/account/delete', { password: 'quiet-harbor-9' });
+  assert.equal(await s.store.purgeDeleted(Date.now() + 1000), 1);
+  const { rows } = await s.db.query('SELECT amount_cents FROM payments WHERE id = $1', ['cs_keep']);
+  assert.equal(Number(rows[0].amount_cents), 999);
+});
