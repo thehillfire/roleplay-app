@@ -375,3 +375,5 @@ select { width: 100%; background: var(--bg); border: 1px solid var(--line); bord
 .promises li { font-size: 14px; line-height: 1.55; color: var(--muted); padding-left: 16px; position: relative; }
 .promises li::before { content: ''; position: absolute; left: 0; top: 0.6em; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .promises strong { color: var(--text); font-weight: 600; }
+
+.on-call-offer { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 360px; }

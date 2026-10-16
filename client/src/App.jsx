@@ -201,6 +201,14 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
           error={matchError}
           presence={presence}
           canLeaveMessage={findRole !== 'listen'}
+          listening={findRole === 'listen'}
+          pushKey={pushKey}
+          onCall={user.listenerAlerts}
+          onWentOnCall={() => {
+            onRefreshMe();
+            setNotice("You're on call. We'll send a notification when someone is waiting for a listener (at most once every few hours). Turn it off any time in Account.");
+            goHome();
+          }}
           onLeftMessage={({ crisis }) => {
             setNotice(`Your message is waiting for the next listener. It shows up in your conversations when someone picks it up${pushKey ? ", and you'll get a notification" : ''}.${crisis ? ' If you are in danger right now, call or text 988.' : ''}`);
             goHome();

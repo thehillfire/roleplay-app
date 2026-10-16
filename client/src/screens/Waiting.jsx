@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
+import { enablePush, pushSupported } from '../notifications.js';
 
 const LINES = [
   'Finding someone kind…',
@@ -19,7 +20,7 @@ function readBreathe() {
   }
 }
 
-export default function Waiting({ onCancel, error, presence, canLeaveMessage, onLeftMessage }) {
+export default function Waiting({ onCancel, error, presence, canLeaveMessage, onLeftMessage, listening, pushKey, onCall, onWentOnCall }) {
   const [i, setI] = useState(0);
   const [slow, setSlow] = useState(false);
   const [offer, setOffer] = useState(false); // "leave a message" after 20s
@@ -29,6 +30,18 @@ export default function Waiting({ onCancel, error, presence, canLeaveMessage, on
   const [note, setNote] = useState('');
   const [noteError, setNoteError] = useState('');
   const [sending, setSending] = useState(false);
+
+  const [callError, setCallError] = useState('');
+  const goOnCall = async () => {
+    setCallError('');
+    try {
+      if (!(await enablePush(pushKey, api.pushSubscribe))) throw new Error('Allow notifications for Kindred first, then try again.');
+      await api.setListenerAlerts(true);
+      onWentOnCall();
+    } catch (err) {
+      setCallError(err.message);
+    }
+  };
 
   const leaveMessage = async (e) => {
     e.preventDefault();
@@ -81,6 +94,13 @@ export default function Waiting({ onCancel, error, presence, canLeaveMessage, on
       {slow && !error && <p className="hint">It's quiet right now. Choosing <strong>Either</strong> or no topic widens the search.</p>}
       {offer && !error && canLeaveMessage && !writing && (
         <button className="btn" onClick={() => setWriting(true)}>Leave a message for the next listener</button>
+      )}
+      {offer && !error && listening && !onCall && pushKey && pushSupported() && (
+        <div className="on-call-offer">
+          <p className="hint">Nobody needs a listener right this minute. We can let you know when someone does, at most once every few hours.</p>
+          <button className="btn" onClick={goOnCall}>Notify me when someone needs a listener</button>
+          {callError && <p className="form-error" role="alert">{callError}</p>}
+        </div>
       )}
       {writing && (
         <form className="card form leave-message" onSubmit={leaveMessage}>
