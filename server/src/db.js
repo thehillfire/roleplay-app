@@ -244,6 +244,11 @@ const MIGRATIONS = [
   [
     'ALTER TABLE feedback ADD COLUMN note_id TEXT',
   ],
+  // 20: mute push notifications for one conversation
+  [
+    'ALTER TABLE conversations ADD COLUMN muted_a INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE conversations ADD COLUMN muted_b INTEGER NOT NULL DEFAULT 0',
+  ],
 ];
 
 async function migrate(db) {

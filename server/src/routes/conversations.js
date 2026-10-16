@@ -80,6 +80,7 @@ module.exports = function register(app, { store, hub, payments, classifier, push
         partner: { handle: partner.handle, online: hub.isOnline(partner.id) },
         connection,
         partnerReadAt,
+        muted: req.conversation.muted,
         feedback: { canRate, helpful: feedback },
       },
       // Flags are only shown to the sender, to explain why a message was held.
@@ -136,7 +137,7 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     } else if (screen.deliver) {
       hub.push(partnerId, { type: 'message', message: { ...out, fromMe: false, ...(screen.crisis ? { crisis: true } : {}) } });
       // Not looking at the app: notify their devices (handle only, never the text).
-      if (!hub.isOnline(partnerId)) {
+      if (!hub.isOnline(partnerId) && !ctx.partnerMuted) {
         push.notify(store, partnerId, { title: 'Kindred', body: `New message from ${req.user.handle}`, conversationId: id, tag: id })
           .catch((err) => console.warn('push notify failed', err.message));
       }
@@ -244,6 +245,13 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     if (c.paid) await store.addCredits(req.user.id, 1);
     await pushConnection(id, [partnerId]);
     res.json({ connection: { status: 'none' } });
+  }));
+
+  // No push notifications for this conversation (messages still arrive in the app).
+  app.post('/api/conversations/:id/mute', member, conversation, asyncRoute(async (req, res) => {
+    if (typeof req.body.muted !== 'boolean') throw badRequest('muted must be true or false');
+    await store.muteConversation(req.user.id, req.conversation.id, req.body.muted);
+    res.json({ muted: req.body.muted });
   }));
 
   // Tidies the list; the conversation returns when either person writes or they match again.

@@ -213,6 +213,11 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return { id: rows[0].id, isNew: inserted.rowCount === 1 };
     },
 
+    async muteConversation(userId, conversationId, muted) {
+      await db.query('UPDATE conversations SET muted_a = $1 WHERE id = $2 AND user_a = $3', [muted ? 1 : 0, conversationId, userId]);
+      await db.query('UPDATE conversations SET muted_b = $1 WHERE id = $2 AND user_b = $3', [muted ? 1 : 0, conversationId, userId]);
+    },
+
     async hideConversation(userId, conversationId) {
       const t = now();
       await db.query('UPDATE conversations SET hidden_a = $1 WHERE id = $2 AND user_a = $3', [t, conversationId, userId]);
@@ -221,11 +226,16 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
 
     // Returns { id, partnerId } if the user is in the conversation, else null.
     async getMembership(userId, conversationId) {
-      const { rows } = await db.query('SELECT user_a, user_b, read_a, read_b FROM conversations WHERE id = $1', [conversationId]);
+      const { rows } = await db.query('SELECT user_a, user_b, read_a, read_b, muted_a, muted_b FROM conversations WHERE id = $1', [conversationId]);
       const row = rows[0];
       if (!row || (row.user_a !== userId && row.user_b !== userId)) return null;
       const iAmA = row.user_a === userId;
-      return { id: conversationId, partnerId: iAmA ? row.user_b : row.user_a, partnerReadAt: num(iAmA ? row.read_b : row.read_a) };
+      return {
+        id: conversationId,
+        partnerId: iAmA ? row.user_b : row.user_a,
+        partnerReadAt: num(iAmA ? row.read_b : row.read_a),
+        muted: Number(iAmA ? row.muted_a : row.muted_b) === 1,
+      };
     },
 
     // Forces committed data to disk where the database defers it (SQLite WAL); no-op on Postgres.
@@ -247,7 +257,8 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         `SELECT CASE WHEN c.user_a = $1 THEN c.user_b ELSE c.user_a END AS partner_id,
                 p.status AS partner_status,
                 EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = $1 AND b.blocked_id = p.id) OR (b.blocker_id = p.id AND b.blocked_id = $1)) AS blocked,
-                (SELECT status FROM connections WHERE conversation_id = c.id) AS connection_status
+                (SELECT status FROM connections WHERE conversation_id = c.id) AS connection_status,
+                CASE WHEN c.user_a = $1 THEN c.muted_b ELSE c.muted_a END AS partner_muted
            FROM conversations c
            JOIN users p ON p.id = CASE WHEN c.user_a = $1 THEN c.user_b ELSE c.user_a END
           WHERE c.id = $2 AND (c.user_a = $1 OR c.user_b = $1)`,
@@ -261,6 +272,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         partnerStatus: r.partner_status,
         blocked: r.blocked === true || Number(r.blocked) === 1,
         connected: r.connection_status === 'accepted',
+        partnerMuted: Number(r.partner_muted) === 1,
       };
     },
 

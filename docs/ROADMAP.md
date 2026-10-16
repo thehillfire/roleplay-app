@@ -63,6 +63,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Waiting room: optional paced breathing (4s in, 6s out); "Say goodbye…" drafts a kind sign-off
 - [x] Ban evasion: a hashed device cookie; a new account on a suspended account's browser starts paused for review (survives the suspended account's deletion, lifted on restore)
 - [x] Optional Cloudflare Turnstile bot check at signup (TURNSTILE_SITE_KEY/SECRET_KEY), verified server-side
+- [x] Mute notifications per conversation (messages still arrive; 🔕 in the chat header)
 - [ ] Scale past one server: Redis pub/sub for realtime + shared queue (only needed beyond several thousand concurrent chatters)
 
 ## Known limits

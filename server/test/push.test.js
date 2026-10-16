@@ -58,3 +58,36 @@ test('push endpoints are off when VAPID keys are missing', async (t) => {
   assert.equal((await alice('GET', '/api/auth/me')).body.push.publicKey, null);
   assert.equal((await alice('POST', '/api/push/subscribe', { subscription: sub(2) })).status, 503);
 });
+
+test('a muted conversation sends no push, but messages still arrive', async (t) => {
+  const sent = [];
+  const push = createPush({ publicKey: 'pub', privateKey: 'priv', sendImpl: async (subscription, payload) => { sent.push(JSON.parse(payload)); } });
+  const s = await start({ push });
+  t.after(s.stop);
+  const alice = await signedUp(s.base);
+  const bob = await signedUp(s.base);
+  await bob('POST', '/api/push/subscribe', { subscription: sub(3) });
+  const aws = await alice.socket();
+  const bws = await bob.socket();
+  aws.send({ type: 'match.join', role: 'talk' });
+  await aws.next('match.waiting');
+  bws.send({ type: 'match.join', role: 'listen' });
+  const { conversationId: id } = await aws.next('match.found');
+  assert.equal((await bob('POST', `/api/conversations/${id}/mute`, { muted: 'yes' })).status, 400);
+  assert.deepEqual((await bob('POST', `/api/conversations/${id}/mute`, { muted: true })).body, { muted: true });
+  assert.equal((await bob('GET', `/api/conversations/${id}`)).body.conversation.muted, true);
+  assert.equal((await alice('GET', `/api/conversations/${id}`)).body.conversation.muted, false, 'only for Bob');
+  await bws.close();
+  await new Promise((r) => setTimeout(r, 30));
+
+  await alice('POST', `/api/conversations/${id}/messages`, { body: 'are you around?' });
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(sent.length, 0, 'muted: no push');
+  assert.equal((await bob('GET', '/api/conversations')).body.conversations[0].unread, 1, 'still delivered');
+
+  await bob('POST', `/api/conversations/${id}/mute`, { muted: false });
+  await alice('POST', `/api/conversations/${id}/messages`, { body: 'hello again' });
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(sent.length, 1);
+  await aws.close();
+});

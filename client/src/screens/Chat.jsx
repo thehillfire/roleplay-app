@@ -191,6 +191,16 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     }
   };
 
+  const toggleMute = async () => {
+    setMenuOpen(false);
+    try {
+      const { muted } = await api.mute(id, !convo.muted);
+      setConvo((c) => ({ ...c, muted }));
+    } catch (err) {
+      setSendError(err.message);
+    }
+  };
+
   const hide = async () => {
     setMenuOpen(false);
     try {
@@ -313,7 +323,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
             <span className="avatar" aria-hidden="true">{convo.partner.handle.slice(0, 1)}</span>
             <span>
               <h1 className="chat-name">{convo.partner.handle}</h1>
-              <small>{partnerTyping ? 'typing…' : convo.partner.online ? 'online' : 'anonymous'}</small>
+              <small>{partnerTyping ? 'typing…' : convo.partner.online ? 'online' : 'anonymous'}{convo.muted && <span aria-label=", notifications muted"> · 🔕</span>}</small>
             </span>
           </div>
         )}
@@ -326,6 +336,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
                   <button role="menuitem" onClick={() => { setMenuOpen(false); setConnectSheet('request'); }}>Connect…</button>
                 )}
                 <button role="menuitem" onClick={() => { setMenuOpen(false); setDraft(GOODBYE); document.querySelector('.composer textarea')?.focus(); }}>Say goodbye…</button>
+                <button role="menuitem" onClick={toggleMute}>{convo.muted ? 'Unmute notifications' : 'Mute notifications'}</button>
                 <button role="menuitem" onClick={hide}>Hide from my list</button>
                 <button role="menuitem" onClick={() => close('end')}>End conversation</button>
                 <button role="menuitem" onClick={() => { setMenuOpen(false); setReporting(true); }}>Report</button>

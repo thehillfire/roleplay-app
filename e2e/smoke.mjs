@@ -182,7 +182,13 @@ await bob.getByRole('button', { name: 'Conversation options' }).click();
 await bob.getByRole('menuitem', { name: 'Say goodbye…' }).click();
 assert.match(await bob.getByLabel('Message').inputValue(), /Thank you for talking with me/);
 await bob.getByLabel('Message').fill('');
-step('goodbye drafted, not sent');
+await bob.getByRole('button', { name: 'Conversation options' }).click();
+await bob.getByRole('menuitem', { name: 'Mute notifications' }).click();
+await bob.locator('.chat-who', { hasText: '🔕' }).waitFor();
+await bob.getByRole('button', { name: 'Conversation options' }).click();
+await bob.getByRole('menuitem', { name: 'Unmute notifications' }).click();
+await bob.locator('.chat-who', { hasText: '🔕' }).waitFor({ state: 'detached' });
+step('goodbye drafted, not sent; mute toggles');
 
 // Crisis language: sender sees resources, listener sees guidance
 await alice.getByLabel('Message').fill('some days I just want to die');
