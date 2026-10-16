@@ -40,8 +40,27 @@ function parseHistory(historyIn, { max = LIMITS.history } = {}) {
     if (!turn || (turn.role !== 'player' && turn.role !== 'narrator')) {
       throw badRequest(`history[${i}].role must be "player" or "narrator"`);
     }
-    return { role: turn.role, text: str(turn.text, `history[${i}].text`, LIMITS.turnText) };
+    const out = { role: turn.role, text: str(turn.text, `history[${i}].text`, LIMITS.turnText) };
+    // Display-only extras on narrator turns; kept if well-formed, dropped otherwise.
+    if (turn.role === 'narrator') {
+      if (Number.isInteger(turn.roll) && turn.roll >= 1 && turn.roll <= 20) out.roll = turn.roll;
+      const effects = cleanEffects(turn.effects);
+      if (effects) out.effects = effects;
+    }
+    return out;
   });
+}
+
+function cleanEffects(e) {
+  if (!e || typeof e !== 'object') return undefined;
+  const names = (list) => (Array.isArray(list) ? list.filter((x) => typeof x === 'string').map((x) => x.slice(0, 40)).slice(0, 12) : []);
+  const out = {};
+  if (Number.isInteger(e.hp) && Math.abs(e.hp) <= 100) out.hp = e.hp;
+  if (names(e.gained).length) out.gained = names(e.gained);
+  if (names(e.lost).length) out.lost = names(e.lost);
+  if (typeof e.quest === 'string' && e.quest.trim()) out.quest = e.quest.slice(0, 120);
+  if (e.ended === true) out.ended = true;
+  return Object.keys(out).length ? out : undefined;
 }
 
 function parseAction(value, { required }) {

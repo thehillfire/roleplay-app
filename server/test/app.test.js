@@ -51,16 +51,22 @@ test('POST /api/class returns a full class', async () => {
 test('POST /api/story opens and continues a story', async () => {
   await withServer(makeApp({ narrator: createOfflineNarrator() }), async (base) => {
     const open = await (await post(base, '/api/story', { hero })).json();
-    assert.ok(open.passage.includes('Void Hunter'));
+    assert.equal(open.turns.length, 1);
+    assert.ok(open.turns[0].text.includes('Void Hunter'));
     assert.equal(open.choices.length, 3);
+    assert.deepEqual(open.state.inventory, ['Lantern']);
 
     const next = await post(base, '/api/story', {
       hero,
-      history: [{ role: 'narrator', text: open.passage }],
+      history: open.turns,
+      state: open.state,
       action: 'I follow the light.',
     });
     assert.equal(next.status, 200);
-    assert.ok((await next.json()).passage.startsWith('You follow the light.'));
+    const body = await next.json();
+    assert.deepEqual(body.turns.map((t) => t.role), ['player', 'narrator']);
+    assert.ok(body.turns[1].text.startsWith('You follow the light.'));
+    assert.deepEqual(body.state.inventory, ['Lantern']);
   });
 });
 
@@ -125,13 +131,13 @@ test('gemini narrator sends key in header and parses structured output', async (
     return {
       ok: true,
       json: async () => ({
-        candidates: [{ content: { parts: [{ text: JSON.stringify({ passage: ' Hello. ', choices: ['a', '', 'b', 'c', 'd'] }) }] } }],
+        candidates: [{ content: { parts: [{ text: JSON.stringify({ passage: ' Hello. ', choices: ['a', '', 'b', 'c', 'd'], rollUsed: true, effects: { hpChange: -5 } }) }] } }],
       }),
     };
   };
   const narrator = createGeminiNarrator({ apiKey: 'k', model: 'm', fetchImpl });
   const out = await narrator.tell({ hero, history: [], action: undefined });
-  assert.deepEqual(out, { passage: 'Hello.', choices: ['a', 'b', 'c'] });
+  assert.deepEqual(out, { passage: 'Hello.', choices: ['a', 'b', 'c'], rollUsed: true, effects: { hpChange: -5 } });
   assert.ok(captured.url.endsWith('/models/m:generateContent'));
   assert.ok(!captured.url.includes('key='));
   assert.equal(captured.init.headers['x-goog-api-key'], 'k');

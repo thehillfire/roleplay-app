@@ -32,9 +32,10 @@ export const api = {
   rollClass: () => request('POST', '/api/class').then((d) => d.class),
 
   // Guest play: the client keeps the history.
-  tellStory: (hero, history, action) => request('POST', '/api/story', {
+  tellStory: (hero, history, action, state) => request('POST', '/api/story', {
     hero: heroPayload(hero),
     history: history.slice(-HISTORY_SENT),
+    state: state || undefined,
     action: action || undefined,
   }),
 
@@ -45,6 +46,6 @@ export const api = {
   takeTurn: (id, action, version) => request('POST', `/api/stories/${encodeURIComponent(id)}/turns`, { action, version }).then((d) => d.story),
   deleteStory: (id) => request('DELETE', `/api/stories/${encodeURIComponent(id)}`),
   importStories: (stories) => request('POST', '/api/stories/import', {
-    stories: stories.map((s) => ({ hero: heroPayload(s.hero), history: s.history, choices: s.choices, createdAt: s.createdAt })),
+    stories: stories.map((s) => ({ hero: heroPayload(s.hero), history: s.history, choices: s.choices, state: s.state, createdAt: s.createdAt })),
   }),
 };

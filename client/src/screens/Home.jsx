@@ -65,7 +65,7 @@ export default function Home({
                 <button className="saved-open" onClick={() => onOpen(s.id)}>
                   <span className="saved-name">{s.hero.name} <Rarity rarity={s.hero.rarity} /></span>
                   <span className="saved-meta">
-                    Level {progressFromActions(s.actions).level} · {s.actions} {s.actions === 1 ? 'action' : 'actions'} · {timeAgo(s.updatedAt)}
+                    {s.ended ? 'Tale ended' : `Level ${progressFromActions(s.actions).level}`} · {s.actions} {s.actions === 1 ? 'action' : 'actions'} · {timeAgo(s.updatedAt)}
                   </span>
                 </button>
                 <button

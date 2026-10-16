@@ -29,7 +29,13 @@ const heroName = (await page.locator('.class-name').textContent()).trim();
 await page.getByText('Begin this story').click();
 await page.locator('.chip').first().waitFor();
 await act('I wave at the horizon');
-step(`guest played as ${heroName}`);
+assert.match(await page.locator('p.quest').innerText(), /distant bell/);
+await act('I pick up the brass compass');
+await page.locator('.badge', { hasText: '+ Brass compass' }).waitFor();
+await page.locator('.satchel summary').click();
+assert.match(await page.locator('.satchel').innerText(), /Lantern[\s\S]*Brass compass/);
+await shot('1b-story-guest');
+step(`guest played as ${heroName}, picked up an item`);
 
 // Sign up: guest story moves into the account
 const email = `e2e-${Date.now()}@example.com`;
@@ -51,7 +57,7 @@ await page.getByLabel('Your action').waitFor();
 await act('I follow the river');
 await page.reload();
 await page.locator('.saved-item', { hasText: heroName }).waitFor();
-assert.match(await page.locator('.saved-item', { hasText: heroName }).innerText(), /2 actions/);
+assert.match(await page.locator('.saved-item', { hasText: heroName }).innerText(), /3 actions/);
 step('saved story survives reload');
 
 // Start a new account story from Imagine

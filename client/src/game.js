@@ -23,5 +23,5 @@ export function progress(history) {
 
 export function newStory(hero) {
   const now = Date.now();
-  return { id: `${now}-${Math.random().toString(36).slice(2, 8)}`, hero, history: [], choices: [], createdAt: now, updatedAt: now };
+  return { id: `${now}-${Math.random().toString(36).slice(2, 8)}`, hero, history: [], choices: [], state: null, createdAt: now, updatedAt: now };
 }

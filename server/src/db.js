@@ -2,7 +2,10 @@
 // and Postgres (set DATABASE_URL, e.g. Supabase or Neon). SQL is written with
 // Postgres-style $1 placeholders and translated for SQLite.
 
-const SCHEMA = [
+// Each migration runs once, in order; never edit one that has shipped, add a new one.
+const MIGRATIONS = [
+  // 1: accounts, sessions, stories
+  [
   `CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
@@ -28,7 +31,29 @@ const SCHEMA = [
     updated_at BIGINT NOT NULL
   )`,
   'CREATE INDEX IF NOT EXISTS stories_user_idx ON stories(user_id, updated_at)',
+  ],
+  // 2: game state (HP, inventory, quest)
+  ['ALTER TABLE stories ADD COLUMN state TEXT'],
 ];
+
+async function migrate(db) {
+  await db.query('CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY, applied_at BIGINT NOT NULL)');
+  const { rows } = await db.query('SELECT id FROM schema_migrations');
+  const done = new Set(rows.map((r) => Number(r.id)));
+  for (let i = 0; i < MIGRATIONS.length; i += 1) {
+    const id = i + 1;
+    if (done.has(id)) continue;
+    for (const statement of MIGRATIONS[i]) {
+      try {
+        await db.query(statement);
+      } catch (err) {
+        // Already applied (a DB from before tracking, or another instance racing us on boot).
+        if (!/duplicate column|already exists/i.test(err.message)) throw err;
+      }
+    }
+    await db.query('INSERT INTO schema_migrations (id, applied_at) VALUES ($1, $2) ON CONFLICT DO NOTHING', [id, Date.now()]);
+  }
+}
 
 function createSqlite(file) {
   // Loaded lazily so Postgres deployments never touch the experimental module.
@@ -84,7 +109,7 @@ async function createDb({ url = process.env.DATABASE_URL, sqliteFile = process.e
     }
     db = createSqlite(sqliteFile);
   }
-  for (const statement of SCHEMA) await db.query(statement);
+  await migrate(db);
   return db;
 }
 

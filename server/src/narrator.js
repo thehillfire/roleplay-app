@@ -10,6 +10,12 @@ const SYSTEM_INSTRUCTION = [
   'Keep each passage under 90 words. Never decide the player\'s actions for them.',
   'Always end on a moment that invites the player to act.',
   'Offer exactly three short suggested actions (under 8 words each) that fit the scene.',
+  'Track the game state through "effects": hpChange (negative for harm, positive for healing; usually 0,',
+  'small swings of 5-15, never more than 25), gainItems and loseItems (only items the player is carrying),',
+  'and quest (a short current objective; empty string to keep the current one).',
+  'Each player action comes with a d20 luck roll. If the action is risky or uncertain, let the roll decide',
+  'the outcome (1-5 setback, 6-14 mixed, 15-19 success, 20 triumph) and set rollUsed to true; for safe',
+  'actions ignore it and set rollUsed to false. Be gentle: harm should be rare and never gratuitous.',
 ].join(' ');
 
 const CLASS_SCHEMA = {
@@ -26,8 +32,18 @@ const STORY_SCHEMA = {
   properties: {
     passage: { type: 'string' },
     choices: { type: 'array', items: { type: 'string' } },
+    rollUsed: { type: 'boolean' },
+    effects: {
+      type: 'object',
+      properties: {
+        hpChange: { type: 'integer' },
+        gainItems: { type: 'array', items: { type: 'string' } },
+        loseItems: { type: 'array', items: { type: 'string' } },
+        quest: { type: 'string' },
+      },
+    },
   },
-  required: ['passage', 'choices'],
+  required: ['passage', 'choices', 'rollUsed', 'effects'],
 };
 
 function heroLine(hero) {
@@ -37,18 +53,31 @@ function heroLine(hero) {
   return parts.join(' ');
 }
 
-function storyPrompt({ hero, history, action }) {
+function stateLine(state) {
+  if (!state) return null;
+  const carrying = state.inventory.length ? state.inventory.join(', ') : 'nothing';
+  return `State: HP ${state.hp}/${state.maxHp}. Carrying: ${carrying}. Current quest: ${state.quest || 'none yet'}.`;
+}
+
+function storyPrompt({ hero, history, action, state, roll }) {
   const recent = history.slice(-MAX_HISTORY_TURNS);
   const lines = [`The player's character: ${heroLine(hero)}`];
+  const stateText = stateLine(state);
+  if (stateText) lines.push(stateText);
   if (recent.length === 0) {
-    lines.push('Open the story: introduce the character\'s world and a first point of tension.');
+    lines.push('Open the story: introduce the character\'s world and a first point of tension.',
+      'Give the character one or two fitting starting items and set their first quest.');
   } else {
     lines.push('Story so far:');
     for (const turn of recent) {
       lines.push(turn.role === 'player' ? `PLAYER: ${turn.text}` : `NARRATOR: ${turn.text}`);
     }
   }
-  if (action) lines.push(`The player now does this: ${action}`, 'Narrate what happens next.');
+  if (action) {
+    lines.push(`The player now does this: ${action}`);
+    if (roll) lines.push(`Luck roll: ${roll}/20.`);
+    lines.push('Narrate what happens next.');
+  }
   return lines.join('\n');
 }
 
@@ -115,7 +144,12 @@ function createGeminiNarrator({ apiKey, model, fetchImpl = fetch, timeoutMs = 30
     },
     async tell(input) {
       const out = await generate(storyPrompt(input), STORY_SCHEMA, 0.85);
-      return { passage: String(out.passage || '').trim(), choices: cleanChoices(out.choices) };
+      return {
+        passage: String(out.passage || '').trim(),
+        choices: cleanChoices(out.choices),
+        rollUsed: out.rollUsed === true,
+        effects: out.effects && typeof out.effects === 'object' ? out.effects : {},
+      };
     },
   };
 }
@@ -142,13 +176,33 @@ function createOfflineNarrator() {
         description: `${/^[aeiou]/i.test(seed.rarity) ? 'An' : 'A'} ${seed.rarity.toLowerCase()} ${seed.role} whose craft is woven from ${seed.theme}.`,
       };
     },
-    async tell({ hero, history, action }) {
-      const turn = history.length;
-      const deed = action && action.replace(/^i\s+/i, '').replace(/[.!?]+$/, '');
-      const passage = action
-        ? `You ${deed.charAt(0).toLowerCase()}${deed.slice(1)}. ${beats[turn % beats.length]}`
-        : `${openings[hero.name.length % openings.length]} You are ${hero.name}, and the story is yours to shape.`;
-      return { passage, choices: ['Follow the light', 'Call out to the stranger', 'Rest and listen'] };
+    async tell({ hero, history, action, roll }) {
+      const choices = ['Follow the light', 'Call out to the stranger', 'Rest and listen'];
+      if (!action) {
+        return {
+          passage: `${openings[hero.name.length % openings.length]} You are ${hero.name}, and the story is yours to shape.`,
+          choices,
+          rollUsed: false,
+          effects: { gainItems: ['Lantern'], quest: 'Find where the distant bell is ringing' },
+        };
+      }
+      const deed = action.replace(/^i\s+/i, '').replace(/[.!?]+$/, '');
+      const effects = {};
+      // A tiny rule set so offline play exercises every effect.
+      const risky = /\b(fight|attack|jump|climb|run|steal|charge)\b/i.test(action);
+      if (risky && roll <= 5) effects.hpChange = -10;
+      if (/\b(rest|sleep|heal|drink)\b/i.test(action)) effects.hpChange = 10;
+      const take = action.match(/\b(?:take|pick up|grab)\s+(?:the\s+|a\s+|an\s+)?([a-z ]{2,30})/i);
+      if (take) effects.gainItems = [capitalize(take[1].trim())];
+      const drop = action.match(/\b(?:drop|give away|throw)\s+(?:the\s+|my\s+)?([a-z ]{2,30})/i);
+      if (drop) effects.loseItems = [drop[1].trim()];
+      const outcome = risky ? (roll <= 5 ? ' It goes badly; you are hurt.' : ' Fortune favors you.') : '';
+      return {
+        passage: `You ${deed.charAt(0).toLowerCase()}${deed.slice(1)}.${outcome} ${beats[history.length % beats.length]}`,
+        choices,
+        rollUsed: risky,
+        effects,
+      };
     },
   };
 }

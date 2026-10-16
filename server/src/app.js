@@ -2,6 +2,7 @@ const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
 const { rollClassSeed } = require('./game');
+const { initialState, normalizeState, applyEffects, rollD20 } = require('./rules');
 const { createNarrator } = require('./narrator');
 const { createAuth, hashPassword, verifyPassword } = require('./auth');
 const { parseStoryRequest, parseHero, parseHistory, parseAction, parseCredentials, badRequest } = require('./validate');
@@ -33,12 +34,19 @@ function createRateLimiter({ max, windowMs, now = Date.now, key = (req) => req.i
 
 const httpError = (status, message) => Object.assign(new Error(message), { status, expose: true });
 
-// Runs one narration step and returns the turns to append.
-async function narrate(narrator, { hero, history, action }) {
-  const { passage, choices } = await narrator.tell({ hero, history, action });
-  if (!passage) throw httpError(502, 'Narrator returned an empty passage');
-  const turns = action ? [{ role: 'player', text: action }, { role: 'narrator', text: passage }] : [{ role: 'narrator', text: passage }];
-  return { turns, choices };
+// Runs one narration step: rolls the dice, asks the narrator, enforces the rules.
+// Returns the turns to append, the next suggested choices and the new state.
+async function narrate(narrator, { hero, history, action, state, rng }) {
+  if (state.ended) throw httpError(409, 'This tale has ended. Begin a new one!');
+  const roll = action ? rollD20(rng) : undefined;
+  const out = await narrator.tell({ hero, history, action, state, roll });
+  if (!out.passage) throw httpError(502, 'Narrator returned an empty passage');
+  const { state: next, applied } = applyEffects(state, out.effects);
+  const narration = { role: 'narrator', text: out.passage };
+  if (roll && out.rollUsed) narration.roll = roll;
+  if (Object.keys(applied).length) narration.effects = applied;
+  const turns = action ? [{ role: 'player', text: action }, narration] : [narration];
+  return { turns, choices: next.ended ? [] : out.choices, state: next };
 }
 
 const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -49,6 +57,7 @@ function createApp({
   rateLimit = { max: 20, windowMs: 60000 },
   authRateLimit = { max: 10, windowMs: 60000 },
   staticDir,
+  rng = Math.random,
 } = {}) {
   if (!store) throw new Error('createApp requires a store');
   const app = express();
@@ -122,11 +131,12 @@ function createApp({
     res.json({ class: { name, description, ...seed }, source: narrator.source });
   }));
 
-  // Stateless turn for guests: the client holds the history.
+  // Stateless turn for guests: the client holds the history and state.
   app.post('/api/story', limiter, asyncRoute(async (req, res) => {
     const input = parseStoryRequest(req.body);
-    const { turns, choices } = await narrate(narrator, input);
-    res.json({ passage: turns[turns.length - 1].text, choices, source: narrator.source });
+    const state = input.history.length ? normalizeState(req.body.state) : initialState();
+    const { turns, choices, state: next } = await narrate(narrator, { ...input, state, rng });
+    res.json({ turns, choices, state: next, source: narrator.source });
   }));
 
   // --- Saved stories: the server owns the history for signed-in players ---
@@ -140,8 +150,8 @@ function createApp({
     if (await store.countStories(req.user.id) >= MAX_STORIES_PER_USER) {
       throw httpError(409, `You can keep up to ${MAX_STORIES_PER_USER} stories. Delete one to start another.`);
     }
-    const { turns, choices } = await narrate(narrator, { hero, history: [] });
-    const story = await store.createStory(req.user.id, { hero, history: turns, choices });
+    const { turns, choices, state } = await narrate(narrator, { hero, history: [], state: initialState(), rng });
+    const story = await store.createStory(req.user.id, { hero, history: turns, choices, state });
     res.status(201).json({ story });
   }));
 
@@ -158,7 +168,7 @@ function createApp({
       if (history.length === 0) throw badRequest('Each imported story needs at least one turn');
       const choices = Array.isArray(s.choices) ? s.choices.filter((c) => typeof c === 'string').map((c) => c.slice(0, 80)).slice(0, 3) : [];
       const createdAt = Number.isFinite(s.createdAt) && s.createdAt > 0 && s.createdAt <= Date.now() ? s.createdAt : undefined;
-      return { hero: parseHero(s.hero), history, choices, createdAt };
+      return { hero: parseHero(s.hero), history, choices, state: normalizeState(s.state), createdAt };
     });
     const created = [];
     for (const s of parsed) created.push((await store.createStory(req.user.id, s)).id);
@@ -181,8 +191,8 @@ function createApp({
     if (story.history.length + 2 > MAX_STORY_TURNS) {
       throw httpError(409, 'This story has reached its final page. Start a new tale!');
     }
-    const { turns, choices } = await narrate(narrator, { hero: story.hero, history: story.history, action });
-    const updated = await store.updateStory(req.user.id, story, { history: [...story.history, ...turns], choices });
+    const { turns, choices, state } = await narrate(narrator, { hero: story.hero, history: story.history, action, state: story.state, rng });
+    const updated = await store.updateStory(req.user.id, story, { history: [...story.history, ...turns], choices, state });
     if (!updated) throw httpError(409, 'This story moved on in another tab. Reload to continue.');
     res.json({ story: updated });
   }));

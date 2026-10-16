@@ -9,7 +9,7 @@ Working order for turning LoreForge into an app a real user base can use. Each i
 - [x] Storage: SQLite by default (built into Node), Postgres via `DATABASE_URL` (works with Supabase/Neon/Render).
 
 ## Next
-- [ ] Game depth: HP, inventory and quest log updated by the narrator; d20 checks rolled on the server for risky actions.
+- [x] Game depth: HP, inventory and quest log updated by the narrator; d20 checks rolled on the server for risky actions.
 - [ ] Story settings: genre/tone picker (cozy fantasy, mystery, sci-fi, horror-lite).
 - [ ] Streaming narration so text appears as it is written.
 - [ ] Per-user daily turn quota + abuse limits.
@@ -19,5 +19,7 @@ Working order for turning LoreForge into an app a real user base can use. Each i
 ## Polish
 - [ ] PWA: manifest, icons, offline shell, installable on phones.
 - [ ] Accessibility pass (focus order, contrast, reduced motion, screen reader labels).
-- [ ] Client tests (Vitest) and GitHub Actions CI.
+- [x] GitHub Actions CI (tests on SQLite + Postgres, build, browser smoke test).
+- [ ] Client unit tests (Vitest).
+- [ ] Compact sticky HP/quest bar so vitals stay visible in long stories.
 - [ ] Settings: text size, sound, account deletion and data export.

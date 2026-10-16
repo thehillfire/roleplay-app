@@ -199,3 +199,18 @@ test('turn input is validated', async (t) => {
   assert.equal((await api('POST', `/api/stories/${story.id}/turns`, { action: 'x'.repeat(301) })).status, 400);
   assert.equal((await api('POST', '/api/stories', { hero: { name: '' } })).status, 400);
 });
+
+test('saved stories keep HP, inventory and quest between turns', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const api = client(s.base);
+  await api('POST', '/api/auth/signup', signup);
+  const { story } = (await api('POST', '/api/stories', { hero })).body;
+  assert.deepEqual(story.state.inventory, ['Lantern']);
+  assert.equal(story.state.quest, 'Find where the distant bell is ringing');
+
+  await api('POST', `/api/stories/${story.id}/turns`, { action: 'I pick up the silver key' });
+  const reloaded = (await api('GET', `/api/stories/${story.id}`)).body.story;
+  assert.deepEqual(reloaded.state.inventory, ['Lantern', 'Silver key']);
+  assert.deepEqual(reloaded.history[2].effects, { gained: ['Silver key'] });
+});

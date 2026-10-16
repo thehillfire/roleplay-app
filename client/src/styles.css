@@ -130,14 +130,36 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); box-sh
 .story-head { display: flex; flex-direction: column; gap: 10px; }
 .story-hero h2 { font-family: var(--serif); font-weight: 500; font-size: 30px; margin: 0; overflow-wrap: anywhere; }
 .story-hero p { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
-.stats { display: flex; gap: 10px; margin: 0; }
-.stats div { flex: 1; text-align: center; background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 8px; }
-.stats dt { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
-.stats dd { margin: 2px 0 0; font-size: 20px; color: var(--accent); }
+
+.vitals { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.hp { position: relative; flex: 1 1 180px; height: 26px; border-radius: 999px; background: var(--bg-2); border: 1px solid var(--line); overflow: hidden; }
+.hp-fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, rgba(129, 199, 132, 0.55), rgba(128, 222, 234, 0.55)); transition: width 0.8s ease; }
+.hp-fill[data-low] { background: linear-gradient(90deg, rgba(244, 143, 177, 0.65), rgba(255, 183, 77, 0.5)); }
+.hp-label { position: relative; display: block; text-align: center; line-height: 24px; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; }
+.level { font-size: 14px; color: var(--accent); }
+.level small { color: var(--muted); font-size: 12px; }
+.quest { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text); }
+.quest span { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-3); margin-right: 6px; }
+.satchel { font-size: 14px; }
+.satchel summary { cursor: pointer; color: var(--muted); }
+.satchel ul { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 8px 0 0; }
+.satchel li { background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 3px 10px; }
+
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; font-family: var(--sans); }
+.badge { font-size: 12px; font-weight: 500; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.badge.good { color: var(--accent-2); border-color: rgba(129, 199, 132, 0.4); }
+.badge.bad { color: var(--danger); border-color: rgba(244, 143, 177, 0.4); }
+.badge.mid { color: var(--accent); border-color: rgba(100, 181, 246, 0.4); }
+.badge.quest { color: var(--accent-3); border-color: rgba(186, 104, 200, 0.4); }
+.badge.roll { font-variant-numeric: tabular-nums; }
+
+.ending { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; border-color: var(--accent-3); }
+.ending h3 { font-family: var(--serif); font-weight: 500; font-size: 28px; margin: 0; }
+.ending p { margin: 0; color: var(--muted); line-height: 1.6; }
 
 .log { flex: 1; display: flex; flex-direction: column; gap: 14px; }
 .turn { margin: 0; line-height: 1.7; animation: rise 0.6s ease-out; overflow-wrap: anywhere; }
-.turn.narrator { font-family: var(--serif); font-size: 20px; }
+.turn.narrator p { margin: 0; font-family: var(--serif); font-size: 20px; line-height: 1.6; }
 .turn.player {
   align-self: flex-end; max-width: 85%; font-size: 15px; color: var(--accent-2);
   background: rgba(129, 199, 132, 0.08); border: 1px solid rgba(129, 199, 132, 0.25);

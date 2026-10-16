@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { normalizeState } = require('./rules');
 
 const newId = () => crypto.randomUUID();
 const num = (v) => (v === null || v === undefined ? v : Number(v));
@@ -15,6 +16,7 @@ function storyFromRow(row) {
     hero: JSON.parse(row.hero),
     history: JSON.parse(row.history),
     choices: JSON.parse(row.choices),
+    state: normalizeState(row.state ? JSON.parse(row.state) : null),
     version: num(row.version),
     createdAt: num(row.created_at),
     updatedAt: num(row.updated_at),
@@ -26,6 +28,7 @@ function summaryFromRow(row) {
     id: row.id,
     hero: JSON.parse(row.hero),
     actions: num(row.actions),
+    ended: normalizeState(row.state ? JSON.parse(row.state) : null).ended,
     createdAt: num(row.created_at),
     updatedAt: num(row.updated_at),
   };
@@ -78,7 +81,7 @@ function createStore(db, { now = Date.now } = {}) {
 
     async listStories(userId) {
       const { rows } = await db.query(
-        'SELECT id, hero, actions, created_at, updated_at FROM stories WHERE user_id = $1 ORDER BY updated_at DESC',
+        'SELECT id, hero, actions, state, created_at, updated_at FROM stories WHERE user_id = $1 ORDER BY updated_at DESC',
         [userId],
       );
       return rows.map(summaryFromRow);
@@ -94,27 +97,27 @@ function createStore(db, { now = Date.now } = {}) {
       return storyFromRow(rows[0]);
     },
 
-    async createStory(userId, { hero, history, choices, createdAt }) {
+    async createStory(userId, { hero, history, choices, state, createdAt }) {
       const t = now();
-      const story = { id: newId(), hero, history, choices, version: 0, createdAt: createdAt || t, updatedAt: t };
+      const story = { id: newId(), hero, history, choices, state, version: 0, createdAt: createdAt || t, updatedAt: t };
       await db.query(
-        `INSERT INTO stories (id, user_id, hero, history, choices, actions, version, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8)`,
-        [story.id, userId, JSON.stringify(hero), JSON.stringify(history), JSON.stringify(choices), countActions(history), story.createdAt, story.updatedAt],
+        `INSERT INTO stories (id, user_id, hero, history, choices, state, actions, version, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9)`,
+        [story.id, userId, JSON.stringify(hero), JSON.stringify(history), JSON.stringify(choices), JSON.stringify(state), countActions(history), story.createdAt, story.updatedAt],
       );
       return story;
     },
 
     // Optimistic concurrency: returns null if someone else advanced the story first.
-    async updateStory(userId, story, { history, choices }) {
+    async updateStory(userId, story, { history, choices, state }) {
       const t = now();
       const { rowCount } = await db.query(
-        `UPDATE stories SET history = $1, choices = $2, actions = $3, version = version + 1, updated_at = $4
-         WHERE id = $5 AND user_id = $6 AND version = $7`,
-        [JSON.stringify(history), JSON.stringify(choices), countActions(history), t, story.id, userId, story.version],
+        `UPDATE stories SET history = $1, choices = $2, state = $3, actions = $4, version = version + 1, updated_at = $5
+         WHERE id = $6 AND user_id = $7 AND version = $8`,
+        [JSON.stringify(history), JSON.stringify(choices), JSON.stringify(state), countActions(history), t, story.id, userId, story.version],
       );
       if (rowCount === 0) return null;
-      return { ...story, history, choices, version: story.version + 1, updatedAt: t };
+      return { ...story, history, choices, state, version: story.version + 1, updatedAt: t };
     },
 
     async deleteStory(userId, id) {

@@ -9,13 +9,12 @@ import Auth from './screens/Auth.jsx';
 import Story from './screens/Story.jsx';
 import Starting from './screens/Starting.jsx';
 
-const summarize = (s) => ({ id: s.id, hero: s.hero, actions: progress(s.history).actions, updatedAt: s.updatedAt });
+const summarize = (s) => ({ id: s.id, hero: s.hero, actions: progress(s.history).actions, ended: !!s.state?.ended, updatedAt: s.updatedAt });
 
 function GuestStory({ story, onUpdate, onBack }) {
   const advance = async (action) => {
-    const { passage, choices } = await api.tellStory(story.hero, story.history, action);
-    const turns = action ? [{ role: 'player', text: action }, { role: 'narrator', text: passage }] : [{ role: 'narrator', text: passage }];
-    onUpdate({ history: [...story.history, ...turns], choices });
+    const { turns, choices, state } = await api.tellStory(story.hero, story.history, action, story.state);
+    onUpdate({ history: [...story.history, ...turns], choices, state });
   };
   return <Story story={story} advance={advance} onBack={onBack} />;
 }
