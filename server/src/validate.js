@@ -43,7 +43,7 @@ function parseCredentials(body = {}, { signup, today } = {}) {
   if (signup) {
     const age = ageOn(body.birthdate, today);
     if (!Number.isFinite(age) || age > 120 || age < 0) throw badRequest('Enter a valid birthdate');
-    if (age < MIN_AGE) throw Object.assign(new Error(`Kindred is for adults ${MIN_AGE} and over.`), { status: 403, expose: true });
+    if (age < MIN_AGE) throw Object.assign(new Error(`Kindred is for adults ${MIN_AGE} and over.`), { status: 403, expose: true, underage: true });
     if (body.agree !== true) throw badRequest('Please agree to the community guidelines');
     out.birthdate = body.birthdate;
   }

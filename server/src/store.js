@@ -3,6 +3,7 @@ const { randomHandle } = require('./handles');
 const { ageOn } = require('./validate');
 
 const newId = () => crypto.randomUUID();
+const UNDERAGE_SIGNUP = 'underage-signup'; // banned_devices marker: refused at signup as under 18
 const num = (v) => (v === null || v === undefined ? v : Number(v));
 const pairKey = (a, b) => (a < b ? `${a}:${b}` : `${b}:${a}`);
 
@@ -420,9 +421,21 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       );
     },
 
-    async deviceBanned(deviceHash) {
-      const { rows } = await db.query('SELECT 1 FROM banned_devices WHERE device_hash = $1 LIMIT 1', [deviceHash]);
-      return rows.length > 0;
+    // Why a new signup from this browser should wait for a moderator, if at all: a suspended
+    // account used it, or someone was turned away as under 18 on it within the last year.
+    async deviceBanReason(deviceHash) {
+      const { rows } = await db.query('SELECT user_id, created_at FROM banned_devices WHERE device_hash = $1', [deviceHash]);
+      if (rows.some((r) => r.user_id !== UNDERAGE_SIGNUP)) return 'suspended';
+      if (rows.some((r) => num(r.created_at) > now() - 365 * 24 * 60 * 60 * 1000)) return 'underage';
+      return null;
+    },
+
+    async flagUnderageDevice(deviceHash) {
+      await db.query(
+        `INSERT INTO banned_devices (device_hash, user_id, created_at) VALUES ($1, $2, $3)
+         ON CONFLICT (device_hash, user_id) DO UPDATE SET created_at = $3`,
+        [deviceHash, UNDERAGE_SIGNUP, now()],
+      );
     },
 
     async setUserRole(email, role) {

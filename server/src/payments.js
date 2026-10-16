@@ -58,6 +58,17 @@ function createPayments({
     if (!res.ok && res.status !== 404) throw Object.assign(new Error(`Stripe cancel failed (${res.status})`), { status: 502 });
   }
 
+  // Refunds a payment in full (a duplicate subscription's first invoice).
+  async function refundPayment(paymentIntentId) {
+    const res = await fetchImpl('https://api.stripe.com/v1/refunds', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${secretKey}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ payment_intent: paymentIntentId, reason: 'duplicate' }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) throw Object.assign(new Error(`Stripe refund failed (${res.status})`), { status: 502 });
+  }
+
   // Stripe-hosted page to update the card or cancel.
   function createPortal({ customerId, returnUrl }) {
     return stripe('billing_portal/sessions', new URLSearchParams({ customer: customerId, return_url: returnUrl }));
@@ -112,7 +123,7 @@ function createPayments({
     return `t=${t},v1=${v1}`;
   }
 
-  return { enabled, priceCents, plusPriceCents, currency, createCheckout, createSubscriptionCheckout, createPortal, cancelSubscription, verifyWebhook, sign };
+  return { enabled, priceCents, plusPriceCents, currency, createCheckout, createSubscriptionCheckout, createPortal, cancelSubscription, refundPayment, verifyWebhook, sign };
 }
 
 module.exports = { createPayments };

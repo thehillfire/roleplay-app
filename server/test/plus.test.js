@@ -160,3 +160,20 @@ test('Plus: deleting the account cancels the subscription first, and later invoi
   assert.equal(Number(rows[0].connect_credits), 3);
   assert.equal(rows[0].plus_subscription_id, null);
 });
+
+test('Plus: a second subscription paid at the same time is cancelled and refunded', async (t) => {
+  const { calls, payments } = setup();
+  const s = await start({ payments });
+  t.after(s.stop);
+  const { api, id } = await plusMember(s, payments, { subscription: 'sub_first' });
+  // The second checkout completes, then its first invoice arrives.
+  await hook(s, payments, { type: 'checkout.session.completed', data: { object: { id: 'cs_dup', mode: 'subscription', client_reference_id: id, customer: 'cus_sub_first', subscription: 'sub_dup' } } });
+  await hook(s, payments, { type: 'invoice.paid', data: { object: { id: 'in_dup', amount_paid: 499, payment_intent: 'pi_dup', subscription: 'sub_dup', subscription_details: { metadata: { user_id: id } }, billing_reason: 'subscription_create', lines: { data: [{ period: { end: periodEnd() } }] } } } });
+
+  assert.ok(calls.some((c) => c.method === 'DELETE' && c.url === 'https://api.stripe.com/v1/subscriptions/sub_dup'), 'cancelled');
+  const refund = calls.find((c) => c.url === 'https://api.stripe.com/v1/refunds');
+  assert.equal(refund.form.get('payment_intent'), 'pi_dup');
+  const me = (await api('GET', '/api/auth/me')).body.user;
+  assert.equal(me.connectCredits, 3, 'no extra credits for the duplicate');
+  assert.equal((await s.store.getUser(id)).plusSubscriptionId, 'sub_first', 'the first stays linked');
+});

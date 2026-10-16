@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { start, signedUp } = require('./helpers');
+const { start, client, adult, signedUp } = require('./helpers');
 
 async function matched(a, b) {
   const aws = await a.socket();
@@ -271,4 +271,19 @@ test('reviewing a report tells the reporter it was read, and a warning reaches t
 
   assert.equal((await b('POST', '/api/account/notice/dismiss', {})).status, 200);
   assert.equal((await b('GET', '/api/auth/me')).body.user.notice, null, 'shown once');
+});
+
+test('an under-18 refusal followed by an older birthdate on the same browser waits for review', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const browser = client(s.base);
+  const kid = await browser('POST', '/api/auth/signup', adult({ birthdate: `${new Date().getUTCFullYear() - 15}-03-03` }));
+  assert.equal(kid.status, 403);
+  const retry = await browser('POST', '/api/auth/signup', adult({ birthdate: '1990-03-03' }));
+  assert.equal(retry.status, 201);
+  assert.equal(retry.body.user.status, 'review');
+  const mod = await moderator(s, 'mod-underage@example.com');
+  assert.equal((await mod('GET', '/api/admin/log')).body.actions.find((a) => a.action === 'auto_pause').detail, 'Signed up on a device that was refused as under 18');
+  // A different browser is unaffected.
+  assert.equal((await signedUp(s.base)).user.status, 'active');
 });

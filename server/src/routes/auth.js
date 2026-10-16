@@ -55,26 +55,58 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
     return user;
   };
 
+  // At most one email of each kind per address every 2 minutes, whatever IP asks: no inbox bombing.
+  const lastEmailed = new Map(); // `${kind}:${email}` -> time
+  const mayEmail = (kind, email) => {
+    const t = Date.now();
+    const key = `${kind}:${email}`;
+    if (lastEmailed.get(key) > t - emailCooldownMs) return false;
+    if (lastEmailed.size > 20000) for (const [k, v] of lastEmailed) if (v < t - emailCooldownMs) lastEmailed.delete(k);
+    lastEmailed.set(key, t);
+    return true;
+  };
+
   // --- Accounts ---
 
   app.post('/api/auth/signup', authLimiter, asyncRoute(async (req, res) => {
-    const { email, password, birthdate } = parseCredentials(req.body, { signup: true });
+    let creds;
+    try {
+      creds = parseCredentials(req.body, { signup: true });
+    } catch (err) {
+      // Turned away as under 18: retrying with an older birthdate from the same browser
+      // still works, but that account waits for a moderator.
+      if (err.underage) await store.flagUnderageDevice(deviceHash(req, res));
+      throw err;
+    }
+    const { email, password, birthdate } = creds;
     if (!(await captcha.verify(req.body.captchaToken, req.ip))) throw badRequest("Please complete the quick check that you're a person, then try again.");
     const user = await store.createUser({ email, birthdate, passwordHash: await hashPassword(password) });
-    if (!user) throw httpError(409, 'An account with that email already exists.');
+    if (!user) {
+      // Let the real owner know (once in a while): it may be them, or someone using their address.
+      const base = siteUrl(req);
+      if (base && mayEmail('exists', email)) {
+        mailer.send({
+          to: email,
+          subject: 'Someone tried to sign up to Kindred with your email',
+          text: `Someone just tried to create a Kindred account with this address, which already has one.\n\nIf it was you, sign in at ${base}/ (or use "Forgot password?").\nIf it wasn't, you don't need to do anything: nobody can get into your account without your password.`,
+        }).catch((err) => console.error('notice email failed', err.message));
+      }
+      throw httpError(409, 'An account with that email already exists.');
+    }
     const device = deviceHash(req, res);
-    const evading = await store.deviceBanned(device);
+    const banReason = await store.deviceBanReason(device);
     await store.noteDevice(user.id, device);
     let created = user;
-    if (evading) {
-      // Same browser as a suspended account: a moderator takes a look first (they can appeal).
+    if (banReason) {
+      // Same browser as a suspended account, or as an under-18 signup that was turned away:
+      // a moderator takes a look first (they can appeal).
       await store.setUserStatus(user.id, 'review');
-      await store.logModAction({ targetId: user.id, action: 'auto_pause', detail: 'Signed up on the device of a suspended account' });
+      await store.logModAction({ targetId: user.id, action: 'auto_pause', detail: banReason === 'suspended' ? 'Signed up on the device of a suspended account' : 'Signed up on a device that was refused as under 18' });
       created = { ...user, status: 'review' };
       store.moderatorEmails().then((emails) => Promise.all(emails.map((to) => mailer.send({
         to,
-        subject: '[Kindred] Possible ban evasion paused',
-        text: `A new account (${user.handle}) signed up on a device used by a suspended account and was paused for review. Look it up under Moderate → Look up.`,
+        subject: banReason === 'suspended' ? '[Kindred] Possible ban evasion paused' : '[Kindred] Possible minor paused',
+        text: `A new account (${user.handle}) signed up on a device ${banReason === 'suspended' ? 'used by a suspended account' : 'where an under-18 signup was just refused'} and was paused for review. Look it up under Moderate → Look up.`,
       })))).catch((err) => console.error('evasion alert failed', err.message));
     }
     await sendVerification(req, user);
@@ -113,17 +145,6 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
   }));
 
   // Always answers the same way, so it can't be used to find out who has an account.
-  // At most one email of each kind per address every 2 minutes, whatever IP asks: no inbox bombing.
-  const lastEmailed = new Map(); // `${kind}:${email}` -> time
-  const mayEmail = (kind, email) => {
-    const t = Date.now();
-    const key = `${kind}:${email}`;
-    if (lastEmailed.get(key) > t - emailCooldownMs) return false;
-    if (lastEmailed.size > 20000) for (const [k, v] of lastEmailed) if (v < t - emailCooldownMs) lastEmailed.delete(k);
-    lastEmailed.set(key, t);
-    return true;
-  };
-
   app.post('/api/auth/forgot', authLimiter, asyncRoute(async (req, res) => {
     const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     const found = email ? await store.findUserByEmail(email) : null;

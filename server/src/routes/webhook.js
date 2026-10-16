@@ -6,6 +6,13 @@ module.exports = function register(app, { store, hub, payments }) {
   // A paid Plus invoice (first month or renewal): extend Plus to the end of the period and
   // grant the month's connect credits once (keyed by invoice id, so retries are harmless).
   // Reads both pre- and post-2025 Stripe invoice shapes.
+  async function stopDuplicate(subscriptionId, paymentIntentId, amount) {
+    await payments.cancelSubscription(subscriptionId).catch((err) => console.error('duplicate subscription cancel failed', subscriptionId, err.message));
+    if (paymentIntentId && amount) {
+      await payments.refundPayment(paymentIntentId).catch((err) => console.error('duplicate subscription refund failed; refund by hand in Stripe', paymentIntentId, err.message));
+    }
+  }
+
   async function handlePlusInvoice(inv) {
     const details = inv.parent?.subscription_details || inv.subscription_details || {};
     const subscriptionId = inv.subscription || details.subscription;
@@ -18,6 +25,10 @@ module.exports = function register(app, { store, hub, payments }) {
       if (owner && owner.status !== 'deleted' && !owner.plusSubscriptionId) {
         await store.linkSubscription(owner.id, { customerId: inv.customer, subscriptionId });
         user = owner;
+      } else if (owner?.plusSubscriptionId && owner.plusSubscriptionId !== subscriptionId) {
+        // A second subscription (two checkouts paid at once): stop it and give the money back.
+        await stopDuplicate(subscriptionId, inv.payment_intent || inv.payments?.data?.[0]?.payment?.payment_intent, inv.amount_paid);
+        return;
       }
     }
     if (!user || user.status === 'deleted') return;
@@ -38,7 +49,11 @@ module.exports = function register(app, { store, hub, payments }) {
     if (event.type === 'checkout.session.completed' && obj.mode === 'subscription') {
       // Plus started: remember the subscription; the first invoice.paid grants the month.
       const userId = obj.client_reference_id || obj.metadata?.user_id;
-      if (userId && obj.subscription && (await store.getUser(userId))?.status === 'active') {
+      const owner = userId && obj.subscription ? await store.getUser(userId) : null;
+      if (owner?.status === 'active' && owner.plusSubscriptionId && owner.plusSubscriptionId !== obj.subscription) {
+        // Already subscribed (two checkouts paid at once): cancel this one; its invoice gets refunded.
+        await stopDuplicate(obj.subscription);
+      } else if (owner?.status === 'active') {
         await store.linkSubscription(userId, { customerId: obj.customer, subscriptionId: obj.subscription });
       }
     } else if (event.type === 'invoice.paid') {
