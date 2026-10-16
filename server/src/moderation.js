@@ -89,8 +89,17 @@ const AGE_PROBE_PATTERNS = [
   /\btienes\s+(1[0-7]|[1-9])\s*(anos)?\s*\?/,
 ];
 
+// Ages written as words, so "I'm fifteen" reads like "I'm 15" (English and Spanish teens).
+const AGE_WORDS = {
+  ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17,
+  diez: 10, once: 11, doce: 12, trece: 13, catorce: 14, quince: 15, dieciseis: 16, diecisiete: 17,
+};
+const withAgeDigits = (t) => t.replace(/\b(ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|diez|doce|trece|catorce|quince|dieciseis|diecisiete)\b/g, (w) => String(AGE_WORDS[w]));
+
 // Unambiguous: pauses the account.
 const MINOR_PATTERNS = [
+  /\b(i'?m|im|i\s+am)\s+(only\s+|just\s+)?a\s+(1[0-7]|[1-9])[\s-]*(years?|yrs?)[\s-]*old\b/, // "I'm a 15 year old girl"
+  /\b(i\s+)?just\s+turned\s+(1[0-7]|[1-9])\b(?!\s*(minutes|hours|days|weeks|months|percent|%))/,
   /\b(i'?m|im|i\s+am)\s+(only\s+|just\s+)?(1[0-7]|[1-9])\s*(years?\s*old|yrs?\s*old|y\/?o)\b/,
   /\b(i'?m|im|i\s+am)\s+(a\s+)?(minor|underage)\b/,
   /\b(i'?m|im|i\s+am)\s+in\s+(middle\s+school|high\s+school|junior\s+high|(6|7|8|9|10|11|12)(th)?\s+grade)\b/,
@@ -105,6 +114,17 @@ const MINOR_PATTERNS = [
 // 13-17, and not "I'm 16 hours into this shift", "I'm 10 and a half weeks pregnant" or "on a scale
 // of 1 to 10 I'm 3". Ambiguous, so it's held for a moderator but doesn't pause anyone.
 const BARE_AGE = /\b(i'?m|im|i\s+am)\s+(only\s+|just\s+)?(1[3-7])(?=\s*([.!?,;)]|$)|\s+(btw|lol|lmao|haha|tho|though|rn|and|but|so|too|also|actually|now)\b)(?!\s+and\s+a\s+half)/;
+// Self-labels people use in chat: "16f", "15 m here", "16 yo", "17 years old here", "age: 15",
+// "turning 18 next month", "my 16th birthday is next week". Held for a moderator, no pause.
+const SELF_ID_MAYBE = [
+  /^\s*(hi|hey|hello|yo|hola)?[\s,!]*(1[3-7])\s*(f|m|male|female|girl|boy|guy|nb|yo|y\/o|yrs?|years?\s+old)\b/,
+  /\b(age|edad|asl)\s*[:=-]?\s*(1[3-7])\b/,
+  /\b(1[3-7])\s*(years?\s+old|yrs?\s+old|yo|y\/o)\s+here\b/,
+  /\b(me|yo)\s*[:=-]\s*(1[3-7])\b/,
+  /(^\s*|\b(i'?m|im|i\s+am|i'?ll\s+be|i\s+will\s+be)\s+)turn(ing)?\s+(16|17|18)\s+(next|in|this|soon|tomorrow)\b/,
+  /\b(i'?m|im|i\s+am)\s+(1[3-7])\s*(yrs?|years?)\b(?!\s+(of|into|in|at|on|with|clean|sober|married|together|later))/,
+  /\bmy\s+(1[3-8])(th)?\s+(birthday|bday)\s+(is\s+)?(next|this|tomorrow|today|coming|soon)\b/,
+];
 // Spanish "tengo 15 (años)" the same way; "tengo 15 años trabajando aquí" (years of work) doesn't match.
 const BARE_AGE_ES = /\btengo\s+(solo\s+|apenas\s+)?(1[3-7])(\s+anos)?(?=\s*([.!?,;)]|$)|\s+(jaja|jeje|lol|xd|pero|asi|ahorita|tambien|y\s+(tu|vos|usted)))/;
 const RATING_CONTEXT = /\b(scale|out\s+of|rate|rating|escala|de\s+10|del\s+1\s+al\s+10)\b|\/\s*10\b/;
@@ -154,8 +174,9 @@ function screenMessage(body, { connected = false } = {}) {
   if (!connected && (hasPhoneNumber(t) || any(CONTACT_PATTERNS, t) || OBFUSCATED_CONTACT.test(deobfuscate(t)))) flags.push('contact');
   if (!connected && any(LOCATION_PATTERNS, t)) flags.push('location');
   if (any(AGE_PROBE_PATTERNS, t)) flags.push('age_probe');
-  if (any(MINOR_PATTERNS, t)) flags.push('minor');
-  else if ((BARE_AGE.test(t) || BARE_AGE_ES.test(t)) && !RATING_CONTEXT.test(t)) flags.push('minor_maybe');
+  const aged = withAgeDigits(t);
+  if (any(MINOR_PATTERNS, aged)) flags.push('minor');
+  else if ((BARE_AGE.test(aged) || BARE_AGE_ES.test(aged) || any(SELF_ID_MAYBE, aged)) && !RATING_CONTEXT.test(aged)) flags.push('minor_maybe');
   if (any(SEXUAL_PATTERNS, t)) flags.push('sexual');
   const crisis = any(CRISIS_PATTERNS, t);
   if (crisis) flags.push('crisis');

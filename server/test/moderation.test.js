@@ -167,3 +167,19 @@ test('asking for contact details, dodged spellings, location questions and sexua
     'do you have kids?',
   ]) assert.deepEqual(flagsOf(text), [], text);
 });
+
+test('spelled-out ages and chat-style self-labels are caught; adults talking about ages are not', () => {
+  const pause = ['I am a 15 year old girl', 'I just turned 16'];
+  for (const text of pause) assert.equal(screenMessage(text).suspend, true, text);
+  const held = ["i'm fifteen", '16f here', '15 m', '16 yo', 'me: 15, you?', '17 years old here', 'turning 18 next month', 'my 16th birthday is next week', 'tengo quince', 'im 14 yrs'];
+  for (const text of held) {
+    const r = screenMessage(text);
+    assert.ok(r.flags.includes('minor_maybe'), text);
+    assert.equal(r.suspend, false, `${text} must not pause`);
+  }
+  for (const text of [
+    'I was 16 when it happened', 'my son is 15', '24f', 'im 19', 'I just turned 30', 'once upon a time',
+    'I was ten minutes late', 'I have fifteen dollars left', 'once I get paid I can breathe', 'my 16th birthday was awful',
+    'hey 23 m here', 'I worked there for 17 years', 'my daughter turning 16 next week stresses me out', "I'm 15 years into this career",
+  ]) assert.deepEqual(flagsOf(text), [], text);
+});
