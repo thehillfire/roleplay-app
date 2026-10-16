@@ -356,3 +356,6 @@ select { width: 100%; background: var(--bg); border: 1px solid var(--line); bord
 .support-meta { font-size: 12px; color: var(--muted); }
 .support-reply { color: var(--muted); }
 .reply-box { width: 100%; min-height: 80px; }
+
+/* Turnstile bot check on the signup form. */
+.turnstile { min-height: 65px; display: flex; justify-content: center; }

@@ -8,8 +8,9 @@ What's left between this repo and real users, in order. The code side is done an
 2. **Host + database.** Render → New → Blueprint → this repo (see [DEPLOY.md](DEPLOY.md)). That creates the server and a Postgres database. Starter plans are about $7/month each.
 3. **Email (Resend).** Free tier covers 3,000 emails/month. Verify your domain, then set `RESEND_API_KEY`, `MAIL_FROM` and `PUBLIC_URL`. Without email, password resets and moderator setup won't work.
 4. **You as moderator.** Set `ADMIN_EMAILS` to your email, sign up, click the confirmation link, and you'll see **Moderate**.
-5. **Notifications.** Run `npm run vapid` locally and paste the three values into Render.
-6. **Smoke test on your phone.** Sign up on two devices (or one phone + one laptop), match, chat, report, connect. Add it to your home screen.
+5. **Bot protection.** Create a free Cloudflare Turnstile widget and set `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` (see DEPLOY.md). Spam bots find anonymous chat apps within days.
+6. **Notifications.** Run `npm run vapid` locally and paste the three values into Render.
+7. **Smoke test on your phone.** Sign up on two devices (or one phone + one laptop), match, chat, report, connect. Add it to your home screen.
 
 ## Before inviting anyone (a week, mostly not code)
 

@@ -4,7 +4,7 @@ const { hashPassword, verifyPassword, hashToken, deviceHash } = require('../auth
 const { parseCredentials, badRequest } = require('../validate');
 const { httpError, asyncRoute, publicUser, RESET_TTL_MS, VERIFY_TTL_MS, PLUS_MONTHLY_CREDITS } = require('./common');
 
-module.exports = function register(app, { store, hub, auth, payments, push, mailer, ads, adminEmails, authLimiter, member, siteUrl }) {
+module.exports = function register(app, { store, hub, auth, payments, push, mailer, captcha, ads, adminEmails, authLimiter, member, siteUrl }) {
   // Failed logins per account, whatever IPs they come from (slow down distributed guessing).
   const failedLogins = new Map(); // email -> { count, resetAt }
   const LOGIN_FAILS = { max: 10, windowMs: 15 * 60 * 1000 };
@@ -55,6 +55,7 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
 
   app.post('/api/auth/signup', authLimiter, asyncRoute(async (req, res) => {
     const { email, password, birthdate } = parseCredentials(req.body, { signup: true });
+    if (!(await captcha.verify(req.body.captchaToken, req.ip))) throw badRequest("Please complete the quick check that you're a person, then try again.");
     const user = await store.createUser({ email, birthdate, passwordHash: await hashPassword(password) });
     if (!user) throw httpError(409, 'An account with that email already exists.');
     const device = deviceHash(req, res);
@@ -163,6 +164,7 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
       user: req.user ? { ...publicUser(req.user), helped: await store.helpedCount(req.user.id) } : null,
       billing: { enabled: payments.enabled, priceCents: payments.priceCents, plusPriceCents: payments.plusPriceCents, plusCredits: PLUS_MONTHLY_CREDITS, currency: payments.currency },
       push: { publicKey: push.publicKey },
+      captcha: { siteKey: captcha.siteKey },
       ads,
     });
   }));

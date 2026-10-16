@@ -222,6 +222,7 @@ export default function App() {
   const [billing, setBilling] = useState(null);
   const [pushKey, setPushKey] = useState(null);
   const [ads, setAds] = useState(null);
+  const [captchaSiteKey, setCaptchaSiteKey] = useState(null);
   const [checkoutNotice] = useState(takeCheckoutNotice);
 
   const refreshMe = useCallback(() => api.me().then((d) => {
@@ -229,6 +230,7 @@ export default function App() {
     setBilling(d.billing);
     setPushKey(d.push?.publicKey || null);
     setAds(d.ads || null);
+    setCaptchaSiteKey(d.captcha?.siteKey || null);
   }), []);
 
   const refreshMeQuietly = useCallback(() => { refreshMe().catch(() => {}); }, [refreshMe]);
@@ -306,7 +308,7 @@ export default function App() {
       {resetToken !== null && !legal && <ResetPassword token={resetToken} onDone={finishReset} />}
       <div hidden={Boolean(legal) || resetToken !== null}>
       {user === undefined && <main className="screen"><p className="loading">One moment…</p></main>}
-      {user === null && <Welcome onSignedIn={(u) => refreshMe().catch(() => setUser(u))} onOpenLegal={openLegal} />}
+      {user === null && <Welcome onSignedIn={(u) => refreshMe().catch(() => setUser(u))} onOpenLegal={openLegal} captchaSiteKey={captchaSiteKey} />}
       {user && user.status !== 'active' && <Paused onSignOut={signOut} />}
       {user && user.status === 'active' && (
         <Signedin

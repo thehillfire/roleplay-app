@@ -42,6 +42,14 @@ Use the connection string with SSL:
 
 Create a [Resend](https://resend.com) account, verify your sending domain, and set `RESEND_API_KEY`, `MAIL_FROM` (for example `Kindred <no-reply@yourdomain.com>`) and `PUBLIC_URL` (your site's address, used in the emailed link). Without these, reset links are only printed to the server log, which is fine for testing but useless for real users.
 
+## Bot protection (recommended)
+
+Anonymous chat apps attract spam bots. Kindred supports Cloudflare Turnstile at signup, which is free and usually invisible to people.
+1. In the Cloudflare dashboard, open **Turnstile** and add a widget for your domain.
+2. Set `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`.
+
+The signup form then shows the check, the server verifies every token, and the Content Security Policy opens for `challenges.cloudflare.com` only. If Cloudflare can't be reached, signups are let through and a warning is logged.
+
 ## Payments (Connect)
 
 1. Create a Stripe account and copy the **secret key** into `STRIPE_SECRET_KEY`.

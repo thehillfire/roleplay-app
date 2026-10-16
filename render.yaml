@@ -35,6 +35,10 @@ services:
         sync: false
       - key: ADSENSE_SLOT
         sync: false
+      - key: TURNSTILE_SITE_KEY
+        sync: false
+      - key: TURNSTILE_SECRET_KEY
+        sync: false
 
 databases:
   - name: kindred-db

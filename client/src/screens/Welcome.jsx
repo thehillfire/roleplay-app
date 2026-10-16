@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { api } from '../api.js';
+import Turnstile from '../components/Turnstile.jsx';
 
 const GUIDELINES = [
   'Be kind. People come here when things are hard.',
@@ -9,7 +10,7 @@ const GUIDELINES = [
   'If someone is in danger, point them to real help (call or text 988 in the US).',
 ];
 
-export default function Welcome({ onSignedIn, onOpenLegal }) {
+export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey }) {
   const [mode, setMode] = useState(null); // null | 'signup' | 'login' | 'forgot'
   const [sent, setSent] = useState(false);
   const [email, setEmail] = useState('');
@@ -18,6 +19,9 @@ export default function Welcome({ onSignedIn, onOpenLegal }) {
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaRound, setCaptchaRound] = useState(0);
+  const onCaptchaToken = useCallback((t) => setCaptchaToken(t), []);
   const signup = mode === 'signup';
 
   const sendReset = async (e) => {
@@ -63,11 +67,12 @@ export default function Welcome({ onSignedIn, onOpenLegal }) {
     setBusy(true);
     setError('');
     try {
-      const user = signup ? await api.signup({ email, password, birthdate, agree }) : await api.login(email, password);
+      const user = signup ? await api.signup({ email, password, birthdate, agree, captchaToken: captchaToken || undefined }) : await api.login(email, password);
       onSignedIn(user);
     } catch (err) {
       setError(err.message);
       setBusy(false);
+      if (signup && captchaSiteKey) setCaptchaRound((n) => n + 1); // tokens are single-use
     }
   };
 
@@ -139,9 +144,10 @@ export default function Welcome({ onSignedIn, onOpenLegal }) {
             </label>
           </>
         )}
+        {signup && captchaSiteKey && <Turnstile siteKey={captchaSiteKey} onToken={onCaptchaToken} resetKey={captchaRound} />}
         {error && <p className="form-error" role="alert">{error}</p>}
         {!signup && <button type="button" className="link forgot" onClick={() => { setMode('forgot'); setError(''); }}>Forgot password?</button>}
-        <button className="btn primary" type="submit" disabled={busy || (signup && !agree)}>
+        <button className="btn primary" type="submit" disabled={busy || (signup && (!agree || (captchaSiteKey && !captchaToken)))}>
           {busy ? 'One moment…' : signup ? 'Create account' : 'Sign in'}
         </button>
       </form>

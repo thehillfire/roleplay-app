@@ -7,6 +7,7 @@ const { createClassifier } = require('./classifier');
 const { createPayments } = require('./payments');
 const { createPush } = require('./push');
 const { createMailer } = require('./mailer');
+const { createCaptcha } = require('./captcha');
 const { envInt } = require('./env');
 
 const { AUTO_PAUSE, createRateLimiter, httpError, asyncRoute } = require('./routes/common');
@@ -31,6 +32,7 @@ function createApp({
   autoPauseMinReporterAgeMs = AUTO_PAUSE.minReporterAgeMs,
   push = createPush(),
   mailer = createMailer(),
+  captcha = createCaptcha(),
   publicUrl = process.env.PUBLIC_URL,
   // The Host header is attacker-controlled, so links in emails and payment redirects
   // only fall back to it in development. Production needs PUBLIC_URL.
@@ -48,15 +50,16 @@ function createApp({
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
   // Ad scripts only get through the CSP when ads are configured.
+  const captchaHosts = captcha.enabled ? ['https://challenges.cloudflare.com'] : [];
   const adHosts = ads ? ['https://pagead2.googlesyndication.com', 'https://*.googlesyndication.com', 'https://*.doubleclick.net', 'https://*.google.com', 'https://*.adtrafficquality.google'] : [];
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
         'font-src': ["'self'", 'https://fonts.gstatic.com'],
         'style-src': ["'self'", 'https://fonts.googleapis.com', "'unsafe-inline'"],
-        'connect-src': ["'self'", ...adHosts],
-        'script-src': ["'self'", ...adHosts],
-        'frame-src': ["'self'", ...adHosts],
+        'connect-src': ["'self'", ...adHosts, ...captchaHosts],
+        'script-src': ["'self'", ...adHosts, ...captchaHosts],
+        'frame-src': ["'self'", ...adHosts, ...captchaHosts],
         'img-src': ["'self'", 'data:', ...adHosts],
       },
     },
@@ -126,7 +129,7 @@ function createApp({
   // Rough live numbers for the home screen ("12 people here now").
   app.get('/api/presence', member, (req, res) => res.json(hub.stats()));
 
-  const ctx = { store, hub, auth, payments, classifier, push, mailer, ads, adminEmails, autoPauseMinReporterAgeMs, authLimiter, messageLimiter, member, siteUrl, conversation };
+  const ctx = { store, hub, auth, payments, classifier, push, mailer, captcha, ads, adminEmails, autoPauseMinReporterAgeMs, authLimiter, messageLimiter, member, siteUrl, conversation };
   routes.auth(app, ctx);
   routes.account(app, ctx);
   routes.billing(app, ctx);
