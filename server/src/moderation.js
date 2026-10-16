@@ -145,8 +145,29 @@ const SEXUAL_PATTERNS = [
   /\bque\s+(traes|llevas|tienes)\s+puesto\b/,
 ];
 
+// A false alarm here only shows a resource card, so these lean broad: missing someone matters more.
 const CRISIS_PATTERNS = [
-  /\b(kill|hurt|harm)\s+(my\s*self|myself)\b/,
+  /\b(kill|killing|hurt|hurting|harm|harming)\s+(my\s*self|myself)\b/,
+  /\b(kms|unalive|sewer\s*slide)\b/,
+  /\b(going\s+to|gonna|want\s+to|wanna|about\s+to)\s+end\s+it\b/,
+  /\bcan'?t\s+(do\s+this|go\s+on|take\s+(it|this)|keep\s+going)\s+any\s*more\b/,
+  /\b(nobody|no\s+one|noone)\s+would\s+(miss|notice|care\s+if)\b/,
+  /\b(saved|saving|stockpil(ed|ing)|hoard(ed|ing))\s+(up\s+)?(pills|meds|medication)\b/,
+  /\b(pills|rope|gun)\s+(saved|ready|stockpiled)\b/,
+  /\b(goodbye|suicide)\s+(note|letter)\b/,
+  /\b(jump|jumping)\s+(off|from|in\s+front\s+of)\s+(a|the|my)\b/,
+  /\bdon'?t\s+want\s+to\s+(be\s+here|exist)\s*any\s*more\b/,
+  /\b(better|happier)\s+(off\s+)?without\s+me\b/,
+  /\bdisappear\s+(forever|for\s+good)\b/,
+  /\bdone\s+with\s+(life|living|being\s+alive)\b/,
+  /\bnever\s+wake\s+up\b/,
+  /\b(what'?s|what\s+is)\s+the\s+point\s+(of|in)\s+(living|life|going\s+on|being\s+alive)\b/,
+  /\bi\s+should\s+(just\s+)?die\b/,
+  /\bhate\s+being\s+alive\b/,
+  /\boverdos(e|ed|ing)\b/,
+  /\bya\s+no\s+(puedo|aguanto)\s+mas\b/,
+  /\bnadie\s+me\s+(extranaria|extrana|va\s+a\s+extranar)\b/,
+  /\bdesaparecer\s+para\s+siempre\b/,
   /\bsuicid(e|al)\b/,
   /\b(want|wanna|going)\s+to\s+die\b/,
   /\bwanna\s+die\b/,
@@ -166,6 +187,14 @@ const CRISIS_PATTERNS = [
   /\bacabar\s+con\s+(todo|mi\s+vida)\b/,
 ];
 
+// Telling someone to kill themselves is abuse, not a crisis.
+const ABUSE_PATTERNS = [
+  /\bkys\b/,
+  /\b(go|just|you\s+should|u\s+should)\s+(kill|unalive)\s+(your\s*self|yourself|urself|ur\s*self)\b/,
+  /\b(matate|suicidate)\b/,
+  /\b(you|u)\s+should\s+(just\s+)?die\b/,
+];
+
 const any = (patterns, t) => patterns.some((re) => re.test(t));
 
 function screenMessage(body, { connected = false } = {}) {
@@ -178,6 +207,7 @@ function screenMessage(body, { connected = false } = {}) {
   if (any(MINOR_PATTERNS, aged)) flags.push('minor');
   else if ((BARE_AGE.test(aged) || BARE_AGE_ES.test(aged) || any(SELF_ID_MAYBE, aged)) && !RATING_CONTEXT.test(aged)) flags.push('minor_maybe');
   if (any(SEXUAL_PATTERNS, t)) flags.push('sexual');
+  if (any(ABUSE_PATTERNS, t)) flags.push('harassment');
   const crisis = any(CRISIS_PATTERNS, t);
   if (crisis) flags.push('crisis');
   const blocking = flags.filter((f) => f !== 'crisis');

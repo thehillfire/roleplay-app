@@ -183,3 +183,22 @@ test('spelled-out ages and chat-style self-labels are caught; adults talking abo
     'hey 23 m here', 'I worked there for 17 years', 'my daughter turning 16 next week stresses me out', "I'm 15 years into this career",
   ]) assert.deepEqual(flagsOf(text), [], text);
 });
+
+test('crisis language people actually use is caught (and delivered); abuse aimed at others is held', () => {
+  for (const text of [
+    'kms', 'i want to unalive myself', "i'm going to end it", "i can't do this anymore", 'nobody would miss me',
+    'i have pills saved up', 'i wrote a goodbye note', 'thinking of jumping off a bridge', "i don't want to be here anymore",
+    'everyone would be better without me', 'i want to disappear forever', "i'm done with life", 'i want to sleep and never wake up',
+    'what is the point of living', 'i should just die', 'i hate being alive', 'killing myself tonight', 'ya no puedo más',
+  ]) {
+    const r = screenMessage(text);
+    assert.equal(r.crisis, true, text);
+    assert.equal(r.deliver, true, `${text} is still delivered`);
+  }
+  for (const text of ['this job is killing me', 'i could die of embarrassment', 'that joke killed me lol']) assert.deepEqual(flagsOf(text), [], text);
+  for (const text of ['kys', 'just kill yourself', 'you should die lol']) {
+    const r = screenMessage(text);
+    assert.equal(r.deliver, false, text);
+    assert.ok(r.flags.includes('harassment'), text);
+  }
+});
