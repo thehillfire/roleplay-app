@@ -31,7 +31,8 @@ What's left between this repo and real users, in order. The code side is done an
 
 - **Reddit:** communities like r/offmychest, r/lonely, r/KindVoice and r/needafriend. Follow each sub's self-promotion rules. One honest post ("I built a free, anonymous place to talk on your lunch break, adults only, moderated") beats ten ads.
 - **TikTok/Reels:** short "this is what it feels like to vent to a stranger who's kind" clips. Use the share image and tagline.
-- **Listeners first.** Recruit 20–50 people who like helping (nursing students, peer-support volunteers, your own friends) before you launch to talkers. The "N people are waiting for a listener" banner works best when someone answers it.
+- **Listeners first.** Recruit 20–50 people who like helping (nursing students, peer-support volunteers, your own friends) before you launch to talkers. The "N people are waiting for a listener" banner works best when someone answers it. Ask them to turn on **On call as a listener** (Account), so a notification brings them back when someone is waiting.
+- **Quiet hours are expected.** Early on, most people will find nobody online. After 20 seconds the waiting room offers to *leave a message for the next listener*. Point that out in your launch posts ("say what's on your mind and close the app; we'll tell you when someone answers") so an empty room doesn't feel like a dead app.
 
 ## Numbers to watch (Moderate screen)
 
@@ -41,6 +42,7 @@ What's left between this repo and real users, in order. The code side is done an
 | Messages per new match | 10+ means real conversations happen |
 | "Helped" votes this week | Growing week over week |
 | Open reports | Cleared within a day |
+| Held queue | Reviewed daily; use *Deliver anyway* for false positives so the screener's mistakes don't silence people |
 | Connections made → Revenue | Your monetization signal |
 
 ## Biggest risks, honestly
