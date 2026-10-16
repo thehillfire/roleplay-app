@@ -287,6 +287,15 @@ const MIGRATIONS = [
     'ALTER TABLE payments_v2 RENAME TO payments',
     'CREATE INDEX IF NOT EXISTS payments_user_idx ON payments(user_id)',
   ],
+  // 25: indexes for moderator lookup (case-insensitive handle, history by account), reports
+  // made, on-call listener search and waiting messages by author
+  [
+    'CREATE INDEX IF NOT EXISTS users_handle_lower_idx ON users(LOWER(handle))',
+    'CREATE INDEX IF NOT EXISTS users_listener_alerts_idx ON users(listener_alerts, listener_alerted_at)',
+    'CREATE INDEX IF NOT EXISTS mod_actions_target_idx ON mod_actions(target_id, created_at)',
+    'CREATE INDEX IF NOT EXISTS reports_reporter_idx ON reports(reporter_id, created_at)',
+    'CREATE INDEX IF NOT EXISTS bottles_user_idx ON bottles(user_id, status)',
+  ],
 ];
 
 async function migrate(db) {
