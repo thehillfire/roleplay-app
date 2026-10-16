@@ -6,6 +6,7 @@ import Home from './screens/Home.jsx';
 import Waiting from './screens/Waiting.jsx';
 import Chat from './screens/Chat.jsx';
 import Moderate from './screens/Moderate.jsx';
+import { disablePushOnThisDevice, enablePush, pushSupported, syncPush } from './notifications.js';
 
 function Paused({ onSignOut }) {
   return (
@@ -20,7 +21,7 @@ function Paused({ onSignOut }) {
   );
 }
 
-function Signedin({ user, billing, onSignOut, onPaused, onRefreshMe, initialNotice }) {
+function Signedin({ user, billing, pushKey, onSignOut, onPaused, onRefreshMe, initialNotice }) {
   const [view, setView] = useState({ name: 'home' });
 
   // Browser history: home is the root entry; other screens are pushed on top so the
@@ -49,6 +50,19 @@ function Signedin({ user, billing, onSignOut, onPaused, onRefreshMe, initialNoti
   viewRef.current = view;
 
   useEffect(() => () => socket.close(), [socket]);
+
+  const [askPush, setAskPush] = useState(() => Boolean(pushKey) && pushSupported() && Notification.permission === 'default');
+  useEffect(() => {
+    if (pushKey) syncPush(api.pushSubscribe).catch(() => {});
+  }, [pushKey]);
+  const turnOnPush = async () => {
+    try {
+      await enablePush(pushKey, api.pushSubscribe);
+    } catch {
+      // Permission denied or the browser refused; nothing else to do.
+    }
+    setAskPush(false);
+  };
 
   const refresh = useCallback(() => {
     setListError('');
@@ -105,6 +119,9 @@ function Signedin({ user, billing, onSignOut, onPaused, onRefreshMe, initialNoti
           notice={notice}
           onDismissNotice={() => setNotice('')}
           onModerate={user.role === 'admin' ? () => navigate({ name: 'moderate' }) : undefined}
+          askPush={askPush}
+          onEnablePush={turnOnPush}
+          onDismissPush={() => setAskPush(false)}
         />
       )}
       {view.name === 'moderate' && <Moderate onBack={goHome} />}
@@ -144,11 +161,13 @@ function takeCheckoutNotice() {
 export default function App() {
   const [user, setUser] = useState(undefined); // undefined while checking the session
   const [billing, setBilling] = useState(null);
+  const [pushKey, setPushKey] = useState(null);
   const [checkoutNotice] = useState(takeCheckoutNotice);
 
   const refreshMe = useCallback(() => api.me().then((d) => {
     setUser(d.user);
     setBilling(d.billing);
+    setPushKey(d.push?.publicKey || null);
   }), []);
 
   const refreshMeQuietly = useCallback(() => { refreshMe().catch(() => {}); }, [refreshMe]);
@@ -158,6 +177,7 @@ export default function App() {
   }, [refreshMe]);
 
   const signOut = async () => {
+    await disablePushOnThisDevice(api.pushUnsubscribe).catch(() => {});
     await api.logout().catch(() => {});
     setUser(null);
   };
@@ -173,6 +193,7 @@ export default function App() {
           key={user.id}
           user={user}
           billing={billing}
+          pushKey={pushKey}
           initialNotice={checkoutNotice}
           onSignOut={signOut}
           onPaused={() => setUser({ ...user, status: 'review' })}

@@ -43,6 +43,14 @@ await kid.shot('0-welcome');
 await signUp(alice);
 await signUp(bob);
 const aliceHandle = (await alice.locator('.who strong').textContent()).trim();
+const sw = await alice.evaluate(async () => {
+  const reg = await navigator.serviceWorker.ready;
+  return Boolean(reg.active);
+});
+assert.equal(sw, true, 'service worker active');
+const manifest = await (await fetch(`${BASE}/manifest.webmanifest`)).json();
+assert.equal(manifest.display, 'standalone');
+if (process.env.EXPECT_PUSH) await alice.getByText('Get a notification when someone replies').waitFor();
 const bobHandle = (await bob.locator('.who strong').textContent()).trim();
 assert.notEqual(aliceHandle, bobHandle);
 await alice.getByRole('button', { name: 'Find someone' }).waitFor();

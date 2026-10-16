@@ -29,6 +29,8 @@ export const api = {
   connect: (id, name, contact) => request('POST', `/api/conversations/${enc(id)}/connect`, { name, contact: contact || undefined }),
   declineConnect: (id) => request('POST', `/api/conversations/${enc(id)}/connect/decline`, {}),
   cancelConnect: (id) => request('POST', `/api/conversations/${enc(id)}/connect/cancel`, {}),
+  pushSubscribe: (subscription) => request('POST', '/api/push/subscribe', { subscription }),
+  pushUnsubscribe: (endpoint) => request('POST', '/api/push/unsubscribe', { endpoint }),
   checkout: () => request('POST', '/api/billing/checkout', {}),
   admin: {
     reports: (status = 'open') => request('GET', `/api/admin/reports?status=${status}`).then((d) => d.reports),

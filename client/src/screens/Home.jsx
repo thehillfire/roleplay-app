@@ -16,7 +16,7 @@ export function timeAgo(ts) {
   return `${Math.round(hours / 24)}d`;
 }
 
-export default function Home({ user, conversations, listError, onRetry, onFind, onOpen, onSignOut, connection, notice, onDismissNotice, onModerate }) {
+export default function Home({ user, conversations, listError, onRetry, onFind, onOpen, onSignOut, connection, notice, onDismissNotice, onModerate, askPush, onEnablePush, onDismissPush }) {
   const [role, setRole] = useState('talk');
   const [topic, setTopic] = useState('');
 
@@ -60,6 +60,14 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
           {connection === 'online' ? 'Find someone' : 'Connecting…'}
         </button>
       </section>
+
+      {askPush && (
+        <div className="notice push-ask">
+          <p>Get a notification when someone replies. It only shows their anonymous name, never what they wrote.</p>
+          <button className="btn primary" onClick={onEnablePush}>Turn on</button>
+          <button className="icon-btn" aria-label="Not now" onClick={onDismissPush}>×</button>
+        </div>
+      )}
 
       {listError && <div className="card error"><p>{listError}</p><button className="btn" onClick={onRetry}>Try again</button></div>}
 

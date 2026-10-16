@@ -25,7 +25,8 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Payment behind an interface; Stripe Checkout when keys exist, free in development
 
 ## 4. Polish
-- [ ] PWA: installable, notification permission for new messages
+- [x] PWA: installable (manifest, icons, service worker) and web push for new messages and connect requests (handle only, never message text)
+- [x] Back button / swipe-back navigation; load earlier messages
 - [ ] Account deletion and data export
 - [ ] Accessibility pass; reduced motion; text size
 - [ ] Deployment guide (needs a host with WebSockets: Render, Fly.io, Railway; Postgres via Supabase/Neon)

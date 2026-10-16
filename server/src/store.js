@@ -370,6 +370,32 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return rowCount === 1;
     },
 
+    // --- push notifications ---
+
+    async savePushSubscription(userId, subscription) {
+      // An endpoint belongs to one browser; if someone else signs in there, it moves to them.
+      await db.query(
+        `INSERT INTO push_subscriptions (endpoint, user_id, subscription, created_at) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (endpoint) DO UPDATE SET user_id = $2, subscription = $3`,
+        [subscription.endpoint, userId, JSON.stringify(subscription), now()],
+      );
+    },
+
+    async deletePushSubscription(endpoint, userId) {
+      const params = [endpoint];
+      let extra = '';
+      if (userId) {
+        params.push(userId);
+        extra = 'AND user_id = $2';
+      }
+      await db.query(`DELETE FROM push_subscriptions WHERE endpoint = $1 ${extra}`, params);
+    },
+
+    async pushSubscriptions(userId) {
+      const { rows } = await db.query('SELECT subscription FROM push_subscriptions WHERE user_id = $1', [userId]);
+      return rows.map((r) => JSON.parse(r.subscription));
+    },
+
     async listHeldMessages({ limit = 50 } = {}) {
       const { rows } = await db.query(
         `SELECT m.*, u.handle AS sender_handle, u.status AS sender_status FROM messages m JOIN users u ON u.id = m.sender_id

@@ -93,6 +93,16 @@ const MIGRATIONS = [
       created_at BIGINT NOT NULL
     )`,
   ],
+  // 4: web push subscriptions
+  [
+    `CREATE TABLE IF NOT EXISTS push_subscriptions (
+      endpoint TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      subscription TEXT NOT NULL,
+      created_at BIGINT NOT NULL
+    )`,
+    'CREATE INDEX IF NOT EXISTS push_user_idx ON push_subscriptions(user_id)',
+  ],
 ];
 
 async function migrate(db) {

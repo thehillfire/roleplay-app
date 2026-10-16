@@ -5,6 +5,7 @@ const { createAuth, hashPassword, verifyPassword } = require('./auth');
 const { parseCredentials, parseMessageBody, str, badRequest } = require('./validate');
 const { screenMessage } = require('./moderation');
 const { createPayments } = require('./payments');
+const { createPush } = require('./push');
 
 const REPORT_REASONS = ['harassment', 'sexual', 'minor', 'hate', 'spam', 'self_harm', 'other'];
 // Auto-pause (pending human review) when this many different people report someone within a week.
@@ -54,6 +55,7 @@ function createApp({
   messageRateLimit = { max: 30, windowMs: 60000 },
   staticDir,
   payments = createPayments(),
+  push = createPush(),
   adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
 } = {}) {
   if (!store || !hub) throw new Error('createApp requires a store and a hub');
@@ -157,8 +159,26 @@ function createApp({
     res.json({
       user: req.user ? publicUser(req.user) : null,
       billing: { enabled: payments.enabled, priceCents: payments.priceCents, currency: payments.currency },
+      push: { publicKey: push.publicKey },
     });
   });
+
+  // --- Push notifications ---
+
+  app.post('/api/push/subscribe', member, asyncRoute(async (req, res) => {
+    if (!push.enabled) throw httpError(503, 'Notifications are not set up on this server.');
+    const sub = req.body.subscription;
+    const valid = sub && typeof sub.endpoint === 'string' && /^https:\/\//.test(sub.endpoint) && sub.endpoint.length < 1000
+      && sub.keys && typeof sub.keys.p256dh === 'string' && typeof sub.keys.auth === 'string';
+    if (!valid) throw badRequest('Invalid push subscription');
+    await store.savePushSubscription(req.user.id, { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } });
+    res.status(201).json({ ok: true });
+  }));
+
+  app.post('/api/push/unsubscribe', member, asyncRoute(async (req, res) => {
+    if (typeof req.body.endpoint === 'string') await store.deletePushSubscription(req.body.endpoint, req.user.id);
+    res.json({ ok: true });
+  }));
 
   // --- Billing ---
 
@@ -218,6 +238,11 @@ function createApp({
       setImmediate(() => hub.disconnect(req.user.id));
     } else if (screen.deliver) {
       hub.push(partnerId, { type: 'message', message: { ...out, fromMe: false, ...(screen.crisis ? { crisis: true } : {}) } });
+      // Not looking at the app: notify their devices (handle only, never the text).
+      if (!hub.isOnline(partnerId)) {
+        push.notify(store, partnerId, { title: 'Kindred', body: `New message from ${req.user.handle}`, conversationId: id, tag: id })
+          .catch((err) => console.warn('push notify failed', err.message));
+      }
     }
     res.status(201).json({ message: { ...out, fromMe: true, flags }, crisis: screen.crisis, paused: screen.suspend || undefined });
   }));
@@ -231,7 +256,13 @@ function createApp({
 
   const pushConnection = async (conversationId, userIds) => {
     const c = await store.getConnection(conversationId);
-    for (const uid of userIds) hub.push(uid, { type: 'connect.updated', conversationId, connection: connectionView(c, uid) });
+    for (const uid of userIds) {
+      hub.push(uid, { type: 'connect.updated', conversationId, connection: connectionView(c, uid) });
+      if (c?.status === 'pending' && !hub.isOnline(uid)) {
+        push.notify(store, uid, { title: 'Kindred', body: 'Someone would like to connect with you', conversationId, tag: `connect-${conversationId}` })
+          .catch(() => {});
+      }
+    }
   };
 
   app.post('/api/conversations/:id/connect', member, conversation, asyncRoute(async (req, res) => {
