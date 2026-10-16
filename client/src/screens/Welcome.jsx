@@ -87,6 +87,11 @@ export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey }) {
           <p>Rough day? Money tight, work heavy, something you can't tell the people around you?</p>
           <p>Tap once and get matched with a kind stranger. Vent, or be the one who listens. You'll only ever see each other's anonymous names.</p>
         </div>
+        <ul className="promises">
+          <li><strong>No profiles, no photos.</strong> A random name like QuietHeron42. Phone numbers and socials are held back unless you both choose to connect.</li>
+          <li><strong>Nobody around?</strong> Leave a message and go. The next person who comes to listen starts there.</li>
+          <li><strong>Adults only, with rules.</strong> Every message is screened before it's delivered, and reports are read by a person.</li>
+        </ul>
         <div className="stack">
           <button className="btn primary big" onClick={() => setMode('signup')}>Get started</button>
           <button className="btn big" onClick={() => setMode('login')}>I have an account</button>
