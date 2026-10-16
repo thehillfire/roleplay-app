@@ -101,8 +101,10 @@ await alice.getByRole('button', { name: 'Money' }).click();
 await alice.getByRole('button', { name: 'Find someone' }).click();
 await alice.locator('.waiting').waitFor();
 await alice.shot('2-waiting');
-await bob.getByRole('radio', { name: 'I can listen' }).click();
-await bob.getByRole('button', { name: 'Find someone' }).click();
+// Bob sees that someone is waiting for a listener and steps up
+await bob.reload();
+await bob.getByText('Someone is waiting for someone to listen.').waitFor();
+await bob.getByRole('button', { name: 'Be a listener' }).click();
 await alice.locator('.chat-who', { hasText: bobHandle }).waitFor();
 await bob.locator('.chat-who', { hasText: aliceHandle }).waitFor();
 await bob.getByRole('button', { name: 'Hey. Rough day?' }).click();

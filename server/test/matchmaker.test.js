@@ -91,3 +91,10 @@ test('topic outweighs age band', () => {
   mm.join({ userId: 'me', role: 'talk', topic: 'money', ageBand: '25-34' });
   assert.deepEqual(matches, [['me', 'sameTopic']]);
 });
+
+test('counts who is waiting in each role', () => {
+  const { mm } = setup();
+  mm.join({ userId: 'a', role: 'talk' });
+  mm.join({ userId: 'b', role: 'talk' });
+  assert.deepEqual(mm.waitingByRole(), { talk: 2, listen: 0, either: 0 });
+});

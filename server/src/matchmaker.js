@@ -84,6 +84,12 @@ function createMatchmaker({ onMatch, now = Date.now, sameRoleAfterMs = 30000 }) 
     },
 
     isQueued: (userId) => queue.has(userId),
+    // How many are waiting in each role (for "people are waiting for a listener").
+    waitingByRole() {
+      const counts = { talk: 0, listen: 0, either: 0 };
+      for (const e of queue.values()) counts[e.role] += 1;
+      return counts;
+    },
     get size() {
       return queue.size;
     },

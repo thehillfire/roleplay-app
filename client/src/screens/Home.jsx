@@ -64,6 +64,12 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
         <h1 className="find-title">Talk to someone</h1>
         <p className="hint">A random, anonymous match. Stay as long as you like.</p>
         {presence?.online > 1 && <p className="presence"><span className="dot" aria-hidden="true" /> {presence.online} people here now</p>}
+        {presence?.waitingToTalk > 0 && (
+          <div className="need-listener">
+            <p>💙 {presence.waitingToTalk === 1 ? 'Someone is' : `${presence.waitingToTalk} people are`} waiting for someone to listen.</p>
+            <button className="btn" onClick={() => { setRole('listen'); onFind({ role: 'listen', topic: '' }); }}>Be a listener</button>
+          </div>
+        )}
         <div className="segmented" role="radiogroup" aria-label="What do you need?">
           {ROLES.map((r) => (
             <button key={r.id} type="button" role="radio" aria-checked={role === r.id} className={role === r.id ? 'seg active' : 'seg'} onClick={() => setRole(r.id)}>

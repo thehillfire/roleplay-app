@@ -166,13 +166,13 @@ test('presence counts people online and waiting', async (t) => {
   t.after(s.stop);
   const alice = await signedUp(s.base);
   const bob = await signedUp(s.base);
-  assert.deepEqual((await alice('GET', '/api/presence')).body, { online: 0, waiting: 0 });
+  assert.deepEqual((await alice('GET', '/api/presence')).body, { online: 0, waiting: 0, waitingToTalk: 0 });
   const aws = await alice.socket();
   const bws = await bob.socket();
   t.after(() => Promise.all([aws.close(), bws.close()]));
   aws.send({ type: 'match.join', role: 'talk' });
   await aws.next('match.waiting');
-  assert.deepEqual((await alice('GET', '/api/presence')).body, { online: 2, waiting: 1 });
+  assert.deepEqual((await alice('GET', '/api/presence')).body, { online: 2, waiting: 1, waitingToTalk: 1 });
 });
 
 test('history paging never skips messages that share a timestamp', async (t) => {

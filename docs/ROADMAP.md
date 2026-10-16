@@ -32,6 +32,8 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Deployment: Dockerfile (tested: production mode, non-root, clean SIGTERM), Render Blueprint, docs/DEPLOY.md
 
 ## 5. Community & launch readiness
+- [x] "N people are waiting for someone to listen" banner with one-tap Be a listener (balances the two sides)
+- [x] Message retention (MESSAGE_RETENTION_DAYS, default 365); calmer chat (actions on tap/hover)
 - [x] Moderation ops: urgent-report emails to moderators, audit log of every moderator/automatic action, appeals from the paused screen
 - [x] Private daily check-in (mood 1–5, two-week strip, low days offer a listener); exported, deleted with the account
 - [x] Gentle reactions (💙 🫂 🙏) on the other person's messages; age-band matching preference; sign out everywhere; `npm run verify`
