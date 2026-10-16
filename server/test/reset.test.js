@@ -42,7 +42,7 @@ test('forgot password emails a single-use link that resets and signs out old ses
 test('only the newest reset link works, and links expire', async (t) => {
   const mailer = fakeMailer();
   const clock = Date.now();
-  const s = await start({ mailer });
+  const s = await start({ mailer, emailCooldownMs: 0 });
   t.after(s.stop);
   await signedUp(s.base, { email: 'bob-reset@example.com' });
   const anon = client(s.base);

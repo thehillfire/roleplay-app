@@ -34,6 +34,8 @@ function createApp({
   push = createPush(),
   mailer = createMailer(),
   captcha = createCaptcha(),
+  trustProxy = envInt('TRUST_PROXY', 1),
+  emailCooldownMs = 2 * 60 * 1000, // per address, for reset/confirmation emails
   publicUrl = process.env.PUBLIC_URL,
   // The Host header is attacker-controlled, so links in emails and payment redirects
   // only fall back to it in development. Production needs PUBLIC_URL.
@@ -48,7 +50,9 @@ function createApp({
   const app = express();
   const auth = createAuth(store);
 
-  app.set('trust proxy', 1);
+  // How many proxies sit in front (Render/Fly/Heroku: 1). Set TRUST_PROXY=0 when Node is reachable
+  // directly, or anyone can fake X-Forwarded-For and get a fresh rate-limit bucket per request.
+  app.set('trust proxy', trustProxy);
   app.disable('x-powered-by');
   // Ad scripts only get through the CSP when ads are configured.
   const captchaHosts = captcha.enabled ? ['https://challenges.cloudflare.com'] : [];
@@ -130,7 +134,7 @@ function createApp({
   // Rough live numbers for the home screen ("12 people here now").
   app.get('/api/presence', member, (req, res) => res.json(hub.stats()));
 
-  const ctx = { store, hub, auth, payments, classifier, push, mailer, captcha, ads, adminEmails, autoPauseMinReporterAgeMs, authLimiter, messageLimiter, member, siteUrl, conversation };
+  const ctx = { store, hub, auth, payments, classifier, push, mailer, captcha, emailCooldownMs, ads, adminEmails, autoPauseMinReporterAgeMs, authLimiter, messageLimiter, member, siteUrl, conversation };
   routes.auth(app, ctx);
   routes.account(app, ctx);
   routes.billing(app, ctx);

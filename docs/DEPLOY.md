@@ -31,6 +31,8 @@ docker run -d --name kindred -p 3000:3000 \
 
 Without `DATABASE_URL`, data goes to SQLite at `/app/data/kindred.db`. Mount a volume (`-v kindred-data:/app/data`) or it's lost when the container is replaced. Put it behind HTTPS (Caddy, nginx, or your platform's load balancer). Sessions use `Secure` cookies in production, and browsers only allow notifications and installs over HTTPS.
 
+`TRUST_PROXY` (default `1`) is how many proxies sit in front of Node. Keep 1 behind one proxy (Caddy, nginx, Render). If port 3000 is reachable directly from the internet, set `TRUST_PROXY=0`. Otherwise anyone can send a fake `X-Forwarded-For` header and slip past the rate limits.
+
 ## Database: Supabase or Neon
 
 Use the connection string with SSL:

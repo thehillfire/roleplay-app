@@ -4,7 +4,7 @@ const { hashPassword, verifyPassword, hashToken, deviceHash } = require('../auth
 const { parseCredentials, badRequest } = require('../validate');
 const { httpError, asyncRoute, publicUser, RESET_TTL_MS, VERIFY_TTL_MS, PLUS_MONTHLY_CREDITS } = require('./common');
 
-module.exports = function register(app, { store, hub, auth, payments, push, mailer, captcha, ads, adminEmails, authLimiter, member, siteUrl }) {
+module.exports = function register(app, { store, hub, auth, payments, push, mailer, captcha, emailCooldownMs, ads, adminEmails, authLimiter, member, siteUrl }) {
   // Failed logins per account, whatever IPs they come from (slow down distributed guessing).
   const failedLogins = new Map(); // email -> { count, resetAt }
   const LOGIN_FAILS = { max: 10, windowMs: 15 * 60 * 1000 };
@@ -113,10 +113,21 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
   }));
 
   // Always answers the same way, so it can't be used to find out who has an account.
+  // At most one email of each kind per address every 2 minutes, whatever IP asks: no inbox bombing.
+  const lastEmailed = new Map(); // `${kind}:${email}` -> time
+  const mayEmail = (kind, email) => {
+    const t = Date.now();
+    const key = `${kind}:${email}`;
+    if (lastEmailed.get(key) > t - emailCooldownMs) return false;
+    if (lastEmailed.size > 20000) for (const [k, v] of lastEmailed) if (v < t - emailCooldownMs) lastEmailed.delete(k);
+    lastEmailed.set(key, t);
+    return true;
+  };
+
   app.post('/api/auth/forgot', authLimiter, asyncRoute(async (req, res) => {
     const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     const found = email ? await store.findUserByEmail(email) : null;
-    if (found && found.status !== 'deleted') {
+    if (found && found.status !== 'deleted' && mayEmail('reset', email)) {
       const base = siteUrl(req);
       if (!base) {
         console.error('PUBLIC_URL is not set; refusing to email a reset link built from the Host header.');
@@ -141,7 +152,7 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
   }));
 
   app.post('/api/auth/resend-verification', member, authLimiter, asyncRoute(async (req, res) => {
-    if (!req.user.emailVerified) await sendVerification(req, req.user);
+    if (!req.user.emailVerified && mayEmail('verify', req.user.email)) await sendVerification(req, req.user);
     res.json({ ok: true });
   }));
 

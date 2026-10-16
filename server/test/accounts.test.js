@@ -152,3 +152,25 @@ test('a password reset lifts the account lockout', async (t) => {
   await client(s.base)('POST', '/api/auth/reset', { token, password: 'brand-new-pass' });
   assert.equal((await client(s.base)('POST', '/api/auth/login', { email: creds.email, password: 'brand-new-pass' })).status, 200);
 });
+
+test('reset emails: at most one per address every 2 minutes, whatever IP asks', async (t) => {
+  const sent = [];
+  const s = await start({ authRateLimit: { max: 1000, windowMs: 60000 }, publicUrl: 'https://kindred.example', mailer: { enabled: true, send: async (m) => { sent.push(m); } } });
+  t.after(s.stop);
+  assert.equal((await client(s.base)('POST', '/api/auth/signup', adult({ email: 'victim@example.com' }))).status, 201);
+  const attacker = client(s.base);
+  for (let i = 0; i < 5; i += 1) assert.equal((await attacker('POST', '/api/auth/forgot', { email: 'victim@example.com' })).status, 200);
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(sent.filter((m) => m.to === 'victim@example.com' && m.subject === 'Reset your Kindred password').length, 1);
+});
+
+test('TRUST_PROXY=0: a faked X-Forwarded-For does not get a fresh rate-limit bucket', async (t) => {
+  const s = await start({ trustProxy: 0, authRateLimit: { max: 2, windowMs: 60000 } });
+  t.after(s.stop);
+  const statuses = [];
+  for (let i = 0; i < 4; i += 1) {
+    const res = await fetch(`${s.base}/api/auth/forgot`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': `10.9.9.${i}` }, body: JSON.stringify({ email: 'x@example.com' }) });
+    statuses.push(res.status);
+  }
+  assert.deepEqual(statuses, [200, 200, 429, 429]);
+});
