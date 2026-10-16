@@ -316,10 +316,11 @@ function createApp({
     const before = Number(req.query.before) || undefined;
     const beforeId = typeof req.query.beforeId === 'string' ? req.query.beforeId.slice(0, 64) : undefined;
     const messages = await store.listMessages(req.user.id, req.conversation.id, { before, beforeId });
-    const [connection, counts, feedback] = await Promise.all([
+    const [connection, counts, feedback, partnerReadAt] = await Promise.all([
       store.getConnection(req.conversation.id).then((c) => connectionView(c, req.user.id)),
       store.messageCounts(req.conversation.id, req.user.id),
       store.myFeedback(req.conversation.id, req.user.id),
+      store.partnerReadAt(req.user.id, req.conversation.id),
     ]);
     // Ask "did this help?" once a real exchange has happened.
     const canRate = counts.mine >= 2 && counts.theirs >= 2;
@@ -328,6 +329,7 @@ function createApp({
         id: req.conversation.id,
         partner: { handle: partner.handle, online: hub.isOnline(partner.id) },
         connection,
+        partnerReadAt,
         feedback: { canRate, helpful: feedback },
       },
       // Flags are only shown to the sender, to explain why a message was held.
@@ -516,7 +518,11 @@ function createApp({
   }));
 
   app.post('/api/conversations/:id/read', member, conversation, asyncRoute(async (req, res) => {
-    await store.markRead(req.user.id, req.conversation.id);
+    const at = await store.markRead(req.user.id, req.conversation.id);
+    // Lets the other person show "Seen" under their latest message.
+    if (!(await store.isBlocked(req.user.id, req.conversation.partnerId))) {
+      hub.push(req.conversation.partnerId, { type: 'read', conversationId: req.conversation.id, at });
+    }
     res.json({ ok: true });
   }));
 

@@ -24,6 +24,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
   const [connectSheet, setConnectSheet] = useState(null); // null | 'request' | 'accept'
   const [hasMore, setHasMore] = useState(false);
   const [feedbackDone, setFeedbackDone] = useState(false);
+  const [partnerReadAt, setPartnerReadAt] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const endRef = useRef(null);
   const typingTimer = useRef(null);
@@ -34,6 +35,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     api.conversation(id).then((d) => {
       setConvo(d.conversation);
       setMessages(d.messages);
+      setPartnerReadAt(d.conversation.partnerReadAt || 0);
       setHasMore(d.messages.length >= PAGE);
       api.markRead(id).catch(() => {});
     }, (err) => setError(err.message));
@@ -59,6 +61,9 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     const offEnded = socket.on('conversation.ended', ({ conversationId }) => {
       if (conversationId === id) setEnded(true);
     });
+    const offRead = socket.on('read', ({ conversationId, at }) => {
+      if (conversationId === id) setPartnerReadAt((prev) => Math.max(prev, at));
+    });
     const offConnect = socket.on('connect.updated', ({ conversationId, connection }) => {
       if (conversationId !== id) return;
       setConvo((c) => (c ? { ...c, connection } : c));
@@ -66,7 +71,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     });
     // After a reconnect, refetch in case messages arrived while offline.
     const offOpen = socket.on('open', load);
-    return () => { offMessage(); offTyping(); offEnded(); offConnect(); offOpen(); clearTimeout(typingTimer.current); };
+    return () => { offMessage(); offTyping(); offEnded(); offRead(); offConnect(); offOpen(); clearTimeout(typingTimer.current); };
   }, [socket, id, load, onCreditsChanged]);
 
   // Follow the newest message (not older pages loaded above).
@@ -180,6 +185,10 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     }
   };
 
+  // "Seen" goes under my latest delivered message once they've read past it.
+  const lastMine = [...messages].reverse().find((m) => m.fromMe && m.status !== 'held');
+  const seenId = lastMine && messages[messages.length - 1]?.fromMe && partnerReadAt >= lastMine.createdAt ? lastMine.id : null;
+
   // Ask once a real exchange has happened (server says so, or we can see it here).
   const sentByMe = messages.filter((m) => m.fromMe && m.status !== 'held').length;
   const sentByThem = messages.filter((m) => !m.fromMe).length;
@@ -252,7 +261,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
           <div key={m.id} className={`bubble ${m.fromMe ? 'me' : 'them'}${m.status === 'held' ? ' held' : ''}`}>
             <p>{m.body}</p>
             {m.status === 'held' && <p className="held-note">{heldNote(m.flags)}</p>}
-            <time dateTime={new Date(m.createdAt).toISOString()}>{formatTime(m.createdAt)}</time>
+            <time dateTime={new Date(m.createdAt).toISOString()}>{formatTime(m.createdAt)}{m.id === seenId && ' · Seen'}</time>
           </div>
         ))}
         {partnerTyping && <div className="bubble them typing" aria-label="typing"><span /><span /><span /></div>}

@@ -195,3 +195,24 @@ test('history paging never skips messages that share a timestamp', async (t) => 
   const all = new Set([...rest, ...first].map((m) => m.id));
   assert.equal(all.size, 52, 'every message appears exactly once across pages');
 });
+
+test('reading a conversation tells the other person it was seen', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const alice = await signedUp(s.base);
+  const bob = await signedUp(s.base);
+  const aws = await alice.socket();
+  const bws = await bob.socket();
+  t.after(() => Promise.all([aws.close(), bws.close()]));
+  aws.send({ type: 'match.join', role: 'talk' });
+  await aws.next('match.waiting');
+  bws.send({ type: 'match.join', role: 'listen' });
+  const { conversationId: id } = await aws.next('match.found');
+  const sent = (await alice('POST', `/api/conversations/${id}/messages`, { body: 'anyone there?' })).body.message;
+  assert.equal((await alice('GET', `/api/conversations/${id}`)).body.conversation.partnerReadAt, 0);
+  await bob('POST', `/api/conversations/${id}/read`, {});
+  const seen = await aws.next('read');
+  assert.equal(seen.conversationId, id);
+  assert.ok(seen.at >= sent.createdAt);
+  assert.ok((await alice('GET', `/api/conversations/${id}`)).body.conversation.partnerReadAt >= sent.createdAt);
+});

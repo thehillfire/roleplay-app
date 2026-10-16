@@ -91,6 +91,9 @@ await bob.locator('.bubble.them', { hasText: 'Rent is due Friday' }).waitFor();
 await bob.getByLabel('Message').fill("Not dumb at all. Happens to so many people. Want to talk through options?");
 await bob.getByRole('button', { name: 'Send' }).click();
 await alice.locator('.bubble.them', { hasText: 'Not dumb at all' }).waitFor();
+await alice.getByLabel('Message').fill('Yeah. Maybe.');
+await alice.getByLabel('Message').press('Enter');
+await alice.locator('.bubble.me time', { hasText: 'Seen' }).waitFor();
 await alice.shot('3-chat');
 step('messages delivered both ways, typing shown');
 
@@ -100,6 +103,7 @@ await bob.locator('.convo', { hasText: aliceHandle }).waitFor();
 await alice.getByLabel('Message').fill('Thank you. Really.');
 await alice.getByLabel('Message').press('Enter');
 await bob.locator('.convo .count', { hasText: '1' }).waitFor();
+assert.equal(await bob.title(), '(1) Kindred', 'unread count in the tab title');
 assert.match(await bob.locator('.convo').first().innerText(), /Thank you\. Really\./);
 await bob.shot('4-home-unread');
 step('unread message shows on the conversation list');
@@ -108,7 +112,7 @@ step('unread message shows on the conversation list');
 await bob.reload();
 await bob.locator('.convo', { hasText: aliceHandle }).click();
 await bob.locator('.bubble', { hasText: 'Thank you. Really.' }).waitFor();
-assert.equal(await bob.locator('.bubble').count(), 3);
+assert.equal(await bob.locator('.bubble').count(), 4);
 step('session and history survive reload');
 
 // The phone back button returns to the list instead of leaving the app

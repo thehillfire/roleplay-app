@@ -32,6 +32,8 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Deployment: Dockerfile (tested: production mode, non-root, clean SIGTERM), Render Blueprint, docs/DEPLOY.md
 
 ## 5. Community & launch readiness
+- [x] Texting basics: "Seen" receipts, unread count in the tab title, wait-time hint
+- [x] Email confirmation (moderator rights require it)
 - [x] Forgot password: emailed single-use, one-hour reset link (Resend, or the server log in development); signs out other sessions
 - [x] "Did this help?" after chatting: thanks count ("You've helped 12 people") and a live thank-you for the listener
 - [x] Live "people here now" count on home and in the waiting room

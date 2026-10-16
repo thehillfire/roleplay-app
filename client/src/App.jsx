@@ -116,6 +116,12 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onDeleted, onPaused,
 
   useEffect(() => window.scrollTo(0, 0), [view.name]);
 
+  // Unread count in the tab title, e.g. "(2) Kindred".
+  useEffect(() => {
+    const unread = (conversations || []).reduce((n, c) => n + c.unread, 0);
+    document.title = unread && view.name === 'home' ? `(${unread}) Kindred` : 'Kindred';
+  }, [conversations, view.name]);
+
   const find = ({ role, topic }) => {
     setMatchError('');
     navigate({ name: 'waiting' });

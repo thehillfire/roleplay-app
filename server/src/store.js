@@ -276,6 +276,15 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
          WHERE id = $2`,
         [userId, conversationId, at],
       );
+      return at;
+    },
+
+    // When the other person last read this conversation (for "Seen").
+    async partnerReadAt(userId, conversationId) {
+      const { rows } = await db.query('SELECT user_a, read_a, read_b FROM conversations WHERE id = $1', [conversationId]);
+      const r = rows[0];
+      if (!r) return 0;
+      return num(r.user_a === userId ? r.read_b : r.read_a);
     },
 
     // --- safety ---
