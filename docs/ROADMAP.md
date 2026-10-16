@@ -31,5 +31,13 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [ ] Accessibility pass; reduced motion; text size
 - [x] Deployment: Dockerfile (tested: production mode, non-root, clean SIGTERM), Render Blueprint, docs/DEPLOY.md
 
+## 5. Community & launch readiness
+- [x] "Did this help?" after chatting: thanks count ("You've helped 12 people") and a live thank-you for the listener
+- [x] Live "people here now" count on home and in the waiting room
+- [ ] Privacy policy and terms pages (drafts, need legal review before launch)
+- [ ] Accessibility pass (labels, focus, contrast, reduced motion)
+- [ ] Ad slot on the home screen only (never inside chats), off unless configured
+- [ ] Scale past one server: Redis pub/sub for realtime + shared queue
+
 ## Known limits
 - Matchmaking and realtime run in one Node process. Past ~1 server, add Redis pub/sub.

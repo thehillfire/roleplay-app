@@ -52,6 +52,16 @@ function Signedin({ user, billing, pushKey, onSignOut, onDeleted, onPaused, onRe
 
   useEffect(() => () => socket.close(), [socket]);
 
+  // Live "people here now", refreshed while the home screen is visible.
+  const [presence, setPresence] = useState(null);
+  useEffect(() => {
+    if (view.name !== 'home') return undefined;
+    const tick = () => api.presence().then(setPresence, () => {});
+    tick();
+    const t = setInterval(tick, 20000);
+    return () => clearInterval(t);
+  }, [view.name]);
+
   const [askPush, setAskPush] = useState(() => Boolean(pushKey) && pushSupported() && Notification.permission === 'default');
   useEffect(() => {
     if (pushKey) syncPush(api.pushSubscribe).catch(() => {});
@@ -84,6 +94,10 @@ function Signedin({ user, billing, pushKey, onSignOut, onDeleted, onPaused, onRe
       socket.on('open', () => { if (viewRef.current.name === 'home') refresh(); }),
       socket.on('close', () => { if (viewRef.current.name === 'waiting') setMatchError('Connection lost. Reconnecting…'); }),
       socket.on('credits.updated', onRefreshMe),
+      socket.on('thanks', ({ from }) => {
+        setNotice(`💙 ${from} said talking with you helped.`);
+        onRefreshMe();
+      }),
     ];
     return () => offs.forEach((off) => off());
   }, [socket, refresh, onRefreshMe, navigate]);
@@ -120,6 +134,7 @@ function Signedin({ user, billing, pushKey, onSignOut, onDeleted, onPaused, onRe
           notice={notice}
           onDismissNotice={() => setNotice('')}
           onModerate={user.role === 'admin' ? () => navigate({ name: 'moderate' }) : undefined}
+          presence={presence}
           askPush={askPush}
           onEnablePush={turnOnPush}
           onDismissPush={() => setAskPush(false)}

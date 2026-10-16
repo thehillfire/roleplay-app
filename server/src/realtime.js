@@ -7,7 +7,13 @@ const TOPIC_MAX = 30;
 // Tracks which sockets belong to which user so any part of the server can push events.
 function createHub() {
   const sockets = new Map(); // userId -> Set<WebSocket>
+  let waiting = () => 0;
   return {
+    // People with the app open, and how many are waiting for a match right now.
+    stats: () => ({ online: sockets.size, waiting: waiting() }),
+    setWaitingCounter(fn) {
+      waiting = fn;
+    },
     add(userId, ws) {
       if (!sockets.has(userId)) sockets.set(userId, new Set());
       sockets.get(userId).add(ws);
@@ -58,6 +64,7 @@ function attachRealtime({ server, hub, store, allowedOrigins = [], sameRoleAfter
       });
     },
   });
+  hub.setWaitingCounter(() => matchmaker.size);
   const sweep = setInterval(() => matchmaker.sweep(), sweepMs);
   sweep.unref();
 

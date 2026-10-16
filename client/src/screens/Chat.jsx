@@ -23,6 +23,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
   const [reporting, setReporting] = useState(false);
   const [connectSheet, setConnectSheet] = useState(null); // null | 'request' | 'accept'
   const [hasMore, setHasMore] = useState(false);
+  const [feedbackDone, setFeedbackDone] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const endRef = useRef(null);
   const typingTimer = useRef(null);
@@ -160,6 +161,21 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     }
   };
 
+  const giveFeedback = async (helpful) => {
+    setFeedbackDone(true);
+    try {
+      await api.feedback(id, helpful);
+    } catch {
+      // Not worth interrupting the conversation over.
+    }
+  };
+
+  // Ask once a real exchange has happened (server says so, or we can see it here).
+  const sentByMe = messages.filter((m) => m.fromMe && m.status !== 'held').length;
+  const sentByThem = messages.filter((m) => !m.fromMe).length;
+  const askFeedback = convo && !feedbackDone && !ended && convo.feedback?.helpful == null
+    && (convo.feedback?.canRate || (sentByMe >= 2 && sentByThem >= 2));
+
   const report = async (reason, details) => {
     await api.report(id, reason, details);
     onLeft(`Thanks. ${convo.partner.handle} was reported and blocked. A moderator will review it.`);
@@ -232,6 +248,14 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
         {partnerTyping && <div className="bubble them typing" aria-label="typing"><span /><span /><span /></div>}
         <div ref={endRef} />
       </div>
+
+      {askFeedback && (
+        <div className="feedback-bar">
+          <span>Did talking with {convo.partner.handle} help?</span>
+          <button className="chip" onClick={() => giveFeedback(true)}>💙 Yes, thank them</button>
+          <button className="chip" onClick={() => giveFeedback(false)}>Not really</button>
+        </div>
+      )}
 
       {ended ? (
         <div className="composer ended">

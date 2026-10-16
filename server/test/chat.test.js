@@ -160,3 +160,17 @@ test('history pages backwards with ?before', async (t) => {
   const older = (await bob('GET', `/api/conversations/${id}?before=${first[0].createdAt}`)).body.messages;
   assert.deepEqual(older.map((m) => m.body), ['note 1', 'note 2', 'note 3', 'note 4', 'note 5']);
 });
+
+test('presence counts people online and waiting', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const alice = await signedUp(s.base);
+  const bob = await signedUp(s.base);
+  assert.deepEqual((await alice('GET', '/api/presence')).body, { online: 0, waiting: 0 });
+  const aws = await alice.socket();
+  const bws = await bob.socket();
+  t.after(() => Promise.all([aws.close(), bws.close()]));
+  aws.send({ type: 'match.join', role: 'talk' });
+  await aws.next('match.waiting');
+  assert.deepEqual((await alice('GET', '/api/presence')).body, { online: 2, waiting: 1 });
+});

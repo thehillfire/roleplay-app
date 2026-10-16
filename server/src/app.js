@@ -123,6 +123,9 @@ function createApp({
 
   app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
+  // Rough live numbers for the home screen ("12 people here now").
+  app.get('/api/presence', member, (req, res) => res.json(hub.stats()));
+
   // --- Accounts ---
 
   app.post('/api/auth/signup', authLimiter, asyncRoute(async (req, res) => {
@@ -155,13 +158,13 @@ function createApp({
     res.json({ ok: true });
   }));
 
-  app.get('/api/auth/me', (req, res) => {
+  app.get('/api/auth/me', asyncRoute(async (req, res) => {
     res.json({
-      user: req.user ? publicUser(req.user) : null,
+      user: req.user ? { ...publicUser(req.user), helped: await store.helpedCount(req.user.id) } : null,
       billing: { enabled: payments.enabled, priceCents: payments.priceCents, currency: payments.currency },
       push: { publicKey: push.publicKey },
     });
-  });
+  }));
 
   // --- Account ---
 
@@ -227,9 +230,20 @@ function createApp({
     if (blocked) throw httpError(404, 'Conversation not found.');
     const before = Number(req.query.before) || undefined;
     const messages = await store.listMessages(req.user.id, req.conversation.id, { before });
-    const connection = connectionView(await store.getConnection(req.conversation.id), req.user.id);
+    const [connection, counts, feedback] = await Promise.all([
+      store.getConnection(req.conversation.id).then((c) => connectionView(c, req.user.id)),
+      store.messageCounts(req.conversation.id, req.user.id),
+      store.myFeedback(req.conversation.id, req.user.id),
+    ]);
+    // Ask "did this help?" once a real exchange has happened.
+    const canRate = counts.mine >= 2 && counts.theirs >= 2;
     res.json({
-      conversation: { id: req.conversation.id, partner: { handle: partner.handle, online: hub.isOnline(partner.id) }, connection },
+      conversation: {
+        id: req.conversation.id,
+        partner: { handle: partner.handle, online: hub.isOnline(partner.id) },
+        connection,
+        feedback: { canRate, helpful: feedback },
+      },
       // Flags are only shown to the sender, to explain why a message was held.
       messages: messages.map(({ senderId, flags, ...m }) => ({ ...m, fromMe: senderId === req.user.id, ...(senderId === req.user.id && m.status === 'held' ? { flags } : {}) })),
     });
@@ -267,6 +281,16 @@ function createApp({
       }
     }
     res.status(201).json({ message: { ...out, fromMe: true, flags }, crisis: screen.crisis, paused: screen.suspend || undefined });
+  }));
+
+  app.post('/api/conversations/:id/feedback', member, conversation, asyncRoute(async (req, res) => {
+    if (typeof req.body.helpful !== 'boolean') throw badRequest('helpful must be true or false');
+    const { id, partnerId } = req.conversation;
+    const counts = await store.messageCounts(id, req.user.id);
+    if (counts.mine < 2 || counts.theirs < 2) throw httpError(409, 'Chat a little first.');
+    const newThanks = await store.saveFeedback({ conversationId: id, raterId: req.user.id, rateeId: partnerId, helpful: req.body.helpful });
+    if (newThanks) hub.push(partnerId, { type: 'thanks', conversationId: id, from: req.user.handle });
+    res.json({ helpful: req.body.helpful });
   }));
 
   // --- Connect: mutual reveal. Requesting costs a credit (when payments are on); accepting is free. ---

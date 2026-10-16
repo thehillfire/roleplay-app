@@ -105,6 +105,18 @@ const MIGRATIONS = [
   ],
   // 5: account deletion bookkeeping (safety data is purged after a retention period)
   ['ALTER TABLE users ADD COLUMN deleted_at BIGINT'],
+  // 6: "did this help?" feedback, one per person per conversation
+  [
+    `CREATE TABLE IF NOT EXISTS feedback (
+      conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+      rater_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      ratee_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      helpful INTEGER NOT NULL,
+      created_at BIGINT NOT NULL,
+      PRIMARY KEY (conversation_id, rater_id)
+    )`,
+    'CREATE INDEX IF NOT EXISTS feedback_ratee_idx ON feedback(ratee_id, helpful)',
+  ],
 ];
 
 async function migrate(db) {

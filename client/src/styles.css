@@ -223,3 +223,10 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); box-sh
 .link-row:hover { background: var(--bg-3); }
 .danger-text { color: var(--danger); }
 .account .form p { margin: 0; line-height: 1.55; }
+
+/* --- community --- */
+.presence { margin: 0; font-size: 13px; color: var(--accent-2); display: flex; align-items: center; gap: 8px; }
+.helped { margin: 0; font-size: 14px; color: var(--muted); text-align: center; }
+.helped strong { color: var(--text); }
+.feedback-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); background: rgba(100, 181, 246, 0.05); }
+.feedback-bar span { flex-basis: 100%; text-align: center; }

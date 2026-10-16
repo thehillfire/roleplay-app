@@ -26,6 +26,8 @@ export const api = {
   conversations: () => request('GET', '/api/conversations').then((d) => d.conversations),
   conversation: (id, before) => request('GET', `/api/conversations/${enc(id)}${before ? `?before=${before}` : ''}`),
   send: (id, body) => request('POST', `/api/conversations/${enc(id)}/messages`, { body }),
+  feedback: (id, helpful) => request('POST', `/api/conversations/${enc(id)}/feedback`, { helpful }),
+  presence: () => request('GET', '/api/presence'),
   connect: (id, name, contact) => request('POST', `/api/conversations/${enc(id)}/connect`, { name, contact: contact || undefined }),
   declineConnect: (id) => request('POST', `/api/conversations/${enc(id)}/connect/decline`, {}),
   cancelConnect: (id) => request('POST', `/api/conversations/${enc(id)}/connect/cancel`, {}),

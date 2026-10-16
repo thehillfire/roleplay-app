@@ -370,6 +370,40 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return rowCount === 1;
     },
 
+    // --- feedback ---
+
+    // Returns true if this was a new "helpful" vote (so the listener can be thanked live).
+    async saveFeedback({ conversationId, raterId, rateeId, helpful }) {
+      const before = await db.query('SELECT helpful FROM feedback WHERE conversation_id = $1 AND rater_id = $2', [conversationId, raterId]);
+      await db.query(
+        `INSERT INTO feedback (conversation_id, rater_id, ratee_id, helpful, created_at) VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (conversation_id, rater_id) DO UPDATE SET helpful = $4`,
+        [conversationId, raterId, rateeId, helpful ? 1 : 0, now()],
+      );
+      return helpful && Number(before.rows[0]?.helpful) !== 1;
+    },
+
+    async myFeedback(conversationId, raterId) {
+      const { rows } = await db.query('SELECT helpful FROM feedback WHERE conversation_id = $1 AND rater_id = $2', [conversationId, raterId]);
+      return rows[0] ? Number(rows[0].helpful) === 1 : null;
+    },
+
+    // How many different people said this user helped them.
+    async helpedCount(userId) {
+      const { rows } = await db.query('SELECT COUNT(DISTINCT rater_id) AS n FROM feedback WHERE ratee_id = $1 AND helpful = 1', [userId]);
+      return Number(rows[0].n);
+    },
+
+    // Messages each side has sent that the other could see (to decide when to ask "did this help?").
+    async messageCounts(conversationId, userId) {
+      const { rows } = await db.query(
+        `SELECT SUM(CASE WHEN sender_id = $2 THEN 1 ELSE 0 END) AS mine, SUM(CASE WHEN sender_id <> $2 THEN 1 ELSE 0 END) AS theirs
+           FROM messages WHERE conversation_id = $1 AND status = 'delivered'`,
+        [conversationId, userId],
+      );
+      return { mine: Number(rows[0].mine) || 0, theirs: Number(rows[0].theirs) || 0 };
+    },
+
     // --- push notifications ---
 
     async savePushSubscription(userId, subscription) {
