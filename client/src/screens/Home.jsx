@@ -1,5 +1,18 @@
 import { useState } from 'react';
 import HomeAd from '../components/HomeAd.jsx';
+import { api } from '../api.js';
+
+function VerifyNudge() {
+  const [state, setState] = useState('idle'); // idle | sent | hidden
+  if (state === 'hidden') return null;
+  return (
+    <div className="notice verify">
+      <p>{state === 'sent' ? 'Sent! Check your inbox for the confirmation link.' : 'Confirm your email so you can reset your password if you ever forget it.'}</p>
+      {state === 'idle' && <button className="link" onClick={() => api.resendVerification().then(() => setState('sent'), () => setState('sent'))}>Resend link</button>}
+      <button className="icon-btn" aria-label="Dismiss" onClick={() => setState('hidden')}>×</button>
+    </div>
+  );
+}
 
 const ROLES = [
   { id: 'talk', label: 'I need to talk' },
@@ -66,6 +79,8 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
           {connection === 'online' ? 'Find someone' : 'Connecting…'}
         </button>
       </section>
+
+      {!user.emailVerified && <VerifyNudge />}
 
       {askPush && (
         <div className="notice push-ask">

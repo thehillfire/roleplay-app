@@ -174,3 +174,24 @@ test('presence counts people online and waiting', async (t) => {
   await aws.next('match.waiting');
   assert.deepEqual((await alice('GET', '/api/presence')).body, { online: 2, waiting: 1 });
 });
+
+test('history paging never skips messages that share a timestamp', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  await signedUp(s.base);
+  const bob = await signedUp(s.base);
+  const ids = await s.db.query('SELECT id FROM users ORDER BY created_at');
+  const [a, b] = ids.rows.map((r) => r.id);
+  const { id } = await s.store.openConversation(a, b);
+  // 52 messages all in the same millisecond.
+  const t0 = Date.now();
+  for (let i = 0; i < 52; i += 1) {
+    await s.db.query("INSERT INTO messages (id, conversation_id, sender_id, body, status, created_at) VALUES ($1, $2, $3, $4, 'delivered', $5)",
+      [`m${String(i).padStart(3, '0')}`, id, a, `same-ms ${i}`, t0]);
+  }
+  const first = (await bob('GET', `/api/conversations/${id}`)).body.messages;
+  const oldest = first[0];
+  const rest = (await bob('GET', `/api/conversations/${id}?before=${oldest.createdAt}&beforeId=${oldest.id}`)).body.messages;
+  const all = new Set([...rest, ...first].map((m) => m.id));
+  assert.equal(all.size, 52, 'every message appears exactly once across pages');
+});

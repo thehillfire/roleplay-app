@@ -179,8 +179,9 @@ assert.equal(await bob.locator('.convo').count(), 0);
 await alice.getByText('This conversation has ended.').waitFor();
 step('report blocks and ends the chat for both');
 
-// Moderator (MOD_EMAIL must be in the server's ADMIN_EMAILS) reviews the report and suspends
-if (process.env.MOD_EMAIL) {
+// Moderator (MOD_EMAIL must be in the server's ADMIN_EMAILS, and MAIL_LOG must point at the
+// server's output so the email confirmation link can be followed) reviews the report and suspends
+if (process.env.MOD_EMAIL && process.env.MAIL_LOG) {
   const mod = await person('mod');
   await mod.goto(BASE);
   await mod.getByRole('button', { name: 'Get started' }).click();
@@ -189,6 +190,13 @@ if (process.env.MOD_EMAIL) {
   await mod.getByLabel(/Birthdate/).fill('1980-01-01');
   await mod.getByLabel(/I'm 18 or older/).check();
   await mod.getByRole('button', { name: 'Create account' }).click();
+  await mod.getByRole('button', { name: 'Find someone' }).waitFor();
+  assert.equal(await mod.getByRole('button', { name: 'Moderate' }).count(), 0, 'not a moderator until the email is confirmed');
+  await mod.waitForTimeout(300);
+  const verifyLinks = [...readFileSync(process.env.MAIL_LOG, 'utf8').matchAll(/to=(\S+) subject="Confirm[^"]*"\n[\s\S]*?(https?:\/\/\S+\/verify#[\w-]+)/g)]
+    .filter((m) => m[1] === process.env.MOD_EMAIL);
+  await mod.goto(verifyLinks[verifyLinks.length - 1][2]);
+  await mod.getByText('Email confirmed. Thank you!').waitFor();
   await mod.getByRole('button', { name: 'Moderate' }).click();
   const card = mod.locator('.report', { hasText: aliceHandle }).first();
   await card.waitFor();

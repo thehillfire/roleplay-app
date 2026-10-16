@@ -1,7 +1,7 @@
 const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
-const { createAuth, hashPassword, verifyPassword } = require('./auth');
+const { createAuth, hashPassword, verifyPassword, hashToken } = require('./auth');
 const { parseCredentials, parseMessageBody, str, badRequest } = require('./validate');
 const { screenMessage } = require('./moderation');
 const { createPayments } = require('./payments');
@@ -10,6 +10,7 @@ const { createMailer } = require('./mailer');
 const crypto = require('crypto');
 
 const RESET_TTL_MS = 60 * 60 * 1000;
+const VERIFY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const REPORT_REASONS = ['harassment', 'sexual', 'minor', 'hate', 'spam', 'self_harm', 'other'];
 // Auto-pause (pending human review) when this many different people report someone within a week.
@@ -38,7 +39,7 @@ function createRateLimiter({ max, windowMs, now = Date.now, key = (req) => req.i
 
 const httpError = (status, message) => Object.assign(new Error(message), { status, expose: true });
 const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-const publicUser = ({ id, handle, role, status, connectCredits, createdAt }) => ({ id, handle, role, status, connectCredits, createdAt });
+const publicUser = ({ id, handle, role, status, connectCredits, emailVerified, createdAt }) => ({ id, handle, role, status, connectCredits, emailVerified, createdAt });
 
 // What one side of a conversation may see about its connect state.
 function connectionView(c, userId) {
@@ -62,6 +63,9 @@ function createApp({
   push = createPush(),
   mailer = createMailer(),
   publicUrl = process.env.PUBLIC_URL,
+  // The Host header is attacker-controlled, so links in emails and payment redirects
+  // only fall back to it in development. Production needs PUBLIC_URL.
+  allowHostFallback = process.env.NODE_ENV !== 'production',
   // Google AdSense on the home screen only. Off unless both IDs are set.
   ads = process.env.ADSENSE_CLIENT && process.env.ADSENSE_SLOT
     ? { client: process.env.ADSENSE_CLIENT, slot: process.env.ADSENSE_SLOT }
@@ -118,6 +122,28 @@ function createApp({
   app.use('/api', auth.loadUser());
 
   const authLimiter = createRateLimiter(authRateLimit);
+  // Emails a confirmation link. Moderator rights (ADMIN_EMAILS) need a confirmed inbox, so
+  // registering someone else's address first gets you nothing.
+  const sendVerification = async (req, user) => {
+    const base = siteUrl(req);
+    if (!base) return;
+    const token = crypto.randomBytes(32).toString('base64url');
+    await store.createEmailVerification(hashToken(token), user.id, VERIFY_TTL_MS);
+    mailer.send({
+      to: user.email,
+      subject: 'Confirm your email for Kindred',
+      text: `Welcome to Kindred, ${user.handle}.\n\nConfirm this is your email so you can reset your password if you ever forget it:\n${base}/verify#${token}\n\nIf you didn't sign up, ignore this email.`,
+    }).catch((err) => console.error('verification email failed', err.message));
+  };
+  const promoteIfAdmin = async (user) => {
+    if (user.emailVerified && adminEmails.includes(user.email) && user.role !== 'admin') {
+      await store.setUserRole(user.email, 'admin');
+      return { ...user, role: 'admin' };
+    }
+    return user;
+  };
+
+  const siteUrl = (req) => (publicUrl ? publicUrl.replace(/\/$/, '') : allowHostFallback ? `${req.protocol}://${req.get('host')}` : null);
   const messageLimiter = createRateLimiter({ ...messageRateLimit, key: (req) => req.user.id });
 
   // Signed in and in good standing.
@@ -145,12 +171,9 @@ function createApp({
 
   app.post('/api/auth/signup', authLimiter, asyncRoute(async (req, res) => {
     const { email, password, birthdate } = parseCredentials(req.body, { signup: true });
-    let user = await store.createUser({ email, birthdate, passwordHash: await hashPassword(password) });
+    const user = await store.createUser({ email, birthdate, passwordHash: await hashPassword(password) });
     if (!user) throw httpError(409, 'An account with that email already exists.');
-    if (adminEmails.includes(email)) {
-      await store.setUserRole(email, 'admin');
-      user = { ...user, role: 'admin' };
-    }
+    await sendVerification(req, user);
     await auth.startSession(req, res, user.id);
     res.status(201).json({ user: publicUser(user) });
   }));
@@ -160,12 +183,9 @@ function createApp({
     const found = await store.findUserByEmail(email);
     const ok = await verifyPassword(password, found?.passwordHash);
     if (!found || !ok) throw httpError(401, 'Email or password is incorrect.');
-    if (adminEmails.includes(email) && found.role !== 'admin') {
-      await store.setUserRole(email, 'admin');
-      found.role = 'admin';
-    }
-    await auth.startSession(req, res, found.id);
-    res.json({ user: publicUser(found) });
+    const user = await promoteIfAdmin(found);
+    await auth.startSession(req, res, user.id);
+    res.json({ user: publicUser(user) });
   }));
 
   app.post('/api/auth/logout', asyncRoute(async (req, res) => {
@@ -178,9 +198,13 @@ function createApp({
     const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     const found = email ? await store.findUserByEmail(email) : null;
     if (found && found.status !== 'deleted') {
+      const base = siteUrl(req);
+      if (!base) {
+        console.error('PUBLIC_URL is not set; refusing to email a reset link built from the Host header.');
+        return res.json({ ok: true });
+      }
       const token = crypto.randomBytes(32).toString('base64url');
-      await store.createPasswordReset(crypto.createHash('sha256').update(token).digest('hex'), found.id, RESET_TTL_MS);
-      const base = publicUrl || `${req.protocol}://${req.get('host')}`;
+      await store.createPasswordReset(hashToken(token), found.id, RESET_TTL_MS);
       mailer.send({
         to: email,
         subject: 'Reset your Kindred password',
@@ -190,12 +214,28 @@ function createApp({
     res.json({ ok: true });
   }));
 
+  app.post('/api/auth/verify', authLimiter, asyncRoute(async (req, res) => {
+    if (typeof req.body.token !== 'string' || !req.body.token) throw badRequest('Confirmation link is invalid');
+    const user = await store.useEmailVerification(hashToken(req.body.token));
+    if (!user) throw httpError(400, 'This confirmation link has expired or was already used.');
+    await promoteIfAdmin(user);
+    res.json({ ok: true });
+  }));
+
+  app.post('/api/auth/resend-verification', member, authLimiter, asyncRoute(async (req, res) => {
+    if (!req.user.emailVerified) await sendVerification(req, req.user);
+    res.json({ ok: true });
+  }));
+
   app.post('/api/auth/reset', authLimiter, asyncRoute(async (req, res) => {
     const { token, password } = req.body;
     if (typeof token !== 'string' || !token) throw badRequest('Reset link is invalid');
     if (typeof password !== 'string' || password.length < 8 || password.length > 200) throw badRequest('Password must be at least 8 characters');
-    const userId = await store.usePasswordReset(crypto.createHash('sha256').update(token).digest('hex'), await hashPassword(password));
+    const userId = await store.usePasswordReset(hashToken(token), await hashPassword(password));
     if (!userId) throw httpError(400, 'This reset link has expired or was already used. Request a new one.');
+    // Opening the emailed link proves the inbox, so this also confirms the email.
+    await store.markEmailVerified(userId);
+    await promoteIfAdmin(await store.getUser(userId));
     hub.disconnect(userId);
     await auth.startSession(req, res, userId);
     res.json({ ok: true });
@@ -252,8 +292,9 @@ function createApp({
 
   app.post('/api/billing/checkout', member, asyncRoute(async (req, res) => {
     if (!payments.enabled) throw httpError(503, "Payments aren't set up yet. Connecting is free for now.");
-    const returnUrl = `${req.protocol}://${req.get('host')}/`;
-    res.json(await payments.createCheckout({ userId: req.user.id, returnUrl }));
+    const base = siteUrl(req);
+    if (!base) throw httpError(503, 'Payments need PUBLIC_URL to be configured.');
+    res.json(await payments.createCheckout({ userId: req.user.id, returnUrl: `${base}/` }));
   }));
 
   // --- Conversations ---
@@ -273,7 +314,8 @@ function createApp({
     const blocked = await store.isBlocked(req.user.id, partner.id);
     if (blocked) throw httpError(404, 'Conversation not found.');
     const before = Number(req.query.before) || undefined;
-    const messages = await store.listMessages(req.user.id, req.conversation.id, { before });
+    const beforeId = typeof req.query.beforeId === 'string' ? req.query.beforeId.slice(0, 64) : undefined;
+    const messages = await store.listMessages(req.user.id, req.conversation.id, { before, beforeId });
     const [connection, counts, feedback] = await Promise.all([
       store.getConnection(req.conversation.id).then((c) => connectionView(c, req.user.id)),
       store.messageCounts(req.conversation.id, req.user.id),
@@ -363,7 +405,7 @@ function createApp({
 
     if (existing?.status === 'pending' && existing.requesterId === partnerId) {
       // They asked first: accepting is free and reveals both sides.
-      await store.respondToConnect(id, { accept: true, ...reveal });
+      if (!(await store.respondToConnect(id, { accept: true, ...reveal }))) throw httpError(409, 'That request was just withdrawn.');
     } else if (existing?.status === 'accepted') {
       throw httpError(409, "You're already connected.");
     } else if (existing?.status === 'pending') {
@@ -388,7 +430,8 @@ function createApp({
     const { id, partnerId } = req.conversation;
     const c = await store.getConnection(id);
     if (!c || c.status !== 'pending' || c.requesterId !== partnerId) throw httpError(404, 'No request to decline.');
-    await store.respondToConnect(id, { accept: false });
+    // Only the request that actually flips it from pending refunds (no double refunds on races).
+    if (!(await store.respondToConnect(id, { accept: false }))) throw httpError(409, 'That request was already answered.');
     if (c.paid) await store.addCredits(partnerId, 1); // their credit comes back
     await pushConnection(id, [partnerId]);
     res.json({ connection: connectionView(await store.getConnection(id), req.user.id) });
@@ -467,7 +510,7 @@ function createApp({
     if (!['active', 'suspended'].includes(status)) throw badRequest('status must be active or suspended');
     const user = await store.getUser(req.params.id);
     if (!user) throw httpError(404, 'User not found.');
-    await store.setUserStatus(user.id, status);
+    if (!(await store.setUserStatus(user.id, status))) throw httpError(409, 'This account was deleted by its owner.');
     if (status !== 'active') hub.disconnect(user.id);
     res.json({ ok: true });
   }));

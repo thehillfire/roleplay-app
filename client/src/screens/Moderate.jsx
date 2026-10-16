@@ -5,12 +5,13 @@ const REASON_LABELS = {
   harassment: 'Harassment', sexual: 'Sexual messages', minor: 'Possibly under 18', hate: 'Hate or threats',
   spam: 'Spam or scam', self_harm: 'Safety concern', other: 'Other',
 };
-const FLAG_LABELS = { contact: 'Contact info', age_probe: 'Asked age', minor: 'Said under 18', sexual: 'Sexual', crisis: 'Crisis' };
+const FLAG_LABELS = { contact: 'Contact info', age_probe: 'Asked age', minor: 'Said under 18', minor_maybe: 'Maybe under 18', sexual: 'Sexual', crisis: 'Crisis' };
 
 const when = (ts) => new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 function StatusTag({ status }) {
-  return <span className={`tag ${status}`}>{status === 'review' ? 'paused for review' : status}</span>;
+  const label = { review: 'paused for review', deleted: 'deleted by owner' }[status] || status;
+  return <span className={`tag ${status}`}>{label}</span>;
 }
 
 export default function Moderate({ onBack }) {
@@ -82,7 +83,7 @@ export default function Moderate({ onBack }) {
             <button className="btn" disabled={!!busy} onClick={() => act(r.id, () => api.admin.resolve(r.id, 'warned'))}>Warn</button>
             <button className="btn danger" disabled={!!busy} onClick={() => act(r.id, () => api.admin.resolve(r.id, 'suspended'))}>Suspend {r.reported.handle}</button>
           </div>
-          {r.reported.status !== 'active' && (
+          {(r.reported.status === 'review' || r.reported.status === 'suspended') && (
             <button className="link" disabled={!!busy} onClick={() => act(`u-${r.reported.id}`, () => api.admin.setStatus(r.reported.id, 'active'))}>
               Restore {r.reported.handle}'s account
             </button>
@@ -100,9 +101,10 @@ export default function Moderate({ onBack }) {
           <p className="details">{m.body}</p>
           <p className="meta">{m.flags.map((f) => <span key={f} className="tag flag">{FLAG_LABELS[f] || f}</span>)}</p>
           <div className="actions">
-            {m.sender.status === 'active'
-              ? <button className="btn danger" disabled={!!busy} onClick={() => act(m.id, () => api.admin.setStatus(m.sender.id, 'suspended'))}>Suspend sender</button>
-              : <button className="btn" disabled={!!busy} onClick={() => act(m.id, () => api.admin.setStatus(m.sender.id, 'active'))}>Restore sender</button>}
+            {m.sender.status === 'active' && <button className="btn danger" disabled={!!busy} onClick={() => act(m.id, () => api.admin.setStatus(m.sender.id, 'suspended'))}>Suspend sender</button>}
+            {(m.sender.status === 'review' || m.sender.status === 'suspended') && (
+              <button className="btn" disabled={!!busy} onClick={() => act(m.id, () => api.admin.setStatus(m.sender.id, 'active'))}>Restore sender</button>
+            )}
           </div>
         </article>
       ))}

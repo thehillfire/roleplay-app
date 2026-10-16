@@ -24,7 +24,7 @@ function Paused({ onSignOut }) {
   );
 }
 
-function Signedin({ user, billing, ads, pushKey, onSignOut, onDeleted, onPaused, onRefreshMe, onOpenLegal, initialNotice }) {
+function Signedin({ user, billing, ads, pushKey, onSignOut, onDeleted, onPaused, onRefreshMe, onOpenLegal, initialNotice, externalNotice }) {
   const [view, setView] = useState({ name: 'home' });
 
   // Browser history: home is the root entry; other screens are pushed on top so the
@@ -44,6 +44,9 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onDeleted, onPaused,
     else setView({ name: 'home' });
   }, []);
   const [notice, setNotice] = useState(initialNotice || '');
+  useEffect(() => {
+    if (externalNotice) setNotice(externalNotice);
+  }, [externalNotice]);
   const [conversations, setConversations] = useState(null);
   const [listError, setListError] = useState('');
   const [connection, setConnection] = useState('connecting');
@@ -219,6 +222,18 @@ export default function App() {
   const [legal, setLegal] = useState(legalFromPath);
   // Reset links look like /reset#<token>; the token stays out of server logs and referrers.
   const [resetToken, setResetToken] = useState(() => (window.location.pathname === '/reset' ? window.location.hash.slice(1) || '' : null));
+  // Email confirmation links look like /verify#<token>.
+  const [verifyNotice, setVerifyNotice] = useState('');
+  useEffect(() => {
+    if (window.location.pathname !== '/verify') return;
+    const token = window.location.hash.slice(1);
+    window.history.replaceState(null, '', '/');
+    api.verify(token).then(
+      () => { setVerifyNotice('Email confirmed. Thank you!'); refreshMe().catch(() => {}); },
+      (err) => setVerifyNotice(err.message),
+    );
+  }, [refreshMe]);
+
   const finishReset = () => {
     window.history.replaceState(null, '', '/');
     setResetToken(null);
@@ -258,6 +273,7 @@ export default function App() {
           ads={ads}
           pushKey={pushKey}
           initialNotice={checkoutNotice}
+          externalNotice={verifyNotice}
           onSignOut={signOut}
           onDeleted={deleted}
           onPaused={() => setUser({ ...user, status: 'review' })}

@@ -5,7 +5,8 @@
 // Returns { deliver: boolean, flags: string[], crisis: boolean, suspend: boolean }.
 //   contact     phone numbers, emails, links, social handles: held until both connect
 //   age_probe   asking someone's age or grade: held (18+ app; common grooming opener)
-//   minor       sender says they're under 18: held, account paused for review
+//   minor       sender clearly says they're under 18: held, account paused for review
+//   minor_maybe a bare "I'm 15": held for a moderator, account NOT paused (too ambiguous)
 //   sexual      sexual solicitation: held
 //   crisis      self-harm / suicide language: DELIVERED, sender is shown crisis resources
 
@@ -33,7 +34,7 @@ const CONTACT_PATTERNS = [
   /(^|\s)@[a-z0-9_.]{3,}/, // @handles
   /\b(snap(chat)?|insta(gram)?|ig|tiktok|whats\s?app|telegram|discord|kik|wickr|signal|facebook|fb|twitter|x\.com|onlyfans|venmo|cash\s?app|paypal)\b\s*(is\b|:|at\b|@|handle|name|id\b|user(name)?\b|-)\s*\S/,
   /\b(add|text|call|dm|message|hit)\s+me\s+(on|at|up)\b/,
-  /\bmy\s+(number|phone|cell|email|address|insta|snap|discord)\b/,
+  /\bmy\s+(number|phone(\s+number)?|cell|email|address|insta|snap|discord)\s*(is\b|:|=|-)/,
 ];
 
 const AGE_PROBE_PATTERNS = [
@@ -46,15 +47,19 @@ const AGE_PROBE_PATTERNS = [
   /\b(are|r)\s+(you|u)\s+(1[0-7]|[1-9])\b/,
 ];
 
+// Unambiguous: pauses the account.
 const MINOR_PATTERNS = [
   /\b(i'?m|im|i\s+am)\s+(only\s+|just\s+)?(1[0-7]|[1-9])\s*(years?\s*old|yrs?\s*old|y\/?o)\b/,
-  // A bare "I'm 15" at the end of a clause or followed by filler ("I'm 15 btw", "im 16 and ..."),
-  // but not "I'm 16 hours into this shift".
-  /\b(i'?m|im|i\s+am)\s+(only\s+|just\s+)?(1[0-7]|[1-9])(?=\s*([.!?,;)]|$)|\s+(btw|lol|lmao|haha|tho|though|rn|and|but|so|too|also|actually|now)\b)/,
   /\b(i'?m|im|i\s+am)\s+(a\s+)?(minor|underage)\b/,
   /\b(i'?m|im|i\s+am)\s+in\s+(middle\s+school|high\s+school|junior\s+high|(6|7|8|9|10|11|12)(th)?\s+grade)\b/,
   /\b(i'?m|im|i\s+am)\s+a\s+(freshman|sophomore|junior|senior)\s+in\s+high\s+school\b/,
 ];
+
+// A bare "I'm 15" at the end of a clause or before filler ("I'm 15 btw", "im 16 and ..."). Only
+// 13-17, and not "I'm 16 hours into this shift", "I'm 10 and a half weeks pregnant" or "on a scale
+// of 1 to 10 I'm 3". Ambiguous, so it's held for a moderator but doesn't pause anyone.
+const BARE_AGE = /\b(i'?m|im|i\s+am)\s+(only\s+|just\s+)?(1[3-7])(?=\s*([.!?,;)]|$)|\s+(btw|lol|lmao|haha|tho|though|rn|and|but|so|too|also|actually|now)\b)(?!\s+and\s+a\s+half)/;
+const RATING_CONTEXT = /\b(scale|out\s+of|rate|rating)\b|\/\s*10\b/;
 
 const SEXUAL_PATTERNS = [
   /\b(send|show|trade|swap)\s+(me\s+)?(nudes?|pics?\s+of\s+(you|ur)|noods)\b/,
@@ -85,6 +90,7 @@ function screenMessage(body, { connected = false } = {}) {
   if (!connected && (hasPhoneNumber(t) || any(CONTACT_PATTERNS, t))) flags.push('contact');
   if (any(AGE_PROBE_PATTERNS, t)) flags.push('age_probe');
   if (any(MINOR_PATTERNS, t)) flags.push('minor');
+  else if (BARE_AGE.test(t) && !RATING_CONTEXT.test(t)) flags.push('minor_maybe');
   if (any(SEXUAL_PATTERNS, t)) flags.push('sexual');
   const crisis = any(CRISIS_PATTERNS, t);
   if (crisis) flags.push('crisis');

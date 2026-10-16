@@ -125,6 +125,15 @@ const MIGRATIONS = [
       expires_at BIGINT NOT NULL
     )`,
   ],
+  // 8: email verification (moderator rights require a verified email)
+  [
+    'ALTER TABLE users ADD COLUMN email_verified_at BIGINT',
+    `CREATE TABLE IF NOT EXISTS email_verifications (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at BIGINT NOT NULL
+    )`,
+  ],
 ];
 
 async function migrate(db) {

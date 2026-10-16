@@ -61,7 +61,7 @@ test('saying you are a minor pauses the account and ends the chat', async (t) =>
   const bob = await signedUp(s.base);
   const c = await matched(s, alice, bob);
   t.after(c.close);
-  const res = await alice('POST', `/api/conversations/${c.id}/messages`, { body: "lol I'm 15 btw" });
+  const res = await alice('POST', `/api/conversations/${c.id}/messages`, { body: "lol I'm 15 years old btw" });
   assert.equal(res.body.paused, true);
   assert.equal(res.body.message.status, 'held');
   assert.equal((await c.bws.next('conversation.ended')).conversationId, c.id);
@@ -139,12 +139,42 @@ test('moderators review reports and held messages; members cannot', async (t) =>
   assert.equal((await alice('GET', '/api/auth/me')).body.user.status, 'active');
 });
 
-test('ADMIN_EMAILS accounts become moderators on signup', async (t) => {
-  const s = await start({ adminEmails: ['boss@example.com'] });
+test('ADMIN_EMAILS only makes a verified owner of that email a moderator', async (t) => {
+  const sent = [];
+  const mailer = { enabled: true, send: async (m) => { sent.push(m); } };
+  const s = await start({ adminEmails: ['boss@example.com'], mailer });
   t.after(s.stop);
-  const boss = await signedUp(s.base, { email: 'Boss@Example.com' });
-  assert.equal(boss.user.role, 'admin');
-  assert.equal((await boss('GET', '/api/admin/reports')).status, 200);
+
+  // Registering the owner's address doesn't grant anything until the inbox is proven.
+  const squatter = await signedUp(s.base, { email: 'Boss@Example.com' });
+  assert.equal(squatter.user.role, 'member');
+  assert.equal(squatter.user.emailVerified, false);
+  assert.equal((await squatter('GET', '/api/admin/reports')).status, 403);
+  await squatter('POST', '/api/auth/logout', {});
+  assert.equal((await squatter('POST', '/api/auth/login', { email: 'boss@example.com', password: 'quiet-harbor-9' })).body.user.role, 'member');
+
+  // Following the emailed link proves it; the next sign-in is a moderator.
+  await new Promise((r) => setTimeout(r, 20));
+  const token = sent.find((m) => m.to === 'boss@example.com').text.match(/\/verify#([\w-]+)/)[1];
+  assert.equal((await squatter('POST', '/api/auth/verify', { token })).status, 200);
+  assert.equal((await squatter('POST', '/api/auth/verify', { token })).status, 400, 'single use');
+  const me = (await squatter('GET', '/api/auth/me')).body.user;
+  assert.equal(me.role, 'admin');
+  assert.equal(me.emailVerified, true);
+  assert.equal((await squatter('GET', '/api/admin/reports')).status, 200);
+
   const member = await signedUp(s.base);
   assert.equal(member.user.role, 'member');
+});
+
+test('moderators cannot restore or suspend an account its owner deleted', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const mod = await signedUp(s.base, { email: 'mod2@example.com' });
+  await s.store.setUserRole('mod2@example.com', 'admin');
+  const gone = await signedUp(s.base);
+  const goneId = (await s.db.query('SELECT id FROM users WHERE handle = $1', [gone.user.handle])).rows[0].id;
+  await gone('POST', '/api/account/delete', { password: 'quiet-harbor-9' });
+  assert.equal((await mod('POST', `/api/admin/users/${goneId}/status`, { status: 'active' })).status, 409);
+  assert.equal((await s.store.getUser(goneId)).status, 'deleted');
 });

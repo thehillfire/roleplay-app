@@ -18,6 +18,8 @@ test('ordinary venting is delivered untouched', () => {
     "That's a good signal that things are changing",
     'I spent too much on venmo this month',
     'Facebook makes me feel worse about my life',
+    'my phone keeps buzzing with texts from my ex',
+    'my address changed twice this year and I am tired',
   ]) {
     const r = screenMessage(text);
     assert.equal(r.deliver, true, text);
@@ -37,6 +39,8 @@ test('contact details are held until both people connect', () => {
     'add me on snap',
     'snap is heron22',
     'my venmo is @heron',
+    'my number is 555 0199 222',
+    'my email: jane',
     'my insta is @quiet.heron',
     'discord: heron#1234',
     'check out www.example.com',
@@ -55,7 +59,7 @@ test('asking someone their age is held', () => {
 });
 
 test('saying you are under 18 is held and pauses the account', () => {
-  for (const text of ["I'm 15", 'lol im 15 btw', "i'm 16, and my mom", 'im 16 years old', 'i am only 14 yo', "I'm in high school", 'im in 10th grade', 'i am a minor']) {
+  for (const text of ['im 16 years old', 'i am only 14 yo', "I'm in high school", 'im in 10th grade', 'i am a minor']) {
     const r = screenMessage(text);
     assert.ok(r.flags.includes('minor'), text);
     assert.equal(r.suspend, true, text);
@@ -65,6 +69,18 @@ test('saying you are under 18 is held and pauses the account', () => {
   assert.equal(screenMessage("I'm 16 hours into this shift").suspend, false);
   assert.equal(screenMessage("I'm 5 minutes away").suspend, false);
   assert.equal(screenMessage("I'm 3 days late on rent").suspend, false);
+});
+
+test('a bare "I\'m 15" is held for a moderator without pausing the account', () => {
+  for (const text of ["I'm 15", 'lol im 15 btw', "i'm 16, and my mom"]) {
+    const r = screenMessage(text);
+    assert.deepEqual(r.flags, ['minor_maybe'], text);
+    assert.equal(r.deliver, false, text);
+    assert.equal(r.suspend, false, text);
+  }
+  for (const text of ["honestly on a scale of 1 to 10 I'm 3.", "I'm 10 and a half weeks pregnant and scared", "I'm 15 and a half weeks along", "rate my day? I'm 14/10 tired lol", "I'm 5."]) {
+    assert.deepEqual(screenMessage(text).flags, [], text);
+  }
 });
 
 test('sexual solicitation is held', () => {

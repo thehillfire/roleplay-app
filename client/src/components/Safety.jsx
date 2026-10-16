@@ -5,10 +5,11 @@ export const HELD_NOTES = {
   age_probe: "Not sent. Kindred is 18+ only, so please don't ask people their age.",
   sexual: "Not sent. Sexual content isn't allowed on Kindred.",
   minor: 'Not sent.',
+  minor_maybe: 'Not sent. Kindred is for adults 18 and over.',
 };
 
 export function heldNote(flags = []) {
-  const key = ['minor', 'sexual', 'age_probe', 'contact'].find((f) => flags.includes(f));
+  const key = ['minor', 'minor_maybe', 'sexual', 'age_probe', 'contact'].find((f) => flags.includes(f));
   return HELD_NOTES[key] || 'Not sent. This message breaks the community guidelines.';
 }
 

@@ -146,3 +146,20 @@ test('checkout is unavailable while payments are off', async (t) => {
   const alice = await signedUp(s.base);
   assert.equal((await alice('POST', '/api/billing/checkout', {})).status, 503);
 });
+
+test('declining twice at once refunds the credit only once', async (t) => {
+  const s = await start({ payments: createPayments({ secretKey: 'sk_test_x', webhookSecret: 'whsec_x' }) });
+  t.after(s.stop);
+  const p = await pair(s);
+  t.after(p.close);
+  const aliceId = await userId(s, p.alice);
+  await s.store.addCredits(aliceId, 1);
+  await p.alice('POST', `/api/conversations/${p.id}/connect`, { name: 'Jav' });
+  const results = await Promise.all([
+    p.bob('POST', `/api/conversations/${p.id}/connect/decline`, {}),
+    p.bob('POST', `/api/conversations/${p.id}/connect/decline`, {}),
+    p.alice('POST', `/api/conversations/${p.id}/connect/cancel`, {}),
+  ]);
+  assert.equal(results.filter((r) => r.status === 200).length, 1, 'exactly one wins');
+  assert.equal((await p.alice('GET', '/api/auth/me')).body.user.connectCredits, 1, 'refunded exactly once');
+});

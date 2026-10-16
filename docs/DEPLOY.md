@@ -11,7 +11,8 @@ Kindred is one Node process: API, WebSocket and the built web app on one port. I
 1. Push this repo to GitHub.
 2. In Render, choose **New → Blueprint** and select the repo. `render.yaml` creates the web service and a Postgres database and wires `DATABASE_URL` for you.
 3. When prompted, fill in:
-   - `ADMIN_EMAILS`: your email, so you can moderate.
+   - `ADMIN_EMAILS`: your email, so you can moderate. You become a moderator after confirming that email from the link Kindred sends, so set up email (below) first.
+   - `PUBLIC_URL`: your site's address, e.g. `https://kindred.example.com`. It's required in production. Emailed links and Stripe redirects never trust the request's Host header.
    - `VAPID_*`: run `npm run vapid` locally and paste the three lines (optional, enables notifications).
    - `STRIPE_*`: see "Payments" below (optional; connecting is free without it).
 4. Deploy. Tables are created on first start. Open the URL, sign up with your admin email, and you'll see **Moderate** on the home screen.

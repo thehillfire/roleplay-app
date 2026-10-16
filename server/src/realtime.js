@@ -109,6 +109,8 @@ function attachRealtime({ server, hub, store, allowedOrigins = [], sameRoleAfter
           const role = typeof msg.role === 'string' ? msg.role : 'either';
           const topic = typeof msg.topic === 'string' ? msg.topic.trim().toLowerCase().slice(0, TOPIC_MAX) : '';
           const [blocked, known] = await Promise.all([store.blockedIds(user.id), store.partnerIds(user.id)]);
+          // The socket may have closed while we looked those up; never queue someone who's gone.
+          if (ws.readyState !== ws.OPEN) return;
           ws.send(JSON.stringify({ type: 'match.waiting' }));
           matchmaker.join({ userId: user.id, role, topic, blocked, known });
         } else if (msg.type === 'match.leave') {

@@ -78,7 +78,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
   const loadEarlier = async () => {
     setLoadingMore(true);
     try {
-      const d = await api.conversation(id, messages[0].createdAt);
+      const d = await api.conversation(id, messages[0]);
       setMessages((prev) => [...d.messages.filter((m) => !prev.some((p) => p.id === m.id)), ...prev]);
       setHasMore(d.messages.length >= PAGE);
     } catch (err) {

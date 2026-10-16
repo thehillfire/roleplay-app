@@ -14,6 +14,7 @@ function userFromRow(row) {
     role: row.role,
     status: row.status,
     connectCredits: num(row.connect_credits) || 0,
+    emailVerified: Boolean(row.email_verified_at),
     createdAt: num(row.created_at),
   };
 }
@@ -54,7 +55,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       const exists = await db.query('SELECT 1 FROM users WHERE email = $1', [email]);
       if (exists.rows.length) return null;
       for (let attempt = 0; attempt < 8; attempt += 1) {
-        const user = { id: newId(), email, handle: randomHandle(rng), role: 'member', status: 'active', connectCredits: 0, createdAt: now() };
+        const user = { id: newId(), email, handle: randomHandle(rng), role: 'member', status: 'active', connectCredits: 0, emailVerified: false, createdAt: now() };
         try {
           await db.query(
             'INSERT INTO users (id, email, handle, password_hash, birthdate, created_at) VALUES ($1, $2, $3, $4, $5, $6)',
@@ -103,10 +104,36 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       await db.query('DELETE FROM sessions WHERE token_hash = $1', [tokenHash]);
     },
 
+    // --- email verification ---
+
+    async createEmailVerification(tokenHash, userId, ttlMs) {
+      await db.query('DELETE FROM email_verifications WHERE user_id = $1', [userId]);
+      await db.query('INSERT INTO email_verifications (token_hash, user_id, expires_at) VALUES ($1, $2, $3)', [tokenHash, userId, now() + ttlMs]);
+    },
+
+    // Consumes a verification token. Returns the verified user, or null if invalid/expired.
+    async useEmailVerification(tokenHash) {
+      const { rows } = await db.query('SELECT user_id, expires_at FROM email_verifications WHERE token_hash = $1', [tokenHash]);
+      await db.query('DELETE FROM email_verifications WHERE token_hash = $1', [tokenHash]);
+      const row = rows[0];
+      if (!row || num(row.expires_at) < now()) return null;
+      if (!(await store.markEmailVerified(row.user_id))) return null;
+      return store.getUser(row.user_id);
+    },
+
+    async markEmailVerified(userId) {
+      const { rowCount } = await db.query(
+        "UPDATE users SET email_verified_at = COALESCE(email_verified_at, $1) WHERE id = $2 AND status <> 'deleted'",
+        [now(), userId],
+      );
+      return rowCount > 0;
+    },
+
     // --- password reset ---
 
     async createPasswordReset(tokenHash, userId, ttlMs) {
-      await db.query('DELETE FROM password_resets WHERE user_id = $1', [userId]); // only the newest link works
+      await db.query('DELETE FROM password_resets WHERE user_id = $1', [userId]);
+      await db.query('DELETE FROM email_verifications WHERE user_id = $1', [userId]); // only the newest link works
       await db.query('INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES ($1, $2, $3)', [tokenHash, userId, now() + ttlMs]);
     },
 
@@ -116,7 +143,8 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       await db.query('DELETE FROM password_resets WHERE token_hash = $1', [tokenHash]);
       const row = rows[0];
       if (!row || num(row.expires_at) < now()) return null;
-      await db.query("UPDATE users SET password_hash = $1 WHERE id = $2 AND status <> 'deleted'", [passwordHash, row.user_id]);
+      const updated = await db.query("UPDATE users SET password_hash = $1 WHERE id = $2 AND status <> 'deleted'", [passwordHash, row.user_id]);
+      if (updated.rowCount === 0) return null;
       await db.query('DELETE FROM sessions WHERE user_id = $1', [row.user_id]);
       return row.user_id;
     },
@@ -208,10 +236,14 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     },
 
     // Messages visible to this user: everything delivered, plus their own held messages.
-    async listMessages(userId, conversationId, { before, limit = 50 } = {}) {
+    // Pages backwards by (created_at, id) so messages sharing a millisecond are never skipped.
+    async listMessages(userId, conversationId, { before, beforeId, limit = 50 } = {}) {
       const params = [conversationId, userId, Math.min(Math.max(limit, 1), 100)];
       let beforeClause = '';
-      if (before) {
+      if (before && beforeId) {
+        params.push(before, beforeId);
+        beforeClause = 'AND (created_at < $4 OR (created_at = $4 AND id < $5))';
+      } else if (before) {
         params.push(before);
         beforeClause = 'AND created_at < $4';
       }
@@ -248,8 +280,10 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
 
     // --- safety ---
 
+    // Deleted accounts stay deleted (so retention purge still removes them).
     async setUserStatus(userId, status) {
-      await db.query('UPDATE users SET status = $1 WHERE id = $2', [status, userId]);
+      const { rowCount } = await db.query("UPDATE users SET status = $1 WHERE id = $2 AND status <> 'deleted'", [status, userId]);
+      return rowCount > 0;
     },
 
     async setUserRole(email, role) {
@@ -489,12 +523,14 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     async deleteAccount(userId) {
       const t = now();
       await db.query(
-        `UPDATE users SET email = $1, password_hash = '!', birthdate = '0000-00-00', status = 'deleted', role = 'member', deleted_at = $2
+        `UPDATE users SET email = $1, password_hash = '!', birthdate = '0000-00-00', status = 'deleted', role = 'member', email_verified_at = NULL, deleted_at = $2
          WHERE id = $3`,
         [`deleted+${userId}@deleted.invalid`, t, userId],
       );
       await db.query('DELETE FROM sessions WHERE user_id = $1', [userId]);
       await db.query('DELETE FROM push_subscriptions WHERE user_id = $1', [userId]);
+      await db.query('DELETE FROM password_resets WHERE user_id = $1', [userId]);
+      await db.query('DELETE FROM email_verifications WHERE user_id = $1', [userId]);
       await db.query("UPDATE connections SET requester_name = '(deleted)', requester_contact = NULL WHERE requester_id = $1", [userId]);
       await db.query(
         `UPDATE connections SET accepter_name = '(deleted)', accepter_contact = NULL
