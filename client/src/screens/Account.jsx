@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api.js';
 import { TEXT_SIZES, getTextSize, setTextSize } from '../textSize.js';
+import { ACCENTS, getAccent, setAccent } from '../accent.js';
 import { enablePush, pushBlocked, pushSupported } from '../notifications.js';
 import Support from '../components/Support.jsx';
 
@@ -9,6 +10,11 @@ export default function Account({ user, billing, pushKey, onUserChanged, onBack,
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [accent, setAccentState] = useState(getAccent);
+  const pickAccent = (a) => {
+    setAccent(a);
+    setAccentState(a);
+  };
   const [textSize, setSize] = useState(getTextSize);
   const pickSize = (size) => {
     setTextSize(size);
@@ -149,6 +155,18 @@ export default function Account({ user, billing, pushKey, onUserChanged, onBack,
 
         </section>
       )}
+
+      <section className="card">
+        <h2 className="section-title" id="accent-label">Your color</h2>
+        <div className="swatches" role="radiogroup" aria-labelledby="accent-label">
+          {ACCENTS.map((a) => (
+            <button key={a.id} type="button" role="radio" aria-checked={accent === a.id} className={accent === a.id ? 'swatch active' : 'swatch'} style={{ '--swatch': a.swatch }} onClick={() => pickAccent(a.id)}>
+              <span className="swatch-chip" aria-hidden="true" />
+              {a.label}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section className="card">
         <h2 className="section-title" id="text-size-label">Chat text size</h2>

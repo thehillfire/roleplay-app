@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 import { createSocket } from './socket.js';
+import { hype } from './hype.js';
+import Hype from './components/Hype.jsx';
 import Welcome from './screens/Welcome.jsx';
 import Home from './screens/Home.jsx';
 import Waiting from './screens/Waiting.jsx';
@@ -174,7 +176,10 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
   useEffect(() => {
     const offs = [
       // Replace the waiting room in history, so back from the chat goes home.
-      socket.on('match.found', ({ conversationId }) => navigate({ name: 'chat', id: conversationId }, { replace: viewRef.current.name === 'waiting' })),
+      socket.on('match.found', ({ conversationId, partner, isNew }) => {
+        if (isNew && partner) hype({ kind: 'match', them: partner.handle });
+        navigate({ name: 'chat', id: conversationId }, { replace: viewRef.current.name === 'waiting' });
+      }),
       socket.on('match.error', ({ error }) => setMatchError(error)),
       // New messages anywhere but the open chat update the list (unread counts, ordering), so the
       // title and the chat's back arrow can say something arrived elsewhere.
@@ -210,6 +215,7 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
       socket.on('kind_words', () => setNotice('💙 Someone left you a few kind words.')),
       socket.on('thanks', () => {
         setNotice('💙 Someone you talked with said it helped.');
+        hype({ kind: 'thanks' });
         onRefreshMe();
       }),
     ];
@@ -247,6 +253,7 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
 
   return (
     <>
+      <Hype you={user.handle} />
       {view.name === 'home' && (
         <Home
           user={user}

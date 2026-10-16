@@ -47,6 +47,10 @@ function createApp({
     ? { client: process.env.ADSENSE_CLIENT, slot: process.env.ADSENSE_SLOT }
     : null,
   adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
+  // The Android app (a Trusted Web Activity) proves it belongs to this site with these.
+  android = process.env.ANDROID_PACKAGE_NAME && process.env.ANDROID_CERT_SHA256
+    ? { packageName: process.env.ANDROID_PACKAGE_NAME, fingerprints: process.env.ANDROID_CERT_SHA256.split(',').map((f) => f.trim().toUpperCase()).filter(Boolean) }
+    : null,
 } = {}) {
   if (!store || !hub) throw new Error('createApp requires a store and a hub');
   const app = express();
@@ -132,6 +136,15 @@ function createApp({
       res.status(503).json({ status: 'database unavailable' });
     }
   }));
+
+  // Digital Asset Links: without it, the Play Store app opens with a browser address bar.
+  app.get('/.well-known/assetlinks.json', (req, res) => {
+    if (!android) return res.status(404).json({ error: 'Not found' });
+    res.json([{
+      relation: ['delegate_permission/common.handle_all_urls'],
+      target: { namespace: 'android_app', package_name: android.packageName, sha256_cert_fingerprints: android.fingerprints },
+    }]);
+  });
 
   // Rough live numbers for the home screen ("12 people here now").
   app.get('/api/presence', member, (req, res) => res.json(hub.stats()));

@@ -43,6 +43,10 @@ services:
         sync: false
       - key: TURNSTILE_SECRET_KEY
         sync: false
+      - key: ANDROID_PACKAGE_NAME
+        sync: false
+      - key: ANDROID_CERT_SHA256
+        sync: false
 
 databases:
   - name: kindred-db

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
+import { hype } from '../hype.js';
 import { CrisisCard, ReportSheet, heldNote } from '../components/Safety.jsx';
 import { ConnectBanner, ConnectSheet } from '../components/Connect.jsx';
 
@@ -139,7 +140,10 @@ export default function Chat({ id, socket, unreadElsewhere = 0, onBack, onLeft, 
     });
     const offConnect = socket.on('connect.updated', ({ conversationId, connection }) => {
       if (conversationId !== id) return;
-      setConvo((c) => (c ? { ...c, connection } : c));
+      setConvo((c) => {
+        if (c && connection?.status === 'accepted' && c.connection?.status !== 'accepted') hype({ kind: 'connected', them: c.partner.handle });
+        return c ? { ...c, connection } : c;
+      });
       onCreditsChanged(); // a declined request refunds the requester's credit
     });
     // After a reconnect, refetch in case messages arrived while offline.
@@ -246,7 +250,10 @@ export default function Chat({ id, socket, unreadElsewhere = 0, onBack, onLeft, 
     }
   };
 
-  const setConnection = (connection) => setConvo((c) => ({ ...c, connection }));
+  const setConnection = (connection) => setConvo((c) => {
+    if (connection?.status === 'accepted' && c?.connection?.status !== 'accepted') hype({ kind: 'connected', them: c.partner.handle });
+    return { ...c, connection };
+  });
 
   const connect = async (name, contact) => {
     const { connection } = await api.connect(id, name, contact);
