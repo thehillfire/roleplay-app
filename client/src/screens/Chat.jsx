@@ -5,6 +5,18 @@ import { ConnectBanner, ConnectSheet } from '../components/Connect.jsx';
 
 const PAGE = 50; // server page size
 
+// Shown in an empty conversation so nobody has to stare at a blank box.
+const OPENERS = [
+  'Hey. Rough day?',
+  "Hi, I'm here to listen. What's on your mind?",
+  "I just need to vent for a minute, if that's okay.",
+  'Hi! How are you really doing today?',
+];
+
+// On touch devices Enter makes a new line (people write paragraphs when they vent);
+// on keyboards it sends. Shift+Enter always makes a new line.
+const touchKeyboard = () => window.matchMedia?.('(pointer: coarse)').matches;
+
 function formatTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
@@ -123,7 +135,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
   };
 
   const onKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !touchKeyboard()) {
       e.preventDefault();
       send();
     }
@@ -260,7 +272,12 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
           </button>
         )}
         {convo && messages.length === 0 && (
-          <p className="empty">You're connected with {convo.partner.handle}. Say hi, share what's on your mind, or ask how their day is going.</p>
+          <div className="openers">
+            <p className="empty">You're connected with {convo.partner.handle}. Say hi, share what's on your mind, or ask how their day is going.</p>
+            <div className="opener-chips">
+              {OPENERS.map((o) => <button key={o} className="chip" onClick={() => setDraft(o)}>{o}</button>)}
+            </div>
+          </div>
         )}
         {messages.map((m) => (
           <div key={m.id} className={`bubble ${m.fromMe ? 'me' : 'them'}${m.status === 'held' ? ' held' : ''}`}>

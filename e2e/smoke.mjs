@@ -81,7 +81,10 @@ await bob.getByRole('radio', { name: 'I can listen' }).click();
 await bob.getByRole('button', { name: 'Find someone' }).click();
 await alice.locator('.chat-who', { hasText: bobHandle }).waitFor();
 await bob.locator('.chat-who', { hasText: aliceHandle }).waitFor();
-step('matched in real time');
+await bob.getByRole('button', { name: 'Hey. Rough day?' }).click();
+assert.equal(await bob.getByLabel('Message').inputValue(), 'Hey. Rough day?');
+await bob.getByLabel('Message').fill('');
+step('matched in real time; openers offered in the empty chat');
 
 // Chat both ways, with typing indicator
 await alice.getByLabel('Message').fill('Rent is due Friday and I am short. Feeling dumb about it.');
