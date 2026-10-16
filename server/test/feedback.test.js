@@ -41,3 +41,39 @@ test('after a real exchange, "this helped" thanks the listener once and counts d
   assert.equal(lws.events.filter((e) => e.type === 'thanks').length, 2, 'one thank-you per person');
   assert.equal((await listener('GET', '/api/auth/me')).body.user.helped, 2);
 });
+
+test('kind words: a screened note with a thank-you, kept for the listener, who can remove it', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const talker = await signedUp(s.base);
+  const listener = await signedUp(s.base);
+  const tws = await talker.socket();
+  const lws = await listener.socket();
+  t.after(() => Promise.all([tws.close(), lws.close()]));
+  tws.send({ type: 'match.join', role: 'talk' });
+  await tws.next('match.waiting');
+  lws.send({ type: 'match.join', role: 'listen' });
+  const { conversationId: id } = await tws.next('match.found');
+  for (const [who, body] of [[talker, 'rough week'], [listener, 'I hear you'], [talker, 'thanks for listening'], [listener, 'any time']]) {
+    await who('POST', `/api/conversations/${id}/messages`, { body });
+  }
+  const say = (note) => talker('POST', `/api/conversations/${id}/kind-words`, { note });
+
+  assert.equal((await say('You were so patient with me')).status, 409, 'needs a "helped" vote first');
+  await talker('POST', `/api/conversations/${id}/feedback`, { helpful: true });
+  assert.equal((await say('text me 555-123-4567')).status, 400, 'no contact details');
+  assert.equal((await say('x'.repeat(141))).status, 400);
+  assert.equal((await say('You were so patient with me. Thank you.')).status, 201);
+  await lws.next('kind_words');
+
+  const { kindWords } = (await listener('GET', '/api/kind-words')).body;
+  assert.equal(kindWords.length, 1);
+  assert.equal(kindWords[0].note, 'You were so patient with me. Thank you.');
+  assert.ok(!JSON.stringify(kindWords).includes(talker.user.handle), 'never says who');
+  assert.deepEqual((await talker('GET', '/api/kind-words')).body.kindWords, [], 'only for the listener');
+  assert.equal((await listener('GET', '/api/account/export')).body.kindWordsYouReceived.length, 1);
+
+  assert.equal((await talker('POST', `/api/kind-words/${id}/hide`, {})).status, 404, 'only the recipient can remove it');
+  assert.equal((await listener('POST', `/api/kind-words/${id}/hide`, {})).status, 200);
+  assert.deepEqual((await listener('GET', '/api/kind-words')).body.kindWords, []);
+});

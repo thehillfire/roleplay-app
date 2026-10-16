@@ -203,6 +203,12 @@ const MIGRATIONS = [
     'ALTER TABLE conversations ADD COLUMN hidden_a BIGINT NOT NULL DEFAULT 0',
     'ALTER TABLE conversations ADD COLUMN hidden_b BIGINT NOT NULL DEFAULT 0',
   ],
+  // 16: kind words: a short note with a "this helped" vote, kept for the listener
+  [
+    'ALTER TABLE feedback ADD COLUMN note TEXT',
+    'ALTER TABLE feedback ADD COLUMN note_at BIGINT',
+    'ALTER TABLE feedback ADD COLUMN note_hidden INTEGER NOT NULL DEFAULT 0',
+  ],
 ];
 
 async function migrate(db) {

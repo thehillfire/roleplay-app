@@ -188,14 +188,16 @@ await bob.getByLabel('Message').fill("I'm here. Take your time, I'm listening.")
 await bob.getByLabel('Message').press('Enter');
 await alice.locator('.bubble.them', { hasText: "I'm listening" }).waitFor();
 await alice.getByRole('button', { name: '💙 Yes, thank them' }).click();
+await alice.getByLabel('Kind words').fill('You really listened. Thank you.');
+await alice.getByRole('button', { name: 'Leave it' }).click();
 await alice.locator('.feedback-bar').waitFor({ state: 'detached' });
 await bob.getByRole('button', { name: 'Back to conversations' }).click();
-await bob.getByText(`💙 ${aliceHandle} said talking with you helped.`).waitFor();
 await bob.getByText(/You've helped 1 person/).waitFor();
+await bob.locator('.kind-words blockquote', { hasText: 'You really listened. Thank you.' }).waitFor();
 await bob.locator('.presence', { hasText: 'people here now' }).waitFor();
 await bob.shot('6a-thanked');
 await bob.locator('.convo', { hasText: aliceHandle }).click();
-step('thank-you reaches the listener and counts on their home screen');
+step('thank-you and kind words reach the listener and show on their home screen');
 
 // Connect: Alice asks, Bob accepts, both see what the other chose to share
 await alice.getByRole('button', { name: 'Conversation options' }).click();

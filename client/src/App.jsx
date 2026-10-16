@@ -126,6 +126,7 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
       socket.on('close', () => { if (viewRef.current.name === 'waiting') setMatchError('Connection lost. Reconnecting…'); }),
       socket.on('credits.updated', onRefreshMe),
       socket.on('presence', ({ online, waiting, waitingToTalk }) => setPresence({ online, waiting, waitingToTalk })),
+      socket.on('kind_words', () => setNotice('💙 Someone left you a few kind words.')),
       socket.on('thanks', ({ from }) => {
         setNotice(`💙 ${from} said talking with you helped.`);
         onRefreshMe();

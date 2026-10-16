@@ -154,6 +154,28 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     res.json({ helpful: req.body.helpful });
   }));
 
+  // Kind words: an optional short note with a "this helped" vote. Screened like a message,
+  // and anything a message would be held for is refused outright (there's no queue for notes).
+  app.post('/api/conversations/:id/kind-words', member, messageLimiter, conversation, asyncRoute(async (req, res) => {
+    const note = str(req.body.note, 'note', 140);
+    const screen = screenMessage(note);
+    let ok = screen.deliver;
+    if (ok && classifier.enabled) ok = !(await classifier.classify(note))?.flags.length;
+    if (!ok) throw badRequest('Kind words can only be kind words: no contact details, ages or anything personal.');
+    if (!(await store.saveKindWords(req.conversation.id, req.user.id, note))) throw httpError(409, 'Say it helped first.');
+    hub.push(req.conversation.partnerId, { type: 'kind_words' });
+    res.status(201).json({ ok: true });
+  }));
+
+  app.get('/api/kind-words', member, asyncRoute(async (req, res) => {
+    res.json({ kindWords: await store.kindWordsFor(req.user.id) });
+  }));
+
+  app.post('/api/kind-words/:conversationId/hide', member, asyncRoute(async (req, res) => {
+    if (!(await store.hideKindWords(req.user.id, req.params.conversationId))) throw httpError(404, 'Not found.');
+    res.json({ ok: true });
+  }));
+
   // --- Connect: mutual reveal. Requesting costs a credit (when payments are on); accepting is free. ---
 
   const parseReveal = (body = {}) => ({

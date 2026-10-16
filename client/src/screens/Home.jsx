@@ -2,6 +2,7 @@ import { useState } from 'react';
 import HomeAd from '../components/HomeAd.jsx';
 import Onboarding, { shouldOnboard } from '../components/Onboarding.jsx';
 import CheckIn from '../components/CheckIn.jsx';
+import KindWords from '../components/KindWords.jsx';
 import { api } from '../api.js';
 
 function VerifyNudge() {
@@ -141,6 +142,8 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
           </ul>
         </section>
       )}
+
+      {user.helped > 0 && <KindWords refreshKey={notice} />}
 
       <HomeAd ads={ads} />
 

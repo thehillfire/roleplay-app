@@ -27,7 +27,7 @@ SERVER_PID=$!
 for _ in $(seq 1 50); do curl -fs "http://localhost:$PORT/api/health" > /dev/null && break; sleep 0.2; done
 
 echo "▶ e2e"
-BASE_URL="http://localhost:$PORT" MOD_EMAIL=mod@e2e.test MAIL_LOG="$LOG" node e2e/smoke.mjs
+SHOTS_DIR="${SHOTS_DIR:-}" BASE_URL="http://localhost:$PORT" MOD_EMAIL=mod@e2e.test MAIL_LOG="$LOG" node e2e/smoke.mjs
 echo "▶ accessibility"
 BASE_URL="http://localhost:$PORT" node e2e/a11y.mjs | tail -1
 echo "✅ all checks passed"

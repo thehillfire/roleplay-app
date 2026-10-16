@@ -43,6 +43,8 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
   const [connectSheet, setConnectSheet] = useState(null); // null | 'request' | 'accept'
   const [hasMore, setHasMore] = useState(false);
   const [feedbackDone, setFeedbackDone] = useState(false);
+  const [kindNote, setKindNote] = useState(null); // null, or the note being written after "it helped"
+  const [kindError, setKindError] = useState('');
   const [partnerReadAt, setPartnerReadAt] = useState(0);
   const [reactingTo, setReactingTo] = useState(null); // message id with the picker open
   const [selected, setSelected] = useState(null); // tapped message: shows its actions
@@ -258,8 +260,20 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     setFeedbackDone(true);
     try {
       await api.feedback(id, helpful);
+      if (helpful) setKindNote('');
     } catch {
       // Not worth interrupting the conversation over.
+    }
+  };
+
+  const sendKindNote = async (e) => {
+    e.preventDefault();
+    setKindError('');
+    try {
+      await api.sendKindWords(id, kindNote);
+      setKindNote(null);
+    } catch (err) {
+      setKindError(err.message);
     }
   };
 
@@ -385,6 +399,16 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
           <button className="chip" onClick={() => giveFeedback(true)}>💙 Yes, thank them</button>
           <button className="chip" onClick={() => giveFeedback(false)}>Not really</button>
         </div>
+      )}
+
+      {kindNote !== null && (
+        <form className="feedback-bar kind-note" onSubmit={sendKindNote}>
+          <span>Thanks sent. Want to leave {convo.partner.handle} a few kind words? They'll keep them, without your name.</span>
+          <input aria-label="Kind words" value={kindNote} onChange={(e) => setKindNote(e.target.value)} maxLength={140} placeholder="You really listened. Thank you." />
+          <button className="chip" type="submit" disabled={!kindNote.trim()}>Leave it</button>
+          <button className="chip" type="button" onClick={() => setKindNote(null)}>Skip</button>
+          {kindError && <p className="form-error" role="alert">{kindError}</p>}
+        </form>
       )}
 
       {ended ? (

@@ -558,6 +558,31 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return rows[0] ? Number(rows[0].helpful) === 1 : null;
     },
 
+    // A note on an existing "helped" vote; false if there's no such vote.
+    async saveKindWords(conversationId, raterId, note) {
+      const { rowCount } = await db.query(
+        'UPDATE feedback SET note = $1, note_at = $2, note_hidden = 0 WHERE conversation_id = $3 AND rater_id = $4 AND helpful = 1',
+        [note, now(), conversationId, raterId],
+      );
+      return rowCount === 1;
+    },
+
+    // Notes people left for this user, newest first. Never who wrote them.
+    async kindWordsFor(userId, limit = 20) {
+      const { rows } = await db.query(
+        `SELECT conversation_id, note, note_at FROM feedback
+          WHERE ratee_id = $1 AND helpful = 1 AND note IS NOT NULL AND note_hidden = 0
+          ORDER BY note_at DESC LIMIT $2`,
+        [userId, limit],
+      );
+      return rows.map((r) => ({ conversationId: r.conversation_id, note: r.note, at: num(r.note_at) }));
+    },
+
+    async hideKindWords(userId, conversationId) {
+      const { rowCount } = await db.query('UPDATE feedback SET note_hidden = 1 WHERE ratee_id = $1 AND conversation_id = $2 AND note IS NOT NULL', [userId, conversationId]);
+      return rowCount > 0;
+    },
+
     // How many different people said this user helped them.
     async helpedCount(userId) {
       const { rows } = await db.query('SELECT COUNT(DISTINCT rater_id) AS n FROM feedback WHERE ratee_id = $1 AND helpful = 1', [userId]);
@@ -666,6 +691,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         conversations: threads,
         reportsYouFiled: reports.map((r) => ({ reason: r.reason, details: r.details, status: r.status, at: new Date(num(r.created_at)).toISOString() })),
         dailyCheckins: checkins,
+        kindWordsYouReceived: (await store.kindWordsFor(userId, 10000)).map((k) => ({ note: k.note, at: new Date(k.at).toISOString() })),
       };
     },
 
@@ -684,6 +710,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       await db.query('DELETE FROM password_resets WHERE user_id = $1', [userId]);
       await db.query('DELETE FROM email_verifications WHERE user_id = $1', [userId]);
       await db.query('DELETE FROM checkins WHERE user_id = $1', [userId]); // private, no safety value
+      await db.query('UPDATE feedback SET note = NULL WHERE rater_id = $1', [userId]); // words they wrote
       await db.query("UPDATE connections SET requester_name = '(deleted)', requester_contact = NULL WHERE requester_id = $1", [userId]);
       await db.query(
         `UPDATE connections SET accepter_name = '(deleted)', accepter_contact = NULL
