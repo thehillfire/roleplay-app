@@ -279,3 +279,15 @@ test('QA regressions: crisis phrasing, insults aimed at the other person, street
   }
   assert.ok(flagsOf('I live at 42 Elm Street in Dayton').includes('location'));
 });
+
+test('QA pass 2: high-risk crisis phrases and abuse aimed at the other person', () => {
+  for (const text of ['I have a plan and I am going to do it tonight', 'I took all my pills', 'I wish I was dead', "I've been cutting again", 'me quiero suicidar', 'tonight is my last night', 'I wrote my goodbye letters', 'this is goodbye']) {
+    assert.equal(screenMessage(text).crisis, true, text);
+  }
+  for (const text of ['kill yourself', 'lol you were useless, kill yourself', 'why dont you just die', 'do everyone a favor and die']) {
+    assert.ok(flagsOf(text).includes('harassment'), text);
+  }
+  for (const text of ['I have a plan for my career', 'I took my pills this morning', 'this is goodbye to my old job lol', 'we made a plan to go hiking tonight']) {
+    assert.equal(screenMessage(text).crisis, false, text);
+  }
+});

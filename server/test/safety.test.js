@@ -298,3 +298,20 @@ test('the same long message pasted to many people is held as spam', async (t) =>
   const held = await s.store.listHeldMessages();
   assert.deepEqual(held[0].flags, ['spam']);
 });
+
+test('"worried about their safety" keeps the chat open, shows them resources and never counts against them', async (t) => {
+  const s = await start({ autoPauseMinReporterAgeMs: 0 });
+  t.after(s.stop);
+  const person = await signedUp(s.base);
+  const personId = await idOf(s, person);
+  for (let i = 0; i < 3; i += 1) {
+    const listener = await signedUp(s.base);
+    const c = await matched(s, person, listener);
+    await person('POST', `/api/conversations/${c.id}/messages`, { body: 'I have a plan and I am going to do it tonight' });
+    assert.equal((await listener('POST', `/api/conversations/${c.id}/report`, { reason: 'self_harm' })).status, 201);
+    assert.equal((await c.aws.next('support.resources')).conversationId, c.id);
+    assert.equal((await listener('POST', `/api/conversations/${c.id}/messages`, { body: "I'm still here with you" })).status, 201, 'not blocked');
+    await c.close();
+  }
+  assert.equal((await s.store.getUser(personId)).status, 'active', 'three welfare reports never pause someone in crisis');
+});

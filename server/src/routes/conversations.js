@@ -145,6 +145,7 @@ module.exports = function register(app, { store, hub, payments, classifier, push
       alertOnce(`${req.user.id}:minor_sexual`, () => alertModerators(req, 'Held: sexual content involving minors', `A message from ${req.user.handle} was held as sexual content involving minors. Review it now.`));
     } else if (screen.deliver) {
       hub.push(partnerId, { type: 'message', message: { ...out, fromMe: false, ...(screen.crisis ? { crisis: true } : {}) } });
+      hub.push(req.user.id, { type: 'message', message: { ...out, fromMe: true } }); // their other devices (the sending tab dedupes)
       // Not looking at the app: notify their devices (handle only, never the text).
       if (!hub.isOnline(partnerId) && !ctx.partnerMuted) {
         push.notify(store, partnerId, { title: 'Kindred', body: `New message from ${req.user.handle}`, conversationId: id, tag: id })
@@ -281,7 +282,11 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     const details = str(req.body.details, 'details', 1000, { required: false });
     const { id, partnerId } = req.conversation;
     await store.createReport({ reporterId: req.user.id, reportedId: partnerId, conversationId: id, reason, details });
-    if (req.body.block !== false) {
+    // "I'm worried about their safety" is a welfare check, not a complaint: the chat stays open
+    // (cutting off someone in crisis is the worst outcome) and they're shown support resources.
+    const welfare = reason === 'self_harm';
+    if (welfare) hub.push(partnerId, { type: 'support.resources', conversationId: id });
+    if (req.body.block !== false && !welfare) {
       await store.block(req.user.id, partnerId);
       hub.push(partnerId, { type: 'conversation.ended', conversationId: id });
     }

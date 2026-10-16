@@ -493,6 +493,8 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       if (reason) {
         params.push(reason);
         extra = 'AND r.reason = $4';
+      } else {
+        extra = "AND r.reason <> 'self_harm'"; // worrying about someone is never a strike against them
       }
       const { rows } = await db.query(
         `SELECT COUNT(DISTINCT r.reporter_id) AS n FROM reports r JOIN users u ON u.id = r.reporter_id

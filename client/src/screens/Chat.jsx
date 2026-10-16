@@ -49,6 +49,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
   const [kindNote, setKindNote] = useState(null); // null, or the note being written after "it helped"
   const [kindError, setKindError] = useState('');
   const [kindSent, setKindSent] = useState(false);
+  const [notice, setNotice] = useState(''); // a short status line, e.g. after a welfare report
   const [partnerReadAt, setPartnerReadAt] = useState(0);
   const [reactingTo, setReactingTo] = useState(null); // message id with the picker open
   const [selected, setSelected] = useState(null); // tapped message: shows its actions
@@ -121,6 +122,10 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
       setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reaction } : m)));
     });
     // A moderator delivered one of my held messages after all.
+    // Someone worried about me: show me the resources, gently.
+    const offResources = socket.on('support.resources', ({ conversationId }) => {
+      if (conversationId === id) setCrisis('sender');
+    });
     const offReleased = socket.on('message.released', ({ conversationId, messageId }) => {
       if (conversationId !== id) return;
       setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, status: 'delivered', flags: undefined } : m)));
@@ -143,7 +148,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     const onVisible = () => markReadIfVisible(id);
     document.addEventListener('visibilitychange', onVisible);
     return () => {
-      offMessage(); offTyping(); offEnded(); offReacted(); offReleased(); offUnsent(); offRead(); offConnect(); offOpen();
+      offMessage(); offTyping(); offEnded(); offReacted(); offResources(); offReleased(); offUnsent(); offRead(); offConnect(); offOpen();
       document.removeEventListener('visibilitychange', onVisible);
       clearTimeout(typingTimer.current);
     };
@@ -349,7 +354,15 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
 
   const report = async (reason, details) => {
     await api.report(id, reason, details);
-    onLeft(`Thanks. ${convo.partner.handle} was reported and blocked. A moderator will review it.`);
+    if (reason === 'self_harm') {
+      // A welfare check: stay in the chat.
+      setReporting(false);
+      setCrisis('listener');
+      setSendError('');
+      setNotice('Thank you for looking out for them. A moderator will check in, and they were shown support resources.');
+      return;
+    }
+    onLeft(ended ? `Thanks. A moderator will review your report about ${convo.partner.handle}.` : `Thanks. ${convo.partner.handle} was reported and blocked. A moderator will review it.`);
   };
 
   if (error) {
@@ -464,6 +477,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
         </div>
       )}
 
+      {notice && <p className="feedback-bar" role="status">{notice}</p>}
       {kindSent && <p className="feedback-bar" role="status">💙 Sent. They'll find your kind words on their home screen.</p>}
       {kindNote !== null && (
         <form className="feedback-bar kind-note" onSubmit={sendKindNote}>

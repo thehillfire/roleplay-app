@@ -69,7 +69,9 @@ export function ReportSheet({ handle, onSubmit, onClose }) {
       <div className="sheet" role="dialog" aria-modal="true" aria-label={`Report ${handle}`} ref={dialog} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         <form className="sheet-form" onSubmit={submit}>
         <h2>Report {handle}</h2>
-        <p className="hint">A moderator will review the recent messages. You won't be matched with them again.</p>
+        <p className="hint">{reason === 'self_harm'
+          ? "A moderator will check on them, and they'll be shown support resources. Your chat stays open: staying with them can help."
+          : "A moderator will review the recent messages. You won't be matched with them again."}</p>
         <fieldset className="reasons">
           {REASONS.map(([id, label]) => (
             <label key={id} className={reason === id ? 'reason active' : 'reason'}>
@@ -82,7 +84,9 @@ export function ReportSheet({ handle, onSubmit, onClose }) {
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="sheet-actions">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn danger" disabled={!reason || busy}>{busy ? 'Sending…' : 'Report and block'}</button>
+          <button type="submit" className={reason === 'self_harm' ? 'btn primary' : 'btn danger'} disabled={!reason || busy}>
+            {busy ? 'Sending…' : reason === 'self_harm' ? 'Let a moderator know' : 'Report and block'}
+          </button>
         </div>
         </form>
       </div>
