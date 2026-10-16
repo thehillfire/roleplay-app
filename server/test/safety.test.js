@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { start, signedUp } = require('./helpers');
+const { start, client, signedUp } = require('./helpers');
 
 async function matched(s, a, b) {
   const aws = await a.socket();
@@ -139,29 +139,35 @@ test('moderators review reports and held messages; members cannot', async (t) =>
   assert.equal((await alice('GET', '/api/auth/me')).body.user.status, 'active');
 });
 
-test('ADMIN_EMAILS only makes a verified owner of that email a moderator', async (t) => {
+test('ADMIN_EMAILS: a squatter never becomes a moderator; the inbox owner does, via password reset', async (t) => {
   const sent = [];
   const mailer = { enabled: true, send: async (m) => { sent.push(m); } };
-  const s = await start({ adminEmails: ['boss@example.com'], mailer });
+  const s = await start({ adminEmails: ['boss@example.com'], mailer, publicUrl: 'https://kindred.example' });
   t.after(s.stop);
 
-  // Registering the owner's address doesn't grant anything until the inbox is proven.
+  // The attacker registers the owner's address first and keeps that session.
   const squatter = await signedUp(s.base, { email: 'Boss@Example.com' });
   assert.equal(squatter.user.role, 'member');
-  assert.equal(squatter.user.emailVerified, false);
+  await new Promise((r) => setTimeout(r, 20));
+
+  // The real owner clicks "confirm" in their inbox: still no moderator rights for the squatter.
+  const owner = client(s.base);
+  const verifyToken = sent.find((m) => m.to === 'boss@example.com' && /verify#/.test(m.text)).text.match(/\/verify#([\w-]+)/)[1];
+  assert.equal((await owner('POST', '/api/auth/verify', { token: verifyToken })).status, 200);
+  assert.equal((await squatter('GET', '/api/auth/me')).body.user.role, 'member');
   assert.equal((await squatter('GET', '/api/admin/reports')).status, 403);
   await squatter('POST', '/api/auth/logout', {});
-  assert.equal((await squatter('POST', '/api/auth/login', { email: 'boss@example.com', password: 'quiet-harbor-9' })).body.user.role, 'member');
+  assert.equal((await squatter('POST', '/api/auth/login', { email: 'boss@example.com', password: 'quiet-harbor-9' })).body.user.role, 'member', 'nor on login');
 
-  // Following the emailed link proves it; the next sign-in is a moderator.
+  // The owner resets the password from their inbox: now a moderator, and the squatter is out.
+  await owner('POST', '/api/auth/forgot', { email: 'boss@example.com' });
   await new Promise((r) => setTimeout(r, 20));
-  const token = sent.find((m) => m.to === 'boss@example.com').text.match(/\/verify#([\w-]+)/)[1];
-  assert.equal((await squatter('POST', '/api/auth/verify', { token })).status, 200);
-  assert.equal((await squatter('POST', '/api/auth/verify', { token })).status, 400, 'single use');
-  const me = (await squatter('GET', '/api/auth/me')).body.user;
-  assert.equal(me.role, 'admin');
-  assert.equal(me.emailVerified, true);
-  assert.equal((await squatter('GET', '/api/admin/reports')).status, 200);
+  const resetToken = sent.filter((m) => m.to === 'boss@example.com' && /reset#/.test(m.text)).at(-1).text.match(/\/reset#([\w-]+)/)[1];
+  assert.equal((await owner('POST', '/api/auth/reset', { token: resetToken, password: 'owner-chosen-pass-1' })).status, 200);
+  assert.equal((await owner('GET', '/api/auth/me')).body.user.role, 'admin');
+  assert.equal((await owner('GET', '/api/admin/reports')).status, 200);
+  assert.equal((await squatter('GET', '/api/auth/me')).body.user, null, 'squatter signed out');
+  assert.equal((await squatter('POST', '/api/auth/login', { email: 'boss@example.com', password: 'quiet-harbor-9' })).status, 401, 'old password gone');
 
   const member = await signedUp(s.base);
   assert.equal(member.user.role, 'member');

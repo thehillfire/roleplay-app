@@ -7,7 +7,7 @@ What's left between this repo and real users, in order. The code side is done an
 1. **Domain.** Buy one (Namecheap, Cloudflare). You'll point it at the host in step 2.
 2. **Host + database.** Render → New → Blueprint → this repo (see [DEPLOY.md](DEPLOY.md)). That creates the server and a Postgres database. Starter plans are about $7/month each.
 3. **Email (Resend).** Free tier covers 3,000 emails/month. Verify your domain, then set `RESEND_API_KEY`, `MAIL_FROM` and `PUBLIC_URL`. Without email, password resets and moderator setup won't work.
-4. **You as moderator.** Set `ADMIN_EMAILS` to your email, sign up, click the confirmation link, and you'll see **Moderate**.
+4. **You as moderator.** Set `ADMIN_EMAILS` to your email and sign up. Then sign out and use **Forgot password?** once. Completing that reset turns on **Moderate**. (Only a reset counts, because it proves the inbox and replaces any password a squatter might have set.)
 5. **Bot protection.** Create a free Cloudflare Turnstile widget and set `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` (see DEPLOY.md). Spam bots find anonymous chat apps within days.
 6. **Notifications.** Run `npm run vapid` locally and paste the three values into Render.
 7. **Smoke test on your phone.** Sign up on two devices (or one phone + one laptop), match, chat, report, connect. Add it to your home screen.

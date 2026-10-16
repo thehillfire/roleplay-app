@@ -304,7 +304,12 @@ export default function App() {
     const token = window.location.hash.slice(1);
     window.history.replaceState(null, '', '/');
     api.verify(token).then(
-      () => { setVerifyNotice('Email confirmed. Thank you!'); refreshMe().catch(() => {}); },
+      (d) => {
+        setVerifyNotice(d?.moderatorNextStep === 'reset'
+          ? 'Email confirmed. To switch on moderator access, sign out and use "Forgot password?" once: it proves the account is yours.'
+          : 'Email confirmed. Thank you!');
+        refreshMe().catch(() => {});
+      },
       (err) => setVerifyNotice(err.message),
     );
   }, [refreshMe]);

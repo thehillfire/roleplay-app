@@ -43,6 +43,10 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
       text: `Welcome to Kindred, ${user.handle}.\n\nConfirm this is your email so you can reset your password if you ever forget it:\n${base}/verify#${token}\n\nIf you didn't sign up, ignore this email.`,
     }).catch((err) => console.error('verification email failed', err.message));
   };
+  // Moderator rights for ADMIN_EMAILS are granted only when a password reset completes: that
+  // proves the inbox AND replaces a password a squatter may have chosen, and it signs out every
+  // other session. (Confirming the email isn't enough: someone could register the owner's
+  // address first, keep that session, and wait for the owner to click "confirm".)
   const promoteIfAdmin = async (user) => {
     if (user.emailVerified && adminEmails.includes(user.email) && user.role !== 'admin') {
       await store.setUserRole(user.email, 'admin');
@@ -88,7 +92,7 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
       throw httpError(401, 'Email or password is incorrect.');
     }
     failedLogins.delete(email);
-    const user = await promoteIfAdmin(found);
+    const user = found;
     await store.noteDevice(user.id, deviceHash(req, res));
     await auth.startSession(req, res, user.id);
     res.json({ user: publicUser(user) });
@@ -133,8 +137,7 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
     if (typeof req.body.token !== 'string' || !req.body.token) throw badRequest('Confirmation link is invalid');
     const user = await store.useEmailVerification(hashToken(req.body.token));
     if (!user) throw httpError(400, 'This confirmation link has expired or was already used.');
-    await promoteIfAdmin(user);
-    res.json({ ok: true });
+    res.json({ ok: true, ...(adminEmails.includes(user.email) && user.role !== 'admin' ? { moderatorNextStep: 'reset' } : {}) });
   }));
 
   app.post('/api/auth/resend-verification', member, authLimiter, asyncRoute(async (req, res) => {

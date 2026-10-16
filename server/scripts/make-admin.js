@@ -11,7 +11,15 @@ const { createStore } = require('../src/store');
     process.exit(1);
   }
   const db = await createDb();
-  const ok = await createStore(db).setUserRole(email, 'admin');
+  const store = createStore(db);
+  const user = await store.findUserByEmail(email);
+  // Only an account whose owner proved the inbox: anyone can sign up with someone else's address.
+  if (user && !user.emailVerified) {
+    await db.close();
+    console.error(`${email} hasn't confirmed their email yet. Ask them to use "Forgot password?" once, then run this again.`);
+    process.exit(1);
+  }
+  const ok = Boolean(user) && (await store.setUserRole(email, 'admin'));
   await db.close();
   console.log(ok ? `${email} is now a moderator.` : `No account found for ${email}.`);
   process.exit(ok ? 0 : 1);

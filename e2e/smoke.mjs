@@ -263,7 +263,23 @@ if (process.env.MOD_EMAIL && process.env.MAIL_LOG) {
   const verifyLinks = [...readFileSync(process.env.MAIL_LOG, 'utf8').matchAll(/to=(\S+) subject="Confirm[^"]*"\n[\s\S]*?(https?:\/\/\S+\/verify#[\w-]+)/g)]
     .filter((m) => m[1] === process.env.MOD_EMAIL);
   await mod.goto(verifyLinks[verifyLinks.length - 1][2]);
-  await mod.getByText('Email confirmed. Thank you!').waitFor();
+  await mod.getByText(/Email confirmed\. To switch on moderator access/).waitFor();
+  assert.equal(await mod.getByRole('button', { name: 'Moderate' }).count(), 0, 'confirming alone never grants moderator rights');
+  // Moderator rights come from completing a password reset (proves the inbox, replaces the password).
+  await mod.getByRole('button', { name: 'Account' }).click();
+  await mod.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await mod.getByRole('button', { name: 'I have an account' }).click();
+  await mod.getByRole('button', { name: 'Forgot password?' }).click();
+  await mod.getByLabel('Email').fill(process.env.MOD_EMAIL);
+  await mod.getByRole('button', { name: 'Send reset link' }).click();
+  await mod.getByText(/a reset link is on its way/).waitFor();
+  await mod.waitForTimeout(300);
+  // One logged email per "[mail]" entry; take the moderator's latest reset link.
+  const modReset = readFileSync(process.env.MAIL_LOG, 'utf8').split('[mail] ')
+    .filter((m) => m.startsWith(`to=${process.env.MOD_EMAIL} `) && /\/reset#/.test(m)).at(-1).match(/https?:\/\/\S+\/reset#[\w-]+/)[0];
+  await mod.goto(modReset);
+  await mod.getByLabel(/New password/).fill('moderator-pass-22');
+  await mod.getByRole('button', { name: 'Save and sign in' }).click();
   await mod.getByRole('button', { name: 'Moderate' }).click();
   const card = mod.locator('.report', { hasText: aliceHandle }).first();
   await card.waitFor();
