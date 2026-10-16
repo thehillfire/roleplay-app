@@ -89,6 +89,13 @@ await bob.locator('.bubble', { hasText: 'Thank you. Really.' }).waitFor();
 assert.equal(await bob.locator('.bubble').count(), 3);
 step('session and history survive reload');
 
+// The phone back button returns to the list instead of leaving the app
+await bob.goBack();
+await bob.locator('.convo', { hasText: aliceHandle }).waitFor();
+await bob.goForward();
+await bob.locator('.bubble', { hasText: 'Thank you. Really.' }).waitFor();
+step('back and forward buttons move between screens');
+
 // Safety: phone numbers are held back with an explanation
 await alice.getByLabel('Message').fill('text me 555 123 4567');
 await alice.getByLabel('Message').press('Enter');

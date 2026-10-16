@@ -136,3 +136,27 @@ test('closing the last socket leaves the queue', async (t) => {
   await new Promise((r) => setTimeout(r, 50));
   assert.equal(s.server.realtime.matchmaker.size, 0);
 });
+
+test('history pages backwards with ?before', async (t) => {
+  const s = await start({ messageRateLimit: { max: 1000, windowMs: 60000 } });
+  t.after(s.stop);
+  const alice = await signedUp(s.base);
+  const bob = await signedUp(s.base);
+  const aws = await alice.socket();
+  const bws = await bob.socket();
+  t.after(() => Promise.all([aws.close(), bws.close()]));
+  aws.send({ type: 'match.join', role: 'talk' });
+  await aws.next('match.waiting');
+  bws.send({ type: 'match.join', role: 'listen' });
+  const { conversationId: id } = await aws.next('match.found');
+  for (let i = 1; i <= 55; i += 1) {
+    await alice('POST', `/api/conversations/${id}/messages`, { body: `note ${i}` });
+    await new Promise((r) => setTimeout(r, 2)); // distinct timestamps
+  }
+  const first = (await bob('GET', `/api/conversations/${id}`)).body.messages;
+  assert.equal(first.length, 50);
+  assert.equal(first[0].body, 'note 6');
+  assert.equal(first[49].body, 'note 55');
+  const older = (await bob('GET', `/api/conversations/${id}?before=${first[0].createdAt}`)).body.messages;
+  assert.deepEqual(older.map((m) => m.body), ['note 1', 'note 2', 'note 3', 'note 4', 'note 5']);
+});

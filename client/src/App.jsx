@@ -22,6 +22,23 @@ function Paused({ onSignOut }) {
 
 function Signedin({ user, billing, onSignOut, onPaused, onRefreshMe, initialNotice }) {
   const [view, setView] = useState({ name: 'home' });
+
+  // Browser history: home is the root entry; other screens are pushed on top so the
+  // phone's back button (and swipe back) returns to the previous screen instead of leaving.
+  useEffect(() => {
+    window.history.replaceState({ view: { name: 'home' } }, '');
+    const onPop = (e) => setView(e.state?.view || { name: 'home' });
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  const navigate = useCallback((next, { replace = false } = {}) => {
+    window.history[replace ? 'replaceState' : 'pushState']({ view: next }, '');
+    setView(next);
+  }, []);
+  const goHome = useCallback(() => {
+    if (window.history.state?.view && window.history.state.view.name !== 'home') window.history.back();
+    else setView({ name: 'home' });
+  }, []);
   const [notice, setNotice] = useState(initialNotice || '');
   const [conversations, setConversations] = useState(null);
   const [listError, setListError] = useState('');
@@ -44,7 +61,8 @@ function Signedin({ user, billing, onSignOut, onPaused, onRefreshMe, initialNoti
 
   useEffect(() => {
     const offs = [
-      socket.on('match.found', ({ conversationId }) => setView({ name: 'chat', id: conversationId })),
+      // Replace the waiting room in history, so back from the chat goes home.
+      socket.on('match.found', ({ conversationId }) => navigate({ name: 'chat', id: conversationId }, { replace: viewRef.current.name === 'waiting' })),
       socket.on('match.error', ({ error }) => setMatchError(error)),
       // New messages elsewhere update the list (unread counts, ordering).
       socket.on('message', () => { if (viewRef.current.name === 'home') refresh(); }),
@@ -53,20 +71,24 @@ function Signedin({ user, billing, onSignOut, onPaused, onRefreshMe, initialNoti
       socket.on('credits.updated', onRefreshMe),
     ];
     return () => offs.forEach((off) => off());
-  }, [socket, refresh, onRefreshMe]);
+  }, [socket, refresh, onRefreshMe, navigate]);
+
+  // Leaving the waiting room any way (cancel, back button) takes you out of the queue.
+  const prevView = useRef(view.name);
+  useEffect(() => {
+    if (prevView.current === 'waiting' && view.name !== 'waiting' && view.name !== 'chat') socket.send({ type: 'match.leave' });
+    prevView.current = view.name;
+  }, [view.name, socket]);
 
   useEffect(() => window.scrollTo(0, 0), [view.name]);
 
   const find = ({ role, topic }) => {
     setMatchError('');
-    setView({ name: 'waiting' });
+    navigate({ name: 'waiting' });
     socket.send({ type: 'match.join', role, topic });
   };
 
-  const cancel = () => {
-    socket.send({ type: 'match.leave' });
-    setView({ name: 'home' });
-  };
+  const cancel = goHome;
 
   return (
     <>
@@ -77,27 +99,27 @@ function Signedin({ user, billing, onSignOut, onPaused, onRefreshMe, initialNoti
           listError={listError}
           onRetry={refresh}
           onFind={find}
-          onOpen={(id) => setView({ name: 'chat', id })}
+          onOpen={(id) => navigate({ name: 'chat', id })}
           onSignOut={onSignOut}
           connection={connection}
           notice={notice}
           onDismissNotice={() => setNotice('')}
-          onModerate={user.role === 'admin' ? () => setView({ name: 'moderate' }) : undefined}
+          onModerate={user.role === 'admin' ? () => navigate({ name: 'moderate' }) : undefined}
         />
       )}
-      {view.name === 'moderate' && <Moderate onBack={() => setView({ name: 'home' })} />}
+      {view.name === 'moderate' && <Moderate onBack={goHome} />}
       {view.name === 'waiting' && <Waiting onCancel={cancel} error={matchError} />}
       {view.name === 'chat' && (
         <Chat
           key={view.id}
           id={view.id}
           socket={socket}
-          onBack={() => setView({ name: 'home' })}
+          onBack={goHome}
           onLeft={(text) => {
             // Drop the blocked conversation now rather than flashing it until the list refreshes.
             setConversations((prev) => prev?.filter((c) => c.id !== view.id) ?? prev);
             setNotice(text);
-            setView({ name: 'home' });
+            goHome();
           }}
           onPaused={onPaused}
           billing={billing}

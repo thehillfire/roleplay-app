@@ -3,6 +3,8 @@ import { api } from '../api.js';
 import { CrisisCard, ReportSheet, heldNote } from '../components/Safety.jsx';
 import { ConnectBanner, ConnectSheet } from '../components/Connect.jsx';
 
+const PAGE = 50; // server page size
+
 function formatTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
@@ -20,6 +22,8 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
   const [menuOpen, setMenuOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [connectSheet, setConnectSheet] = useState(null); // null | 'request' | 'accept'
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const endRef = useRef(null);
   const typingTimer = useRef(null);
   const lastTypingSent = useRef(0);
@@ -29,6 +33,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     api.conversation(id).then((d) => {
       setConvo(d.conversation);
       setMessages(d.messages);
+      setHasMore(d.messages.length >= PAGE);
       api.markRead(id).catch(() => {});
     }, (err) => setError(err.message));
   }, [id]);
@@ -63,9 +68,24 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     return () => { offMessage(); offTyping(); offEnded(); offConnect(); offOpen(); clearTimeout(typingTimer.current); };
   }, [socket, id, load, onCreditsChanged]);
 
+  // Follow the newest message (not older pages loaded above).
+  const lastId = messages[messages.length - 1]?.id;
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages.length, partnerTyping]);
+  }, [lastId, partnerTyping]);
+
+  const loadEarlier = async () => {
+    setLoadingMore(true);
+    try {
+      const d = await api.conversation(id, messages[0].createdAt);
+      setMessages((prev) => [...d.messages.filter((m) => !prev.some((p) => p.id === m.id)), ...prev]);
+      setHasMore(d.messages.length >= PAGE);
+    } catch (err) {
+      setSendError(err.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const send = async () => {
     const body = draft.trim();
@@ -194,6 +214,11 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
       {crisis && <CrisisCard role={crisis === 'sender' ? 'sender' : 'listener'} onDismiss={() => setCrisis(null)} />}
 
       <div className="messages" aria-live="polite">
+        {hasMore && (
+          <button className="link earlier" onClick={loadEarlier} disabled={loadingMore}>
+            {loadingMore ? 'Loading…' : 'Load earlier messages'}
+          </button>
+        )}
         {convo && messages.length === 0 && (
           <p className="empty">You're connected with {convo.partner.handle}. Say hi, share what's on your mind, or ask how their day is going.</p>
         )}
