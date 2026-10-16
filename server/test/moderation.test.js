@@ -96,3 +96,44 @@ test('crisis language is delivered and flagged so the sender sees resources', ()
     assert.equal(r.deliver, true, text);
   }
 });
+
+test('Spanish: contact details, age questions, minors, sexual content and crisis', () => {
+  const cases = [
+    ['mi numero es cinco cinco cinco uno dos tres cuatro', 'contact'],
+    ['agrégame en insta', 'contact'],
+    ['mi correo es: ana', 'contact'],
+    ['¿cuántos años tienes?', 'age_probe'],
+    ['¿y qué edad tienes?', 'age_probe'],
+    ['eres menor de edad?', 'age_probe'],
+    ['soy menor de edad', 'minor'],
+    ['tengo 15 años de edad', 'minor'],
+    ['estoy en la secundaria', 'minor'],
+    ['tengo 15 años', 'minor_maybe'],
+    ['tengo 16 jaja', 'minor_maybe'],
+    ['mándame tu pack', 'sexual'],
+    ['qué traes puesto?', 'sexual'],
+    ['ya no quiero vivir', 'crisis'],
+    ['a veces quiero morirme', 'crisis'],
+    ['todos estarían mejor sin mí', 'crisis'],
+  ];
+  for (const [text, flag] of cases) assert.ok(flagsOf(text).includes(flag), `${text} → ${flag}`);
+  assert.equal(screenMessage('soy menor de edad').suspend, true);
+  assert.equal(screenMessage('tengo 15 años').suspend, false, 'a bare age is held, never pauses');
+  assert.equal(screenMessage('ya no quiero vivir').deliver, true, 'crisis is still delivered');
+});
+
+test('Spanish: everyday venting is delivered untouched', () => {
+  for (const text of [
+    'tengo 15 años trabajando en la misma empresa',
+    'tengo 3 hijos y dos trabajos',
+    'mi jefe me gritó hoy delante de todos',
+    'mándame fotos de tu perro jaja',
+    'cuando tenía 15 mis papás se divorciaron',
+    'no tengo dinero para la renta y estoy muy estresado',
+    'me siento muy solo desde que me mudé',
+    'del 1 al 10 tengo 15 de estrés jaja',
+  ]) {
+    const r = screenMessage(text);
+    assert.deepEqual(r.flags, [], text);
+  }
+});

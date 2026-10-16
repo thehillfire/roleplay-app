@@ -22,7 +22,8 @@ export function CrisisCard({ role, onDismiss }) {
   return (
     <aside className="crisis" role="note">
       {role === 'sender' ? (
-        <p><strong>You matter.</strong> If you're thinking about ending your life or hurting yourself, you can call or text <a href="tel:988">988</a> (US) any time, or find a line near you at <a href="https://findahelpline.com" target="_blank" rel="noreferrer">findahelpline.com</a>. You can keep talking here too.</p>
+        <div className="crisis-text"><p><strong>You matter.</strong> If you're thinking about ending your life or hurting yourself, you can call or text <a href="tel:988">988</a> (US) any time, or find a line near you at <a href="https://findahelpline.com" target="_blank" rel="noreferrer">findahelpline.com</a>. You can keep talking here too.</p>
+        <p lang="es" className="crisis-es">En español: llama al <a href="tel:988">988</a> y oprime 2, o envía AYUDA por texto al 988.</p></div>
       ) : (
         <p><strong>They may be going through something heavy.</strong> Listen without judging. Gently mention that they can call or text <a href="tel:988">988</a> (US) or visit <a href="https://findahelpline.com" target="_blank" rel="noreferrer">findahelpline.com</a>. If they're in immediate danger, encourage them to contact emergency services.</p>
       )}
