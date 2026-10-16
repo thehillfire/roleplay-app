@@ -10,7 +10,7 @@
     "build": "vite build",
     "start": "node --disable-warning=ExperimentalWarning server/src/index.js",
     "test": "NODE_ENV=test node --disable-warning=ExperimentalWarning --test --test-concurrency=1 server/test/*.test.js",
-    "test:pg": "NODE_ENV=test node --disable-warning=ExperimentalWarning --test --test-concurrency=1 server/test/*.test.js",
+    "test:pg": "node -e \"if (!process.env.TEST_DATABASE_URL) { console.error('test:pg needs TEST_DATABASE_URL (a Postgres URL); without it the tests would quietly run on SQLite.'); process.exit(1) }\" && NODE_ENV=test node --disable-warning=ExperimentalWarning --test --test-concurrency=1 server/test/*.test.js",
     "e2e": "node e2e/smoke.mjs",
     "make-admin": "node --disable-warning=ExperimentalWarning server/scripts/make-admin.js",
     "vapid": "node server/scripts/vapid.js",

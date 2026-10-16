@@ -248,7 +248,13 @@ module.exports = function register(app, { store, hub, payments, classifier, push
       // Counted before any await, so a burst of parallel asks can't all pass the check.
       const askedAt = Date.now();
       connectAsks.set(askKey, [...recentAsks(askKey), askedAt]);
-      const unask = () => connectAsks.set(askKey, recentAsks(askKey).filter((t) => t !== askedAt));
+      const unask = () => { // drop this one ask; another in the same millisecond keeps its count
+        const list = recentAsks(askKey);
+        const i = list.indexOf(askedAt);
+        if (i !== -1) list.splice(i, 1);
+        if (list.length) connectAsks.set(askKey, list);
+        else connectAsks.delete(askKey);
+      };
       const paid = payments.enabled;
       if (paid && !(await store.spendCredit(req.user.id))) {
         unask();
