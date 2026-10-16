@@ -407,7 +407,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
 
       {kindNote !== null && (
         <form className="feedback-bar kind-note" onSubmit={sendKindNote}>
-          <span>Thanks sent. Want to leave {convo.partner.handle} a few kind words? They'll keep them, without your name.</span>
+          <span>Thanks sent. Want to leave {convo.partner.handle} a few kind words? They'll see them on their home screen, not next to your name.</span>
           <input aria-label="Kind words" value={kindNote} onChange={(e) => setKindNote(e.target.value)} maxLength={140} placeholder="You really listened. Thank you." />
           <button className="chip" type="submit" disabled={!kindNote.trim()}>Leave it</button>
           <button className="chip" type="button" onClick={() => setKindNote(null)}>Skip</button>

@@ -583,7 +583,8 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
          ON CONFLICT (conversation_id, rater_id) DO UPDATE SET helpful = $4`,
         [conversationId, raterId, rateeId, helpful ? 1 : 0, now()],
       );
-      return helpful && Number(before.rows[0]?.helpful) !== 1;
+      // Only the first vote thanks them live, so flipping the answer can't spam notifications.
+      return helpful && !before.rows[0];
     },
 
     async myFeedback(conversationId, raterId) {
@@ -594,8 +595,9 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     // A note on an existing "helped" vote; false if there's no such vote.
     async saveKindWords(conversationId, raterId, note) {
       const { rowCount } = await db.query(
-        'UPDATE feedback SET note = $1, note_at = $2, note_hidden = 0 WHERE conversation_id = $3 AND rater_id = $4 AND helpful = 1',
-        [note, now(), conversationId, raterId],
+        // A note the recipient removed stays removed: the writer can't bring it back.
+        'UPDATE feedback SET note = $1, note_at = $2, note_id = $3 WHERE conversation_id = $4 AND rater_id = $5 AND helpful = 1 AND note_hidden = 0',
+        [note, now(), newId(), conversationId, raterId],
       );
       return rowCount === 1;
     },
@@ -603,16 +605,17 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     // Notes people left for this user, newest first. Never who wrote them.
     async kindWordsFor(userId, limit = 20) {
       const { rows } = await db.query(
-        `SELECT conversation_id, note, note_at FROM feedback
-          WHERE ratee_id = $1 AND helpful = 1 AND note IS NOT NULL AND note_hidden = 0
-          ORDER BY note_at DESC LIMIT $2`,
+        `SELECT f.note_id, f.note, f.note_at FROM feedback f
+          WHERE f.ratee_id = $1 AND f.helpful = 1 AND f.note IS NOT NULL AND f.note_hidden = 0
+            AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = $1 AND b.blocked_id = f.rater_id) OR (b.blocker_id = f.rater_id AND b.blocked_id = $1))
+          ORDER BY f.note_at DESC LIMIT $2`,
         [userId, limit],
       );
-      return rows.map((r) => ({ conversationId: r.conversation_id, note: r.note, at: num(r.note_at) }));
+      return rows.map((r) => ({ id: r.note_id, note: r.note, at: num(r.note_at) }));
     },
 
-    async hideKindWords(userId, conversationId) {
-      const { rowCount } = await db.query('UPDATE feedback SET note_hidden = 1 WHERE ratee_id = $1 AND conversation_id = $2 AND note IS NOT NULL', [userId, conversationId]);
+    async hideKindWords(userId, noteId) {
+      const { rowCount } = await db.query('UPDATE feedback SET note_hidden = 1 WHERE ratee_id = $1 AND note_id = $2 AND note IS NOT NULL', [userId, noteId]);
       return rowCount > 0;
     },
 
@@ -875,13 +878,13 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
 
     // Closes an open request exactly once; returns who to reply to (email stays server-side).
     async resolveSupportRequest(id, reply) {
-      const { rows } = await db.query('SELECT s.user_id, s.topic, u.email, u.handle, u.status FROM support_requests s JOIN users u ON u.id = s.user_id WHERE s.id = $1', [id]);
+      const { rows } = await db.query('SELECT s.user_id, s.topic, u.email, u.handle, u.status, u.email_verified_at FROM support_requests s JOIN users u ON u.id = s.user_id WHERE s.id = $1', [id]);
       if (!rows[0]) return null;
       const { rowCount } = await db.query(
         "UPDATE support_requests SET status = 'resolved', reply = $1, resolved_at = $2 WHERE id = $3 AND status = 'open'",
         [reply || null, now(), id],
       );
-      return rowCount === 1 ? { userId: rows[0].user_id, topic: rows[0].topic, email: rows[0].email, handle: rows[0].handle, deleted: rows[0].status === 'deleted' } : null;
+      return rowCount === 1 ? { userId: rows[0].user_id, topic: rows[0].topic, email: rows[0].email, handle: rows[0].handle, deleted: rows[0].status === 'deleted', verified: Boolean(rows[0].email_verified_at) } : null;
     },
 
     async listAppeals() {

@@ -13,9 +13,9 @@ export default function KindWords({ refreshKey }) {
 
   if (!words.length) return null;
   const shown = showAll ? words : words.slice(0, 3);
-  const remove = async (conversationId) => {
-    setWords((w) => w.filter((k) => k.conversationId !== conversationId));
-    await api.hideKindWords(conversationId).catch(() => {});
+  const remove = async (noteId) => {
+    setWords((w) => w.filter((k) => k.id !== noteId));
+    await api.hideKindWords(noteId).catch(() => {});
   };
 
   return (
@@ -23,9 +23,9 @@ export default function KindWords({ refreshKey }) {
       <h2 className="section-title" id="kind-words-title">Kind words people left you</h2>
       <ul>
         {shown.map((k) => (
-          <li key={k.conversationId}>
+          <li key={k.id}>
             <blockquote>{k.note}</blockquote>
-            <button className="icon-btn" aria-label="Remove this note" onClick={() => remove(k.conversationId)}>×</button>
+            <button className="icon-btn" aria-label="Remove this note" onClick={() => remove(k.id)}>×</button>
           </li>
         ))}
       </ul>

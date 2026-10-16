@@ -240,6 +240,10 @@ const MIGRATIONS = [
       PRIMARY KEY (device_hash, user_id)
     )`,
   ],
+  // 19: kind words get their own random id, so nothing ties a note to a conversation
+  [
+    'ALTER TABLE feedback ADD COLUMN note_id TEXT',
+  ],
 ];
 
 async function migrate(db) {

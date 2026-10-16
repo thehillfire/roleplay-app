@@ -37,7 +37,9 @@ module.exports = function register(app, { store, hub, mailer, member }) {
     const reply = typeof req.body.reply === 'string' ? req.body.reply.trim().slice(0, 4000) : '';
     const closed = await store.resolveSupportRequest(req.params.id, reply);
     if (!closed) throw httpError(404, 'Open request not found (it may have just been answered).');
-    if (reply && !closed.deleted) {
+    // Only to a confirmed address: an unconfirmed one may be a typo or someone else's inbox.
+    const emailed = Boolean(reply && !closed.deleted && closed.verified);
+    if (emailed) {
       mailer.send({
         to: closed.email,
         subject: 'Kindred support: a reply to your message',
@@ -45,7 +47,7 @@ module.exports = function register(app, { store, hub, mailer, member }) {
       }).catch((err) => console.error('support reply failed', err.message));
     }
     await store.logModAction({ moderatorId: req.user.id, targetId: closed.userId, action: reply ? 'support_replied' : 'support_closed', detail: closed.topic });
-    res.json({ ok: true, emailed: Boolean(reply && !closed.deleted) });
+    res.json({ ok: true, emailed });
   }));
 
   app.get('/api/admin/stats', admin, asyncRoute(async (req, res) => {

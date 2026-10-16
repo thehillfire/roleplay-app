@@ -148,6 +148,8 @@ test('support: members write in, moderators reply by email without seeing the ad
   t.after(s.stop);
   const mod = await moderator(s, 'mod-support@example.com');
   const member = await signedUp(s.base, { email: 'writer@example.com' });
+  const memberId = (await s.db.query('SELECT id FROM users WHERE email = $1', ['writer@example.com'])).rows[0].id;
+  await s.store.markEmailVerified(memberId);
 
   assert.equal((await member('POST', '/api/support', { topic: 'billing', message: '' })).status, 400);
   assert.equal((await member('POST', '/api/support', { topic: 'billing', message: 'I was charged twice this month.' })).status, 201);
@@ -172,6 +174,15 @@ test('support: members write in, moderators reply by email without seeing the ad
   const mine = (await member('GET', '/api/support')).body.requests;
   assert.deepEqual([mine[0].status, mine[0].reply], ['resolved', reply]);
   assert.equal((await mod('GET', '/api/admin/log')).body.actions[0].action, 'support_replied');
+
+  // Unconfirmed address: the reply is kept in the app but never emailed (may be a typo or someone else's inbox).
+  const unverified = await signedUp(s.base, { email: 'not-mine@example.com' });
+  await unverified('POST', '/api/support', { topic: 'safety', message: 'Someone was rude to me.' });
+  const [open] = (await mod('GET', '/api/admin/support')).body.requests;
+  assert.equal((await mod('POST', `/api/admin/support/${open.id}/resolve`, { reply: 'Thanks, we looked into it.' })).body.emailed, false);
+  await new Promise((r) => setTimeout(r, 20));
+  assert.ok(!sent.some((m) => m.to === 'not-mine@example.com' && m.subject.startsWith('Kindred support')));
+  assert.equal((await unverified('GET', '/api/support')).body.requests[0].reply, 'Thanks, we looked into it.');
 
   // At most three open at once per person.
   for (let i = 0; i < 3; i += 1) assert.equal((await member('POST', '/api/support', { topic: 'other', message: `question ${i}` })).status, 201);

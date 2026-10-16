@@ -147,22 +147,25 @@ module.exports = function register(app, { store, hub, payments, classifier, push
   app.post('/api/conversations/:id/feedback', member, conversation, asyncRoute(async (req, res) => {
     if (typeof req.body.helpful !== 'boolean') throw badRequest('helpful must be true or false');
     const { id, partnerId } = req.conversation;
+    if (await store.isBlocked(req.user.id, partnerId)) throw httpError(403, 'This conversation has ended.');
     const counts = await store.messageCounts(id, req.user.id);
     if (counts.mine < 2 || counts.theirs < 2) throw httpError(409, 'Chat a little first.');
     const newThanks = await store.saveFeedback({ conversationId: id, raterId: req.user.id, rateeId: partnerId, helpful: req.body.helpful });
-    if (newThanks) hub.push(partnerId, { type: 'thanks', conversationId: id, from: req.user.handle });
+    // No name: kind words may follow seconds later, and they're meant to be anonymous.
+    if (newThanks) hub.push(partnerId, { type: 'thanks' });
     res.json({ helpful: req.body.helpful });
   }));
 
   // Kind words: an optional short note with a "this helped" vote. Screened like a message,
   // and anything a message would be held for is refused outright (there's no queue for notes).
   app.post('/api/conversations/:id/kind-words', member, messageLimiter, conversation, asyncRoute(async (req, res) => {
+    if (await store.isBlocked(req.user.id, req.conversation.partnerId)) throw httpError(403, 'This conversation has ended.');
     const note = str(req.body.note, 'note', 140);
     const screen = screenMessage(note);
     let ok = screen.deliver;
     if (ok && classifier.enabled) ok = !(await classifier.classify(note))?.flags.length;
     if (!ok) throw badRequest('Kind words can only be kind words: no contact details, ages or anything personal.');
-    if (!(await store.saveKindWords(req.conversation.id, req.user.id, note))) throw httpError(409, 'Say it helped first.');
+    if (!(await store.saveKindWords(req.conversation.id, req.user.id, note))) throw httpError(409, "These kind words can't be changed now.");
     hub.push(req.conversation.partnerId, { type: 'kind_words' });
     res.status(201).json({ ok: true });
   }));
@@ -171,8 +174,8 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     res.json({ kindWords: await store.kindWordsFor(req.user.id) });
   }));
 
-  app.post('/api/kind-words/:conversationId/hide', member, asyncRoute(async (req, res) => {
-    if (!(await store.hideKindWords(req.user.id, req.params.conversationId))) throw httpError(404, 'Not found.');
+  app.post('/api/kind-words/:id/hide', member, asyncRoute(async (req, res) => {
+    if (!(await store.hideKindWords(req.user.id, req.params.id))) throw httpError(404, 'Not found.');
     res.json({ ok: true });
   }));
 
