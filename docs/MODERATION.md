@@ -14,7 +14,7 @@ Urgent items also arrive by email: possible minors (including a new signup from 
 
 ## Held messages
 
-The screener holds a message before delivery and tells the sender why. Labels you'll see:
+The screener holds a message before delivery and tells the sender why. Each held message shows up to three messages from just before it, which is usually enough to tell a parent talking about their kid from someone fishing. Suspending from here asks first, because it bans their devices too. Labels you'll see:
 
 | Label | What it caught | Usual call |
 | --- | --- | --- |
@@ -59,6 +59,8 @@ Kindred is 18+, and the birthdate check is self-reported. Minors will get in.
 ## Appeals
 
 Read the note, check the account in **Look up** (open reports, held messages, past actions), then decide. *Restore* when the pause was a mistake or a first, minor slip. Most appeals after a "said under 18" pause come from adults who were joking. Restore them, but note it.
+
+You can add a short note (500 characters) with either answer. The person sees it on their paused screen, so write it to them: what happened and what would change your mind, never who reported them. After a *Keep paused*, they can send a new note a week later, so one "no" isn't permanent.
 
 ## Look up
 
