@@ -3,6 +3,13 @@ const fs = require('fs');
 const path = require('path');
 const { boot } = require('./boot');
 const { envInt } = require('./env');
+const { createErrorAlerts } = require('./alerts');
+
+const alerts = createErrorAlerts();
+process.on('unhandledRejection', (err) => {
+  console.error('unhandled rejection', err);
+  alerts.report(err, 'background task');
+});
 
 const port = Number(process.env.PORT) || 3000;
 const distDir = path.join(__dirname, '..', '..', 'dist');
@@ -10,6 +17,9 @@ const staticDir = fs.existsSync(path.join(distDir, 'index.html')) ? distDir : un
 
 if (process.env.NODE_ENV === 'production' && !process.env.PUBLIC_URL) {
   console.warn('PUBLIC_URL is not set: password reset emails and Stripe checkout are disabled until it is.');
+}
+if (process.env.NODE_ENV === 'production' && !process.env.RESEND_API_KEY) {
+  console.warn('RESEND_API_KEY is not set: no emails (password resets, confirmations, moderator alerts) will be sent.');
 }
 
 // Deleted accounts keep messages/reports this long for safety review, then are purged.
@@ -35,6 +45,7 @@ boot({ staticDir }).then(({ listen, db, store }) => {
       }
     } catch (err) {
       console.error('purge failed', err);
+      alerts.report(err, 'daily purge');
     }
   };
   purge();

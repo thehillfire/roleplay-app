@@ -8,6 +8,7 @@ const { createPayments } = require('./payments');
 const { createPush } = require('./push');
 const { createMailer } = require('./mailer');
 const { createCaptcha } = require('./captcha');
+const { createErrorAlerts } = require('./alerts');
 const { envInt } = require('./env');
 
 const { AUTO_PAUSE, createRateLimiter, httpError, asyncRoute } = require('./routes/common');
@@ -34,6 +35,7 @@ function createApp({
   push = createPush(),
   mailer = createMailer(),
   captcha = createCaptcha(),
+  errorAlerts = createErrorAlerts(),
   trustProxy = envInt('TRUST_PROXY', 1),
   emailCooldownMs = 2 * 60 * 1000, // per address, for reset/confirmation emails
   publicUrl = process.env.PUBLIC_URL,
@@ -160,7 +162,10 @@ function createApp({
     let status = err.status || err.statusCode || 500;
     if (err.type === 'entity.parse.failed') status = 400;
     if (err.type === 'entity.too.large') status = 413;
-    if (status >= 500 && !err.expose) console.error(err);
+    if (status >= 500 && !err.expose) {
+      console.error(err);
+      errorAlerts.report(err, `${req.method} ${req.baseUrl}${req.path}`);
+    }
     let message = 'Something went wrong.';
     if (err.type === 'entity.parse.failed') message = 'Request body is not valid JSON.';
     else if (status === 413) message = 'Request is too large.';

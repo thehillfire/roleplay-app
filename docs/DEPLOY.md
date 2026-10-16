@@ -64,6 +64,9 @@ Both keys must be set for payments to turn on. Until then, connecting is free.
 
 ## Logs
 
+**Error alerts (recommended):** create a Slack or Discord *incoming webhook* and set `ERROR_WEBHOOK_URL`. Server errors (5xx, failed background jobs) post a one-line alert with the error type and route, never request data or message text. The same error posts at most once every 10 minutes, and at most 20 alerts are sent per hour.
+
+
 Each API request logs one JSON line: time, method, route (ids collapsed to `:id`), status and duration. Bodies and query strings are never logged, because they can contain message text or reset tokens. Set `REQUEST_LOG=off` to silence it.
 
 ## App stores
