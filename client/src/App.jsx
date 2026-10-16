@@ -7,6 +7,7 @@ import Waiting from './screens/Waiting.jsx';
 import Chat from './screens/Chat.jsx';
 import Moderate from './screens/Moderate.jsx';
 import Account from './screens/Account.jsx';
+import Legal from './screens/Legal.jsx';
 import { disablePushOnThisDevice, enablePush, pushSupported, syncPush } from './notifications.js';
 
 function Paused({ onSignOut }) {
@@ -22,14 +23,14 @@ function Paused({ onSignOut }) {
   );
 }
 
-function Signedin({ user, billing, pushKey, onSignOut, onDeleted, onPaused, onRefreshMe, initialNotice }) {
+function Signedin({ user, billing, pushKey, onSignOut, onDeleted, onPaused, onRefreshMe, onOpenLegal, initialNotice }) {
   const [view, setView] = useState({ name: 'home' });
 
   // Browser history: home is the root entry; other screens are pushed on top so the
   // phone's back button (and swipe back) returns to the previous screen instead of leaving.
   useEffect(() => {
     window.history.replaceState({ view: { name: 'home' } }, '');
-    const onPop = (e) => setView(e.state?.view || { name: 'home' });
+    const onPop = (e) => { if (!e.state?.legal) setView(e.state?.view || { name: 'home' }); };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
@@ -141,7 +142,7 @@ function Signedin({ user, billing, pushKey, onSignOut, onDeleted, onPaused, onRe
         />
       )}
       {view.name === 'moderate' && <Moderate onBack={goHome} />}
-      {view.name === 'account' && <Account user={user} billing={billing} onBack={goHome} onSignOut={onSignOut} onDeleted={onDeleted} />}
+      {view.name === 'account' && <Account user={user} billing={billing} onBack={goHome} onSignOut={onSignOut} onDeleted={onDeleted} onOpenLegal={onOpenLegal} />}
       {view.name === 'waiting' && <Waiting onCancel={cancel} error={matchError} />}
       {view.name === 'chat' && (
         <Chat
@@ -205,11 +206,37 @@ export default function App() {
     setUser(null);
   };
 
+  // /privacy and /terms are readable signed in or out. They overlay the app
+  // (instead of replacing it) so the live connection and current screen survive.
+  const legalFromPath = () => {
+    const path = window.location.pathname.replace(/\/$/, '');
+    return path === '/privacy' || path === '/terms' ? path.slice(1) : null;
+  };
+  const [legal, setLegal] = useState(legalFromPath);
+  useEffect(() => {
+    const onPop = () => setLegal(legalFromPath());
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  const openLegal = useCallback((doc) => {
+    window.history.pushState({ ...window.history.state, legal: doc }, '', `/${doc}`);
+    setLegal(doc);
+  }, []);
+  const closeLegal = () => {
+    if (window.history.state?.legal) window.history.back();
+    else {
+      window.history.replaceState(null, '', '/');
+      setLegal(null);
+    }
+  };
+
   return (
     <div className="app">
       <div className="sky" aria-hidden="true" />
+      {legal && <Legal doc={legal} onBack={closeLegal} />}
+      <div hidden={Boolean(legal)}>
       {user === undefined && <main className="screen"><p className="loading">One moment…</p></main>}
-      {user === null && <Welcome onSignedIn={setUser} />}
+      {user === null && <Welcome onSignedIn={(u) => refreshMe().catch(() => setUser(u))} onOpenLegal={openLegal} />}
       {user && user.status !== 'active' && <Paused onSignOut={signOut} />}
       {user && user.status === 'active' && (
         <Signedin
@@ -222,8 +249,10 @@ export default function App() {
           onDeleted={deleted}
           onPaused={() => setUser({ ...user, status: 'review' })}
           onRefreshMe={refreshMeQuietly}
+          onOpenLegal={openLegal}
         />
       )}
+      </div>
     </div>
   );
 }

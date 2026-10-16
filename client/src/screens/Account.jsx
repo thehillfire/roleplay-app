@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api.js';
 
-export default function Account({ user, billing, onBack, onSignOut, onDeleted }) {
+export default function Account({ user, billing, onBack, onSignOut, onDeleted, onOpenLegal }) {
   const [confirming, setConfirming] = useState(false);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -49,6 +49,8 @@ export default function Account({ user, billing, onBack, onSignOut, onDeleted })
 
       <section className="card rows">
         <a className="row link-row" href="/api/account/export" download>Download my data</a>
+        <button className="row link-row" onClick={() => onOpenLegal('privacy')}>Privacy policy</button>
+        <button className="row link-row" onClick={() => onOpenLegal('terms')}>Terms</button>
         <button className="row link-row" onClick={onSignOut}>Sign out</button>
         <button className="row link-row danger-text" onClick={() => setConfirming(true)}>Delete account</button>
       </section>

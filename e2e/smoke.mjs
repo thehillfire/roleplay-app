@@ -29,6 +29,19 @@ async function signUp(page, { birthdate = '1990-06-01' } = {}) {
   await page.getByRole('button', { name: 'Create account' }).click();
 }
 
+// Legal pages: direct link and from the welcome screen
+const visitor = await person('visitor');
+await visitor.goto(`${BASE}/privacy`);
+await visitor.getByRole('heading', { name: 'Privacy' }).waitFor();
+await visitor.getByRole('button', { name: '← Back' }).click();
+await visitor.getByRole('button', { name: 'Get started' }).waitFor();
+await visitor.getByRole('button', { name: 'Terms' }).click();
+await visitor.getByRole('heading', { name: 'Terms' }).waitFor();
+assert.equal(new URL(visitor.url()).pathname, '/terms');
+await visitor.goBack();
+await visitor.getByRole('button', { name: 'Get started' }).waitFor();
+step('privacy and terms pages');
+
 // Minors are turned away at signup
 const kid = await person('kid');
 await signUp(kid, { birthdate: `${new Date().getUTCFullYear() - 15}-03-03` });

@@ -9,7 +9,7 @@ const GUIDELINES = [
   'If someone is in danger, point them to real help (call or text 988 in the US).',
 ];
 
-export default function Welcome({ onSignedIn }) {
+export default function Welcome({ onSignedIn, onOpenLegal }) {
   const [mode, setMode] = useState(null); // null | 'signup' | 'login'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -48,6 +48,9 @@ export default function Welcome({ onSignedIn }) {
           <button className="btn big" onClick={() => setMode('login')}>I have an account</button>
         </div>
         <p className="fine">Adults 18+ only. If you're in crisis, call or text <a href="tel:988">988</a> (US) or find a line at <a href="https://findahelpline.com" target="_blank" rel="noreferrer">findahelpline.com</a>.</p>
+        <p className="fine legal-links">
+          <button className="link" onClick={() => onOpenLegal('privacy')}>Privacy</button> · <button className="link" onClick={() => onOpenLegal('terms')}>Terms</button>
+        </p>
       </main>
     );
   }
@@ -89,7 +92,10 @@ export default function Welcome({ onSignedIn }) {
             </div>
             <label className="check">
               <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} required />
-              <span>I'm 18 or older and I agree to the guidelines.</span>
+              <span>
+                I'm 18 or older and I agree to the guidelines, <button type="button" className="link" onClick={() => onOpenLegal('terms')}>terms</button> and{' '}
+                <button type="button" className="link" onClick={() => onOpenLegal('privacy')}>privacy policy</button>.
+              </span>
             </label>
           </>
         )}

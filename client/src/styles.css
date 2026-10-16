@@ -230,3 +230,11 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); box-sh
 .helped strong { color: var(--text); }
 .feedback-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); background: rgba(100, 181, 246, 0.05); }
 .feedback-bar span { flex-basis: 100%; text-align: center; }
+
+/* --- legal --- */
+.legal h2 { font-size: 17px; margin: 8px 0 0; }
+.legal p, .legal li { line-height: 1.65; color: var(--text); }
+.legal p { margin: 0; }
+.legal ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.legal .draft { color: var(--danger); font-size: 13px; }
+.legal-links .link { font-size: 13px; }
