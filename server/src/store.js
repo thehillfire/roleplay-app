@@ -795,7 +795,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       const day = t - 24 * 60 * 60 * 1000;
       const week = t - 7 * 24 * 60 * 60 * 1000;
       const one = async (sql, params = []) => Number(Object.values((await db.query(sql, params)).rows[0])[0]) || 0;
-      const [users, signupsDay, signupsWeek, activeDay, messagesDay, matchesDay, connectsAccepted, revenueCents, helpfulWeek] = await Promise.all([
+      const [users, signupsDay, signupsWeek, activeDay, messagesDay, matchesDay, connectsAccepted, revenueCents, helpfulWeek, heldToReview, messagesWaiting, supportOpen] = await Promise.all([
         one("SELECT COUNT(*) FROM users WHERE status <> 'deleted'"),
         one("SELECT COUNT(*) FROM users WHERE created_at >= $1 AND status <> 'deleted'", [day]),
         one("SELECT COUNT(*) FROM users WHERE created_at >= $1 AND status <> 'deleted'", [week]),
@@ -805,8 +805,11 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         one("SELECT COUNT(*) FROM connections WHERE status = 'accepted'"),
         one('SELECT COALESCE(SUM(amount_cents), 0) FROM payments'),
         one('SELECT COUNT(*) FROM feedback WHERE helpful = 1 AND created_at >= $1', [week]),
+        one("SELECT COUNT(*) FROM messages WHERE status = 'held' AND reviewed_at IS NULL"),
+        one("SELECT COUNT(*) FROM bottles WHERE status = 'open' AND created_at >= $1", [day]),
+        one("SELECT COUNT(*) FROM support_requests WHERE status = 'open'"),
       ]);
-      return { users, signupsDay, signupsWeek, activeDay, messagesDay, matchesDay, connectsAccepted, revenueCents, helpfulWeek };
+      return { users, signupsDay, signupsWeek, activeDay, messagesDay, matchesDay, connectsAccepted, revenueCents, helpfulWeek, heldToReview, messagesWaiting, supportOpen };
     },
 
     // --- moderation operations ---

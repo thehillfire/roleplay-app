@@ -87,6 +87,9 @@ export default function Moderate({ onBack }) {
             ['"Helped" this week', stats.helpfulWeek],
             ['Connections made', stats.connectsAccepted],
             ['Revenue', new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(stats.revenueCents / 100)],
+            ['Held to review', stats.heldToReview],
+            ['Messages waiting for a listener', stats.messagesWaiting],
+            ['Support requests open', stats.supportOpen],
           ].map(([label, value]) => (
             <div key={label} className="stat"><span>{label}</span><strong>{value}</strong></div>
           ))}
