@@ -17,7 +17,7 @@ What's left between this repo and real users, in order. The code side is done an
 - **Legal review.** `/privacy` and `/terms` are drafts with bracketed gaps. An app where strangers talk about mental health, with adults only and paid reveals, needs a lawyer's eyes once, especially for the age rules, the 90-day safety retention and the refund policy. Budget a few hundred dollars for a startup-package review.
 - **Company.** An LLC keeps your personal assets separate if something goes wrong. Stripe also wants a business entity.
 - **Stripe.** Create the account, run a test purchase with card `4242 4242 4242 4242`, then switch to live keys. See DEPLOY.md for the webhook.
-- **Moderation coverage.** Decide who checks the queue and when. Urgent reports (possible minors, people at risk) email every moderator, and someone should look at those within hours, not days. At first that's you. Plan for a second moderator before you pass about 500 daily users.
+- **Moderation coverage.** Read [MODERATION.md](MODERATION.md) first. Decide who checks the queue and when. Urgent reports (possible minors, people at risk) email every moderator, and someone should look at those within hours, not days. At first that's you. Plan for a second moderator before you pass about 500 daily users.
 - **Crisis line partnership (optional, strong).** Organizations like Crisis Text Line partner with apps. Being able to say "we work with X" builds trust with users, app stores and press.
 
 ## Pricing: my recommendation
