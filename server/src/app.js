@@ -184,6 +184,18 @@ function createApp({
   };
 
   const siteUrl = (req) => (publicUrl ? publicUrl.replace(/\/$/, '') : allowHostFallback ? `${req.protocol}://${req.get('host')}` : null);
+
+  // Emails moderators about reports that can't wait (possible minors, people at risk).
+  // Never includes message text: just what kind of report and where to look.
+  const alertModerators = async (req, subject, line) => {
+    const base = siteUrl(req);
+    const emails = await store.moderatorEmails();
+    await Promise.all(emails.map((to) => mailer.send({
+      to,
+      subject: `[Kindred] ${subject}`,
+      text: `${line}\n\nOpen the moderation queue: ${base ? `${base}/` : '(set PUBLIC_URL)'} → Account menu → Moderate.`,
+    }).catch((err) => console.error('moderator alert failed', err.message))));
+  };
   const messageLimiter = createRateLimiter({ ...messageRateLimit, key: (req) => req.user.id });
 
   // Signed in and in good standing.
@@ -312,6 +324,23 @@ function createApp({
     });
   }));
 
+  // --- Appeals: paused or suspended people can explain their side ---
+
+  const paused = (req, res, next) => auth.requireUser(req, res, () => {
+    if (!['review', 'suspended'].includes(req.user.status)) return res.status(409).json({ error: 'Your account is active.' });
+    return next();
+  });
+
+  app.get('/api/appeal', paused, asyncRoute(async (req, res) => {
+    res.json({ appeal: await store.openAppeal(req.user.id) });
+  }));
+
+  app.post('/api/appeal', paused, authLimiter, asyncRoute(async (req, res) => {
+    const message = str(req.body.message, 'message', 1000);
+    await store.createAppeal(req.user.id, message);
+    res.status(201).json({ appeal: await store.openAppeal(req.user.id) });
+  }));
+
   // --- Account ---
 
   app.get('/api/account/export', member, asyncRoute(async (req, res) => {
@@ -437,6 +466,8 @@ function createApp({
     if (screen.suspend) {
       // Someone said they're under 18: pause the account until a moderator looks.
       await store.setUserStatus(req.user.id, 'review');
+      await store.logModAction({ targetId: req.user.id, action: 'auto_pause', detail: 'Message said they are under 18' });
+      alertModerators(req, 'Possible minor paused', `An account was paused after saying they're under 18 (${req.user.handle}).`).catch(() => {});
       hub.push(partnerId, { type: 'conversation.ended', conversationId: id });
       setImmediate(() => hub.disconnect(req.user.id));
     } else if (screen.deliver) {
@@ -549,10 +580,15 @@ function createApp({
       // Child safety outranks brigading: every reporter counts for "under 18" (a pause is reversible).
       store.distinctReporters(partnerId, since, { reason: 'minor' }),
     ]);
+    if (reason === 'minor' || reason === 'self_harm') {
+      const label = reason === 'minor' ? 'Report: possibly under 18' : 'Report: someone may be at risk';
+      alertModerators(req, label, `New urgent report (${reason}) about ${(await store.getUser(partnerId))?.handle}.`).catch(() => {});
+    }
     if (all >= AUTO_PAUSE.reporters || minor >= AUTO_PAUSE.minorReporters) {
       const reported = await store.getUser(partnerId);
       if (reported.status === 'active') {
         await store.setUserStatus(partnerId, 'review');
+        await store.logModAction({ targetId: partnerId, action: 'auto_pause', detail: `${all} reporters (${minor} for under 18) in a week` });
         hub.disconnect(partnerId);
       }
     }
@@ -565,6 +601,23 @@ function createApp({
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Moderators only.' });
     return next();
   });
+
+  app.get('/api/admin/log', admin, asyncRoute(async (req, res) => {
+    res.json({ actions: await store.listModActions() });
+  }));
+
+  app.get('/api/admin/appeals', admin, asyncRoute(async (req, res) => {
+    res.json({ appeals: await store.listAppeals() });
+  }));
+
+  app.post('/api/admin/appeals/:id/resolve', admin, asyncRoute(async (req, res) => {
+    const userId = await store.resolveAppeal(req.params.id);
+    if (!userId) throw httpError(404, 'Open appeal not found.');
+    const restore = req.body.restore === true;
+    if (restore) await store.setUserStatus(userId, 'active');
+    await store.logModAction({ moderatorId: req.user.id, targetId: userId, action: restore ? 'appeal_granted' : 'appeal_denied' });
+    res.json({ ok: true });
+  }));
 
   app.get('/api/admin/stats', admin, asyncRoute(async (req, res) => {
     res.json({ ...(await store.adminStats()), ...hub.stats() });
@@ -584,6 +637,7 @@ function createApp({
       await store.setUserStatus(report.reported.id, 'suspended');
       hub.disconnect(report.reported.id);
     }
+    await store.logModAction({ moderatorId: req.user.id, targetId: report.reported.id, action: `report_${resolution}`, detail: report.reason });
     res.json({ ok: true });
   }));
 
@@ -597,6 +651,7 @@ function createApp({
     const user = await store.getUser(req.params.id);
     if (!user) throw httpError(404, 'User not found.');
     if (!(await store.setUserStatus(user.id, status))) throw httpError(409, 'This account was deleted by its owner.');
+    await store.logModAction({ moderatorId: req.user.id, targetId: user.id, action: status === 'active' ? 'restore' : 'suspend' });
     if (status !== 'active') hub.disconnect(user.id);
     res.json({ ok: true });
   }));

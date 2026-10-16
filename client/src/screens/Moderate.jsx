@@ -19,15 +19,19 @@ export default function Moderate({ onBack }) {
   const [reports, setReports] = useState(null);
   const [held, setHeld] = useState(null);
   const [stats, setStats] = useState(null);
+  const [appeals, setAppeals] = useState(null);
+  const [log, setLog] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
 
   const load = useCallback(() => {
     setError('');
-    Promise.all([api.admin.reports(), api.admin.held()]).then(([r, h]) => {
+    Promise.all([api.admin.reports(), api.admin.held(), api.admin.appeals()]).then(([r, h, a]) => {
       setReports(r);
       setHeld(h);
+      setAppeals(a);
     }, (err) => setError(err.message));
+    api.admin.log().then(setLog, () => setLog([]));
     // Stats are nice to have; they must never keep the queues from loading.
     api.admin.stats().then(setStats, () => setStats(null));
   }, []);
@@ -73,7 +77,13 @@ export default function Moderate({ onBack }) {
           Reports {reports ? `(${reports.length})` : ''}
         </button>
         <button role="tab" aria-selected={tab === 'held'} className={tab === 'held' ? 'tab active' : 'tab'} onClick={() => setTab('held')}>
-          Held messages {held ? `(${held.length})` : ''}
+          Held {held ? `(${held.length})` : ''}
+        </button>
+        <button role="tab" aria-selected={tab === 'appeals'} className={tab === 'appeals' ? 'tab active' : 'tab'} onClick={() => setTab('appeals')}>
+          Appeals {appeals ? `(${appeals.length})` : ''}
+        </button>
+        <button role="tab" aria-selected={tab === 'log'} className={tab === 'log' ? 'tab active' : 'tab'} onClick={() => setTab('log')}>
+          Log
         </button>
       </div>
       {error && <p className="form-error" role="alert">{error}</p>}
@@ -129,6 +139,32 @@ export default function Moderate({ onBack }) {
           </div>
         </article>
       ))}
+      {tab === 'appeals' && appeals?.length === 0 && <p className="empty">No open appeals.</p>}
+      {tab === 'appeals' && appeals?.map((a) => (
+        <article key={a.id} className="card report">
+          <header>
+            <strong>{a.user.handle} <StatusTag status={a.user.status} /></strong>
+            <small>{when(a.createdAt)}</small>
+          </header>
+          <p className="details">“{a.message}”</p>
+          <div className="actions">
+            <button className="btn primary" disabled={!!busy} onClick={() => act(a.id, () => api.admin.resolveAppeal(a.id, true))}>Restore account</button>
+            <button className="btn" disabled={!!busy} onClick={() => act(a.id, () => api.admin.resolveAppeal(a.id, false))}>Keep paused</button>
+          </div>
+        </article>
+      ))}
+
+      {tab === 'log' && (
+        <ol className="modlog">
+          {log?.length === 0 && <li className="empty">No moderation actions yet.</li>}
+          {log?.map((e) => (
+            <li key={e.id}>
+              <small>{when(e.createdAt)}</small>
+              <span><strong>{e.moderator}</strong> · {e.action.replace(/_/g, ' ')}{e.target ? ` · ${e.target}` : ''}{e.detail ? ` (${e.detail})` : ''}</span>
+            </li>
+          ))}
+        </ol>
+      )}
     </main>
   );
 }

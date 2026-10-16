@@ -677,6 +677,59 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return { users, signupsDay, signupsWeek, activeDay, messagesDay, matchesDay, connectsAccepted, revenueCents, helpfulWeek };
     },
 
+    // --- moderation operations ---
+
+    async logModAction({ moderatorId, targetId, action, detail }) {
+      await db.query(
+        'INSERT INTO mod_actions (id, moderator_id, target_id, action, detail, created_at) VALUES ($1, $2, $3, $4, $5, $6)',
+        [newId(), moderatorId || null, targetId || null, action, detail || null, now()],
+      );
+    },
+
+    async listModActions(limit = 50) {
+      const { rows } = await db.query(
+        `SELECT a.*, m.handle AS moderator_handle, t.handle AS target_handle FROM mod_actions a
+           LEFT JOIN users m ON m.id = a.moderator_id LEFT JOIN users t ON t.id = a.target_id
+          ORDER BY a.created_at DESC LIMIT $1`,
+        [limit],
+      );
+      return rows.map((r) => ({
+        id: r.id, action: r.action, detail: r.detail, createdAt: num(r.created_at),
+        moderator: r.moderator_handle || 'system', target: r.target_handle || null,
+      }));
+    },
+
+    async createAppeal(userId, message) {
+      // One open appeal at a time; a new one replaces the old text.
+      await db.query("DELETE FROM appeals WHERE user_id = $1 AND status = 'open'", [userId]);
+      await db.query('INSERT INTO appeals (id, user_id, message, created_at) VALUES ($1, $2, $3, $4)', [newId(), userId, message, now()]);
+    },
+
+    async openAppeal(userId) {
+      const { rows } = await db.query("SELECT message, created_at FROM appeals WHERE user_id = $1 AND status = 'open'", [userId]);
+      return rows[0] ? { message: rows[0].message, createdAt: num(rows[0].created_at) } : null;
+    },
+
+    async listAppeals() {
+      const { rows } = await db.query(
+        `SELECT a.*, u.handle, u.status AS user_status FROM appeals a JOIN users u ON u.id = a.user_id
+          WHERE a.status = 'open' ORDER BY a.created_at ASC`,
+      );
+      return rows.map((r) => ({ id: r.id, message: r.message, createdAt: num(r.created_at), user: { id: r.user_id, handle: r.handle, status: r.user_status } }));
+    },
+
+    async resolveAppeal(id) {
+      const { rows } = await db.query("SELECT user_id FROM appeals WHERE id = $1 AND status = 'open'", [id]);
+      if (!rows[0]) return null;
+      await db.query("UPDATE appeals SET status = 'resolved', resolved_at = $1 WHERE id = $2", [now(), id]);
+      return rows[0].user_id;
+    },
+
+    async moderatorEmails() {
+      const { rows } = await db.query("SELECT email FROM users WHERE role = 'admin' AND status = 'active' AND email_verified_at IS NOT NULL");
+      return rows.map((r) => r.email);
+    },
+
     async listHeldMessages({ limit = 50 } = {}) {
       const { rows } = await db.query(
         `SELECT m.*, u.handle AS sender_handle, u.status AS sender_status FROM messages m JOIN users u ON u.id = m.sender_id

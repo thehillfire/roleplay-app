@@ -248,7 +248,7 @@ if (process.env.MOD_EMAIL && process.env.MAIL_LOG) {
   await card.waitFor();
   assert.match(await card.innerText(), /Harassment/);
   assert.match(await card.innerText(), /Rent is due Friday/);
-  await mod.getByRole('tab', { name: /Held messages/ }).click();
+  await mod.getByRole('tab', { name: /Held/ }).click();
   await mod.locator('.report', { hasText: aliceHandle }).filter({ hasText: '555 123 4567' }).first().waitFor();
   await mod.getByRole('tab', { name: /Reports/ }).click();
   await mod.shot('8-moderate');
@@ -257,6 +257,22 @@ if (process.env.MOD_EMAIL && process.env.MAIL_LOG) {
   await alice.reload();
   await alice.getByText('Your account is paused').waitFor();
   step('moderator reviewed the report and suspended the account');
+
+  // The suspended person appeals; the moderator restores them, and it's in the log
+  await alice.getByLabel(/Think this was a mistake/).fill('That was a misunderstanding, sorry.');
+  await alice.getByRole('button', { name: 'Send to moderators' }).click();
+  await alice.getByText(/Your note was sent/).waitFor();
+  await mod.reload();
+  await mod.getByRole('button', { name: 'Moderate' }).click();
+  await mod.getByRole('tab', { name: /Appeals \(1\)/ }).click();
+  await mod.getByText('That was a misunderstanding, sorry.').waitFor();
+  await mod.getByRole('button', { name: 'Restore account' }).click();
+  await mod.getByText('No open appeals.').waitFor();
+  await mod.getByRole('tab', { name: 'Log' }).click();
+  await mod.locator('.modlog li', { hasText: 'appeal granted' }).waitFor();
+  await alice.reload();
+  await alice.getByRole('button', { name: 'Find someone' }).waitFor();
+  step('appeal granted and logged; account restored');
   pages.push(mod);
 }
 

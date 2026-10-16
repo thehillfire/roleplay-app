@@ -148,6 +148,26 @@ const MIGRATIONS = [
       PRIMARY KEY (user_id, day)
     )`,
   ],
+  // 11: moderation audit log and appeals
+  [
+    `CREATE TABLE IF NOT EXISTS mod_actions (
+      id TEXT PRIMARY KEY,
+      moderator_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      target_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+      action TEXT NOT NULL,
+      detail TEXT,
+      created_at BIGINT NOT NULL
+    )`,
+    'CREATE INDEX IF NOT EXISTS mod_actions_created_idx ON mod_actions(created_at)',
+    `CREATE TABLE IF NOT EXISTS appeals (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at BIGINT NOT NULL,
+      resolved_at BIGINT
+    )`,
+  ],
 ];
 
 async function migrate(db) {

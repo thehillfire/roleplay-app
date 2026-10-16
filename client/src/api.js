@@ -44,8 +44,13 @@ export const api = {
   pushUnsubscribe: (endpoint) => request('POST', '/api/push/unsubscribe', { endpoint }),
   deleteAccount: (password) => request('POST', '/api/account/delete', { password }),
   checkout: () => request('POST', '/api/billing/checkout', {}),
+  appeal: () => request('GET', '/api/appeal').then((d) => d.appeal),
+  sendAppeal: (message) => request('POST', '/api/appeal', { message }).then((d) => d.appeal),
   admin: {
     stats: () => request('GET', '/api/admin/stats'),
+    log: () => request('GET', '/api/admin/log').then((d) => d.actions),
+    appeals: () => request('GET', '/api/admin/appeals').then((d) => d.appeals),
+    resolveAppeal: (id, restore) => request('POST', `/api/admin/appeals/${enc(id)}/resolve`, { restore }),
     reports: (status = 'open') => request('GET', `/api/admin/reports?status=${status}`).then((d) => d.reports),
     resolve: (id, resolution) => request('POST', `/api/admin/reports/${enc(id)}/resolve`, { resolution }),
     held: () => request('GET', '/api/admin/held').then((d) => d.messages),

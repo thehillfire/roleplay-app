@@ -6,7 +6,7 @@ const { boot } = require('../src/boot');
 async function start(options = {}) {
   const url = process.env.TEST_DATABASE_URL || '';
   const built = await boot({ db: { url, sqliteFile: ':memory:' }, realtime: { sweepMs: 50, ...options.realtime }, ...options });
-  if (url) await built.db.query('TRUNCATE users, sessions, conversations, messages, blocks, reports, connections, payments, push_subscriptions, feedback, password_resets, email_verifications, checkins CASCADE');
+  if (url) await built.db.query('TRUNCATE users, sessions, conversations, messages, blocks, reports, connections, payments, push_subscriptions, feedback, password_resets, email_verifications, checkins, mod_actions, appeals CASCADE');
   const server = built.listen(0);
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${server.address().port}`;

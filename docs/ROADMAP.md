@@ -32,6 +32,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Deployment: Dockerfile (tested: production mode, non-root, clean SIGTERM), Render Blueprint, docs/DEPLOY.md
 
 ## 5. Community & launch readiness
+- [x] Moderation ops: urgent-report emails to moderators, audit log of every moderator/automatic action, appeals from the paused screen
 - [x] Private daily check-in (mood 1–5, two-week strip, low days offer a listener); exported, deleted with the account
 - [x] Gentle reactions (💙 🫂 🙏) on the other person's messages; age-band matching preference; sign out everywhere; `npm run verify`
 - [x] Unsend within 5 minutes (hidden for both; kept for moderators if reported)

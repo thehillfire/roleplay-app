@@ -12,6 +12,21 @@ import ResetPassword from './screens/ResetPassword.jsx';
 import { disablePushOnThisDevice, enablePush, pushSupported, syncPush } from './notifications.js';
 
 function Paused({ onSignOut }) {
+  const [appeal, setAppeal] = useState(undefined);
+  const [text, setText] = useState('');
+  const [error, setError] = useState('');
+  useEffect(() => {
+    api.appeal().then(setAppeal, () => setAppeal(null));
+  }, []);
+  const send = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      setAppeal(await api.sendAppeal(text));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
   return (
     <main className="screen paused">
       <div className="card">
@@ -19,6 +34,21 @@ function Paused({ onSignOut }) {
         <p>A moderator is taking a look at a recent report or message. This usually happens when something may break the guidelines, for example if it looks like someone under 18 is using Kindred.</p>
         <p className="hint">If you need support right now, call or text <a href="tel:988">988</a> (US) or visit <a href="https://findahelpline.com" target="_blank" rel="noreferrer">findahelpline.com</a>.</p>
       </div>
+      {appeal && (
+        <div className="card">
+          <p role="status">Your note was sent {new Date(appeal.createdAt).toLocaleDateString()}. A moderator will read it.</p>
+        </div>
+      )}
+      {appeal === null && (
+        <form className="card form" onSubmit={send}>
+          <label>
+            <span>Think this was a mistake? Tell the moderators what happened.</span>
+            <textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} rows={4} required />
+          </label>
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <button className="btn primary" type="submit" disabled={!text.trim()}>Send to moderators</button>
+        </form>
+      )}
       <button className="btn" onClick={onSignOut}>Sign out</button>
     </main>
   );
