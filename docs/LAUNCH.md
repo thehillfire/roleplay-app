@@ -46,9 +46,9 @@ What's left between this repo and real users, in order. The code side is done an
 
 1. **Minors getting in.** The birthdate check is self-reported. The screener, reports and auto-pause catch a lot, but not everything. If you get traction, add real age assurance (Yoti, Persona, Stripe Identity) before a journalist tests it for you.
 2. **Someone in crisis.** The app shows 988 resources and alerts moderators, but listeners are strangers. Make that clear (it's in the terms and onboarding) and never market Kindred as therapy.
-3. **Moderation load outgrowing you.** Watch report volume. The rules-based screener is a first line; an ML moderation service (e.g. OpenAI's moderation endpoint is free) can be added behind `server/src/moderation.js` later.
+3. **Moderation load outgrowing you.** Watch report volume. The rules-based screener is a first line. Set `OPENAI_API_KEY` to add OpenAI's free moderation endpoint as a second opinion on every message.
 4. **One server.** Fine for several thousand people chatting at once (see DEPLOY.md load test). Past that, the roadmap's Redis item is next.
 
 ## What's in the box
 
-Everything listed in the [README](../README.md): accounts, anonymous matching, realtime chat, safety screening, reports and appeals, moderator tools and dashboard, paid mutual connect, push notifications, daily check-ins, PWA install, privacy controls, deployment files, and 86 automated tests plus a two-browser end-to-end test running in CI.
+Everything listed in the [README](../README.md): accounts, anonymous matching, realtime chat, safety screening, reports and appeals, moderator tools and dashboard, paid mutual connect, push notifications, daily check-ins, PWA install, privacy controls, deployment files, and 94 automated tests plus a two-browser end-to-end test running in CI.
