@@ -2,7 +2,7 @@
 const { badRequest } = require('../validate');
 const { httpError, asyncRoute } = require('./common');
 
-module.exports = function register(app, { store, hub, member }) {
+module.exports = function register(app, { store, hub, mailer, member }) {
   // --- Moderation (admins) ---
 
   const admin = (req, res, next) => member(req, res, () => {
@@ -26,6 +26,26 @@ module.exports = function register(app, { store, hub, member }) {
     const action = !restore ? 'appeal_denied' : restored ? 'appeal_granted' : 'appeal_closed_account_deleted';
     await store.logModAction({ moderatorId: req.user.id, targetId: userId, action });
     res.json({ ok: true, action });
+  }));
+
+  app.get('/api/admin/support', admin, asyncRoute(async (req, res) => {
+    res.json({ requests: await store.listSupportRequests() });
+  }));
+
+  // Closing a request can include a reply, which is emailed; the moderator never sees the address.
+  app.post('/api/admin/support/:id/resolve', admin, asyncRoute(async (req, res) => {
+    const reply = typeof req.body.reply === 'string' ? req.body.reply.trim().slice(0, 4000) : '';
+    const closed = await store.resolveSupportRequest(req.params.id, reply);
+    if (!closed) throw httpError(404, 'Open request not found (it may have just been answered).');
+    if (reply && !closed.deleted) {
+      mailer.send({
+        to: closed.email,
+        subject: 'Kindred support: a reply to your message',
+        text: `Hi ${closed.handle},\n\n${reply}\n\nThe Kindred team\n\n(You wrote to us about: ${closed.topic}. Reply in the app under Account → Contact support.)`,
+      }).catch((err) => console.error('support reply failed', err.message));
+    }
+    await store.logModAction({ moderatorId: req.user.id, targetId: closed.userId, action: reply ? 'support_replied' : 'support_closed', detail: closed.topic });
+    res.json({ ok: true, emailed: Boolean(reply && !closed.deleted) });
   }));
 
   app.get('/api/admin/stats', admin, asyncRoute(async (req, res) => {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../api.js';
 import { TEXT_SIZES, getTextSize, setTextSize } from '../textSize.js';
 import { enablePush, pushSupported } from '../notifications.js';
+import Support from '../components/Support.jsx';
 
 export default function Account({ user, billing, pushKey, onUserChanged, onBack, onSignOut, onSignOutEverywhere, onDeleted, onOpenLegal }) {
   const [confirming, setConfirming] = useState(false);
@@ -130,6 +131,8 @@ export default function Account({ user, billing, pushKey, onUserChanged, onBack,
           ))}
         </div>
       </section>
+
+      <Support emailVerified={user.emailVerified} />
 
       <section className="card rows">
         <a className="row link-row" href="/api/account/export" download>Download my data</a>

@@ -3,7 +3,39 @@ const { verifyPassword } = require('../auth');
 const { str, badRequest } = require('../validate');
 const { httpError, asyncRoute } = require('./common');
 
-module.exports = function register(app, { store, hub, auth, payments, push, authLimiter, member }) {
+const SUPPORT_TOPICS = ['account', 'billing', 'safety', 'feedback', 'other'];
+
+module.exports = function register(app, { store, hub, auth, payments, push, mailer, siteUrl, authLimiter, member }) {
+  // Moderators hear about new support requests at most once an hour (topic only, never the text).
+  let lastSupportAlert = 0;
+  const alertSupport = async (req, topic) => {
+    if (Date.now() - lastSupportAlert < 60 * 60 * 1000) return;
+    lastSupportAlert = Date.now();
+    const base = siteUrl(req);
+    const emails = await store.moderatorEmails();
+    await Promise.all(emails.map((to) => mailer.send({
+      to,
+      subject: '[Kindred] New support request',
+      text: `Someone wrote in about: ${topic}.\n\nOpen the inbox: ${base ? `${base}/` : '(set PUBLIC_URL)'} → Account menu → Moderate → Inbox.`,
+    }).catch((err) => console.error('support alert failed', err.message))));
+  };
+
+  // --- Support: write to the team; replies arrive by email ---
+
+  app.get('/api/support', member, asyncRoute(async (req, res) => {
+    res.json({ requests: await store.mySupportRequests(req.user.id) });
+  }));
+
+  app.post('/api/support', member, authLimiter, asyncRoute(async (req, res) => {
+    const topic = SUPPORT_TOPICS.includes(req.body.topic) ? req.body.topic : 'other';
+    const message = str(req.body.message, 'message', 2000);
+    if (!(await store.createSupportRequest(req.user.id, topic, message))) {
+      throw httpError(429, "You have a few requests waiting already. We'll get back to you soon.");
+    }
+    alertSupport(req, topic).catch(() => {});
+    res.status(201).json({ ok: true, emailVerified: req.user.emailVerified });
+  }));
+
   // --- Appeals: paused or suspended people can explain their side ---
 
   const paused = (req, res, next) => auth.requireUser(req, res, () => {

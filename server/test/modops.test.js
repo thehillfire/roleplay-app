@@ -141,3 +141,39 @@ test('moderators can look someone up by handle, without seeing their email', asy
   assert.equal((await mod('GET', '/api/admin/users')).status, 400);
   assert.equal((await b('GET', `/api/admin/users?handle=${a.user.handle}`)).status, 403);
 });
+
+test('support: members write in, moderators reply by email without seeing the address', async (t) => {
+  const sent = [];
+  const s = await start({ mailer: { enabled: true, send: async (m) => { sent.push(m); } }, publicUrl: 'https://kindred.example' });
+  t.after(s.stop);
+  const mod = await moderator(s, 'mod-support@example.com');
+  const member = await signedUp(s.base, { email: 'writer@example.com' });
+
+  assert.equal((await member('POST', '/api/support', { topic: 'billing', message: '' })).status, 400);
+  assert.equal((await member('POST', '/api/support', { topic: 'billing', message: 'I was charged twice this month.' })).status, 201);
+  await new Promise((r) => setTimeout(r, 20));
+  const alert = sent.find((m) => m.to === 'mod-support@example.com' && m.subject === '[Kindred] New support request');
+  assert.ok(alert, 'moderators are told');
+  assert.ok(!alert.text.includes('charged twice'), 'but not what it says');
+
+  const { requests } = (await mod('GET', '/api/admin/support')).body;
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].user.handle, member.user.handle);
+  assert.ok(!JSON.stringify(requests).includes('writer@example.com'), 'no email for moderators');
+  assert.equal((await member('GET', '/api/admin/support')).status, 403);
+
+  const reply = 'Sorry about that. We refunded the duplicate charge.';
+  assert.equal((await mod('POST', `/api/admin/support/${requests[0].id}/resolve`, { reply })).status, 200);
+  assert.equal((await mod('POST', `/api/admin/support/${requests[0].id}/resolve`, { reply })).status, 404, 'answered once');
+  await new Promise((r) => setTimeout(r, 20));
+  const email = sent.find((m) => m.to === 'writer@example.com' && m.subject.startsWith('Kindred support'));
+  assert.match(email.text, /refunded the duplicate charge/);
+
+  const mine = (await member('GET', '/api/support')).body.requests;
+  assert.deepEqual([mine[0].status, mine[0].reply], ['resolved', reply]);
+  assert.equal((await mod('GET', '/api/admin/log')).body.actions[0].action, 'support_replied');
+
+  // At most three open at once per person.
+  for (let i = 0; i < 3; i += 1) assert.equal((await member('POST', '/api/support', { topic: 'other', message: `question ${i}` })).status, 201);
+  assert.equal((await member('POST', '/api/support', { topic: 'other', message: 'one more' })).status, 429);
+});

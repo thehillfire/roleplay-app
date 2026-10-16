@@ -209,6 +209,20 @@ const MIGRATIONS = [
     'ALTER TABLE feedback ADD COLUMN note_at BIGINT',
     'ALTER TABLE feedback ADD COLUMN note_hidden INTEGER NOT NULL DEFAULT 0',
   ],
+  // 17: support requests (members write in; moderators reply by email without seeing the address)
+  [
+    `CREATE TABLE IF NOT EXISTS support_requests (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      topic TEXT NOT NULL,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      reply TEXT,
+      created_at BIGINT NOT NULL,
+      resolved_at BIGINT
+    )`,
+    'CREATE INDEX IF NOT EXISTS support_status_idx ON support_requests(status, created_at)',
+  ],
 ];
 
 async function migrate(db) {

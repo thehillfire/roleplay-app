@@ -59,6 +59,8 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Moderator lookup by handle: status, report counts, held messages, action history, suspend/restore (no email shown)
 - [x] Hide a conversation from your list (returns on a new message or a re-match)
 - [x] Kind words: an optional 140-character note with "it helped", screened, shown anonymously on the listener's home screen, removable, exported
+- [x] Support inbox: members write in from Account; moderators reply from Moderate → Inbox, emailed without the moderator seeing the address
+- [x] Waiting room: optional paced breathing (4s in, 6s out); "Say goodbye…" drafts a kind sign-off
 - [ ] Scale past one server: Redis pub/sub for realtime + shared queue (only needed beyond several thousand concurrent chatters)
 
 ## Known limits

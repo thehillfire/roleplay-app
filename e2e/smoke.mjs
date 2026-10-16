@@ -294,6 +294,27 @@ if (process.env.MOD_EMAIL && process.env.MAIL_LOG) {
   await alice.reload();
   await alice.getByRole('button', { name: 'Find someone' }).waitFor();
   step('appeal granted and logged; account restored');
+
+  // Alice writes to support; the moderator replies from the Inbox
+  await alice.getByRole('button', { name: 'Account' }).click();
+  await alice.getByRole('button', { name: 'Write to us' }).click();
+  await alice.getByLabel("What's it about?").selectOption('feedback');
+  await alice.getByLabel('Your message').fill('Could there be a dark blue theme?');
+  await alice.getByRole('button', { name: 'Send', exact: true }).click();
+  await alice.getByText(/Thanks, we got it/).waitFor();
+  await mod.reload();
+  await mod.getByRole('button', { name: 'Moderate' }).click();
+  await mod.getByRole('tab', { name: /Inbox \(1\)/ }).click();
+  await mod.getByText('Could there be a dark blue theme?').waitFor();
+  await mod.getByLabel(`Reply to ${aliceHandle}`).fill('Love it. It is on our list.');
+  await mod.getByRole('button', { name: 'Send reply' }).click();
+  await mod.getByText('No support requests waiting.').waitFor();
+  await alice.reload();
+  await alice.locator('.account, .find').first().waitFor();
+  if (await alice.locator('.find').count()) await alice.getByRole('button', { name: 'Account' }).click();
+  await alice.getByText('Love it. It is on our list.').waitFor();
+  await alice.getByRole('button', { name: '← Back' }).click();
+  step('support request answered from the moderator inbox');
   pages.push(mod);
 }
 

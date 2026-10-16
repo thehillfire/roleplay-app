@@ -692,6 +692,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         conversations: threads,
         reportsYouFiled: reports.map((r) => ({ reason: r.reason, details: r.details, status: r.status, at: new Date(num(r.created_at)).toISOString() })),
         dailyCheckins: checkins,
+        supportRequests: (await store.mySupportRequests(userId)).map(({ id, ...r }) => ({ ...r, createdAt: new Date(r.createdAt).toISOString() })), // eslint-disable-line no-unused-vars
         kindWordsYouReceived: (await store.kindWordsFor(userId, 10000)).map((k) => ({ note: k.note, at: new Date(k.at).toISOString() })),
       };
     },
@@ -815,6 +816,40 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     async openAppeal(userId) {
       const { rows } = await db.query("SELECT message, created_at FROM appeals WHERE user_id = $1 AND status = 'open'", [userId]);
       return rows[0] ? { message: rows[0].message, createdAt: num(rows[0].created_at) } : null;
+    },
+
+    // --- support requests ---
+
+    async createSupportRequest(userId, topic, message) {
+      const { rows } = await db.query("SELECT COUNT(*) AS n FROM support_requests WHERE user_id = $1 AND status = 'open'", [userId]);
+      if (Number(rows[0].n) >= 3) return null; // enough waiting from one person
+      const id = newId();
+      await db.query('INSERT INTO support_requests (id, user_id, topic, message, created_at) VALUES ($1, $2, $3, $4, $5)', [id, userId, topic, message, now()]);
+      return id;
+    },
+
+    async mySupportRequests(userId) {
+      const { rows } = await db.query('SELECT id, topic, message, status, reply, created_at FROM support_requests WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20', [userId]);
+      return rows.map((r) => ({ id: r.id, topic: r.topic, message: r.message, status: r.status, reply: r.reply, createdAt: num(r.created_at) }));
+    },
+
+    async listSupportRequests() {
+      const { rows } = await db.query(
+        `SELECT s.*, u.handle, u.status AS user_status FROM support_requests s JOIN users u ON u.id = s.user_id
+          WHERE s.status = 'open' ORDER BY s.created_at ASC LIMIT 100`,
+      );
+      return rows.map((r) => ({ id: r.id, topic: r.topic, message: r.message, createdAt: num(r.created_at), user: { id: r.user_id, handle: r.handle, status: r.user_status } }));
+    },
+
+    // Closes an open request exactly once; returns who to reply to (email stays server-side).
+    async resolveSupportRequest(id, reply) {
+      const { rows } = await db.query('SELECT s.user_id, s.topic, u.email, u.handle, u.status FROM support_requests s JOIN users u ON u.id = s.user_id WHERE s.id = $1', [id]);
+      if (!rows[0]) return null;
+      const { rowCount } = await db.query(
+        "UPDATE support_requests SET status = 'resolved', reply = $1, resolved_at = $2 WHERE id = $3 AND status = 'open'",
+        [reply || null, now(), id],
+      );
+      return rowCount === 1 ? { userId: rows[0].user_id, topic: rows[0].topic, email: rows[0].email, handle: rows[0].handle, deleted: rows[0].status === 'deleted' } : null;
     },
 
     async listAppeals() {

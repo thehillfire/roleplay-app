@@ -27,6 +27,8 @@ export default function Moderate({ onBack }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const [query, setQuery] = useState('');
+  const [inbox, setInbox] = useState(null);
+  const [replies, setReplies] = useState({});
   const [found, setFound] = useState(null);
 
   const lookup = async (e) => {
@@ -48,6 +50,7 @@ export default function Moderate({ onBack }) {
       setAppeals(a);
     }, (err) => setError(err.message));
     api.admin.log().then(setLog, () => setLog([]));
+    api.admin.support().then(setInbox, () => setInbox([]));
     // Stats are nice to have; they must never keep the queues from loading.
     api.admin.stats().then(setStats, () => setStats(null));
   }, []);
@@ -98,6 +101,9 @@ export default function Moderate({ onBack }) {
         </button>
         <button role="tab" aria-selected={tab === 'appeals'} className={tab === 'appeals' ? 'tab active' : 'tab'} onClick={() => setTab('appeals')}>
           Appeals {appeals ? `(${appeals.length})` : ''}
+        </button>
+        <button role="tab" aria-selected={tab === 'inbox'} className={tab === 'inbox' ? 'tab active' : 'tab'} onClick={() => setTab('inbox')}>
+          Inbox {inbox ? `(${inbox.length})` : ''}
         </button>
         <button role="tab" aria-selected={tab === 'lookup'} className={tab === 'lookup' ? 'tab active' : 'tab'} onClick={() => setTab('lookup')}>
           Look up
@@ -170,6 +176,29 @@ export default function Moderate({ onBack }) {
           <div className="actions">
             <button className="btn primary" disabled={!!busy} onClick={() => act(a.id, () => api.admin.resolveAppeal(a.id, true))}>Restore account</button>
             <button className="btn" disabled={!!busy} onClick={() => act(a.id, () => api.admin.resolveAppeal(a.id, false))}>Keep paused</button>
+          </div>
+        </article>
+      ))}
+
+      {tab === 'inbox' && inbox?.length === 0 && <p className="empty">No support requests waiting.</p>}
+      {tab === 'inbox' && inbox?.map((r) => (
+        <article key={r.id} className="card report">
+          <header>
+            <strong>{r.topic} · {r.user.handle} <StatusTag status={r.user.status} /></strong>
+            <small>{when(r.createdAt)}</small>
+          </header>
+          <p className="details">{r.message}</p>
+          <textarea
+            className="reply-box"
+            aria-label={`Reply to ${r.user.handle}`}
+            value={replies[r.id] || ''}
+            onChange={(e) => setReplies((m) => ({ ...m, [r.id]: e.target.value }))}
+            placeholder="Your reply is emailed to them. You won't see their address."
+            maxLength={4000}
+          />
+          <div className="actions">
+            <button className="btn primary" disabled={!!busy || !(replies[r.id] || '').trim()} onClick={() => act(r.id, () => api.admin.resolveSupport(r.id, replies[r.id]))}>Send reply</button>
+            <button className="btn" disabled={!!busy} onClick={() => act(r.id, () => api.admin.resolveSupport(r.id, ''))}>Close without reply</button>
           </div>
         </article>
       ))}
