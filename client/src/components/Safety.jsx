@@ -4,6 +4,7 @@ export const HELD_NOTES = {
   contact: "Not sent. Contact details (numbers, emails, socials, links) can't be shared unless you both choose to connect.",
   age_probe: "Not sent. Kindred is 18+ only, so please don't ask people their age.",
   location: "Not sent. To keep everyone anonymous, please don't ask where people live.",
+  meetup: "Not sent. Kindred stays anonymous and online: no meetups or photo requests unless you both choose to connect.",
   sexual: "Not sent. Sexual content isn't allowed on Kindred.",
   minor: 'Not sent.',
   minor_maybe: 'Not sent. Kindred is for adults 18 and over.',
@@ -15,7 +16,7 @@ export const HELD_NOTES = {
 };
 
 export function heldNote(flags = []) {
-  const key = ['minor', 'minor_sexual', 'minor_maybe', 'threat', 'hate', 'sexual', 'harassment', 'spam', 'age_probe', 'location', 'contact'].find((f) => flags.includes(f));
+  const key = ['minor', 'minor_sexual', 'minor_maybe', 'threat', 'hate', 'sexual', 'harassment', 'spam', 'age_probe', 'meetup', 'location', 'contact'].find((f) => flags.includes(f));
   return HELD_NOTES[key] || 'Not sent. This message breaks the community guidelines.';
 }
 

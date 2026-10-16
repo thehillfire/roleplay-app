@@ -6,7 +6,7 @@ const REASON_LABELS = {
   spam: 'Spam or scam', self_harm: 'Safety concern', other: 'Other',
 };
 const FLAG_LABELS = {
-  contact: 'Contact info', location: 'Asked location', age_probe: 'Asked age', minor: 'Said under 18', minor_maybe: 'Maybe under 18',
+  contact: 'Contact info', location: 'Asked location', meetup: 'Meetup or photos', age_probe: 'Asked age', minor: 'Said under 18', minor_maybe: 'Maybe under 18',
   sexual: 'Sexual', crisis: 'Crisis', minor_sexual: 'Sexual + minors', threat: 'Threat', hate: 'Hate', harassment: 'Harassment', spam: 'Copy-paste spam',
 };
 

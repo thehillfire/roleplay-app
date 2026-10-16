@@ -8,6 +8,7 @@
 //   minor       sender clearly says they're under 18: held, account paused for review
 //   minor_maybe a bare "I'm 15": held for a moderator, account NOT paused (too ambiguous)
 //   location    asking where someone lives (city, town, address): held (anonymity)
+//   meetup      arranging to meet, or asking for photos: held until both connect (safety)
 //   sexual      sexual solicitation: held
 //   crisis      self-harm / suicide language: DELIVERED, sender is shown crisis resources
 
@@ -71,6 +72,18 @@ const LOCATION_PATTERNS = [
   /\bwhat'?s\s+(your|ur)\s+(address|zip(\s*code)?|city|town)\b/,
   /\b(donde|en\s+que\s+(ciudad|pueblo|colonia|estado))\s+vives\b/,
   /\b(cual|que)\s+es\s+tu\s+(direccion|ciudad|colonia|codigo\s+postal)\b/,
+];
+
+// Strangers arranging to meet, or asking for photos (no photos in Kindred: it means elsewhere).
+const MEETUP_PATTERNS = [
+  /\b(wanna|want\s+to)\s+(meet|hang\s*out|link)\s+(up|you|u|irl|in\s+person|sometime)\b/,
+  /\b(let'?s|lets|we\s+should|can\s+we|could\s+we|should\s+we)\s+(meet|hang\s*out|link\s*up)\b/,
+  /\bmeet\s+(me|up)\s+(at|in|irl|tonight|tomorrow|later|sometime|somewhere)\b/,
+  /\bmeet\s+(irl|in\s+person)\b/,
+  /\bsend\s+(me\s+)?(a\s+)?(selfie|pic|photo|picture)s?\b(?!\s+of\s+(your|ur)\s+(dog|cat|pet|garden|food|view))/,
+  /\b(quieres|quieren)\s+(vernos|que\s+nos\s+veamos|salir\s+conmigo)\b/,
+  /\bnos\s+vemos\s+en\s+persona\b/,
+  /\b(mandame|enviame|pasame)\s+(una\s+)?(foto|selfie)\b/,
 ];
 
 const AGE_PROBE_PATTERNS = [
@@ -211,6 +224,7 @@ function screenMessage(body, { connected = false } = {}) {
   const flags = [];
   if (!connected && (hasPhoneNumber(t) || any(CONTACT_PATTERNS, t) || OBFUSCATED_CONTACT.test(deobfuscate(t)))) flags.push('contact');
   if (!connected && any(LOCATION_PATTERNS, t)) flags.push('location');
+  if (!connected && any(MEETUP_PATTERNS, t)) flags.push('meetup');
   if (any(AGE_PROBE_PATTERNS, t)) flags.push('age_probe');
   const aged = withAgeDigits(t);
   if (any(MINOR_PATTERNS, aged)) flags.push('minor');

@@ -213,3 +213,13 @@ test('common slurs are held as hate, including dodged spellings; look-alike word
     assert.deepEqual(flagsOf(text), [], text);
   }
 });
+
+test('arranging to meet or asking for photos is held until both connect', () => {
+  for (const text of ['wanna meet up?', "let's meet irl", 'we should hang out sometime', 'can we meet in person', 'send me a selfie', 'meet me at the mall', 'quieres vernos?', 'nos vemos en persona?']) {
+    assert.ok(flagsOf(text).includes('meetup'), text);
+    assert.deepEqual(flagsOf(text, { connected: true }), [], `${text} is fine once connected`);
+  }
+  for (const text of ['are you single', 'i met up with my sister today', 'I want to meet new people', 'my therapist wants to meet weekly', 'send pics of your dog', 'my mom said lets get together for thanksgiving']) {
+    assert.deepEqual(flagsOf(text), [], text);
+  }
+});
