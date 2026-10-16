@@ -29,7 +29,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Back button / swipe-back navigation; load earlier messages
 - [x] Account deletion (password-confirmed; personal data scrubbed now, safety data purged after 90 days) and JSON data export
 - [ ] Accessibility pass; reduced motion; text size
-- [ ] Deployment guide (needs a host with WebSockets: Render, Fly.io, Railway; Postgres via Supabase/Neon)
+- [x] Deployment: Dockerfile (tested: production mode, non-root, clean SIGTERM), Render Blueprint, docs/DEPLOY.md
 
 ## Known limits
 - Matchmaking and realtime run in one Node process. Past ~1 server, add Redis pub/sub.

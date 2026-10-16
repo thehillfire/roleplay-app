@@ -54,4 +54,4 @@ e2e/      Playwright test: two strangers sign up, match and chat
 
 ## Deploying
 
-Kindred needs a host that keeps a Node process running with WebSockets, such as Render, Fly.io or Railway. Serverless platforms like Vercel can't hold the sockets. Set `DATABASE_URL` to a Postgres database (Supabase, Neon, Render Postgres). Tables are created on first start. Matchmaking and live delivery run inside one server process; to run several, add Redis pub/sub (see roadmap).
+Kindred needs a host that keeps a Node process running with WebSockets (Render, Fly.io, Railway, any Docker host) plus Postgres. A `Dockerfile` and a Render Blueprint (`render.yaml`) are included. See **[docs/DEPLOY.md](docs/DEPLOY.md)** for step-by-step setup, Stripe, Supabase/Neon, and a pre-launch checklist.
