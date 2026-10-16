@@ -424,6 +424,9 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
           'DELETE FROM banned_devices WHERE user_id = $1 AND device_hash IN (SELECT device_hash FROM user_devices WHERE user_id = $2)',
           [UNDERAGE_SIGNUP, userId],
         );
+        // Earlier appeals belonged to that pause. A later pause starts fresh: no old decision
+        // on their screen and no week's wait carried over.
+        await db.query("UPDATE appeals SET status = 'past' WHERE user_id = $1 AND status IN ('open', 'resolved')", [userId]);
       }
       return rowCount > 0;
     },
@@ -961,15 +964,16 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     async listAppeals() {
       const { rows } = await db.query(
         `SELECT a.*, u.handle, u.status AS user_status,
-                (SELECT m.action || COALESCE(': ' || m.detail, '') FROM mod_actions m WHERE m.target_id = a.user_id
-                  ORDER BY m.created_at DESC LIMIT 1) AS last_action
+                (SELECT m.action FROM mod_actions m WHERE m.target_id = a.user_id ORDER BY m.created_at DESC LIMIT 1) AS last_action,
+                (SELECT m.detail FROM mod_actions m WHERE m.target_id = a.user_id ORDER BY m.created_at DESC LIMIT 1) AS last_detail
            FROM appeals a JOIN users u ON u.id = a.user_id
           WHERE a.status = 'open' ORDER BY a.created_at ASC`,
       );
       return rows.map((r) => ({
         id: r.id, message: r.message, createdAt: num(r.created_at),
         user: { id: r.user_id, handle: r.handle, status: r.user_status },
-        reason: r.last_action ? r.last_action.replace(/_/g, ' ') : null, // why they were paused, from the audit log
+        // Why they were paused, from the audit log; the client words it like the Log tab.
+        pausedBy: r.last_action ? { action: r.last_action, detail: r.last_detail || null } : null,
       }));
     },
 

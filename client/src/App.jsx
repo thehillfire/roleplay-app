@@ -11,13 +11,28 @@ import Legal from './screens/Legal.jsx';
 import ResetPassword from './screens/ResetPassword.jsx';
 import { disablePushOnThisDevice, enablePush, pushDismissed, pushSupported, syncPush } from './notifications.js';
 
-function Paused({ onSignOut }) {
+function Paused({ onSignOut, onCheck }) {
   const [appeal, setAppeal] = useState(undefined);
   const [text, setText] = useState('');
   const [error, setError] = useState('');
   useEffect(() => {
     api.appeal().then(setAppeal, () => setAppeal(null));
   }, []);
+  // No live connection while paused, so look again now and then: a restore opens the app,
+  // a decision shows up, without a reload.
+  useEffect(() => {
+    const check = () => {
+      if (document.visibilityState !== 'visible') return;
+      onCheck();
+      api.appeal().then(setAppeal, () => {});
+    };
+    const timer = setInterval(check, 60000);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, [onCheck]);
   const send = async (e) => {
     e.preventDefault();
     setError('');
@@ -51,6 +66,7 @@ function Paused({ onSignOut }) {
           <label>
             <span>Think this was a mistake? Tell the moderators what happened.</span>
             <textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} rows={4} required />
+            {text.length > 800 && <small className="hint">{1000 - text.length} characters left</small>}
           </label>
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="btn primary" type="submit" disabled={!text.trim()}>Send to moderators</button>
@@ -148,8 +164,9 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
     api.conversations().then(setConversations, (err) => setListError(err.message));
   }, []);
 
+  // The chat needs the list too: its back arrow counts what's unread elsewhere (also after a reload).
   useEffect(() => {
-    if (view.name === 'home') refresh();
+    if (view.name === 'home' || view.name === 'chat') refresh();
   }, [view.name, refresh]);
 
   useEffect(() => {
@@ -163,8 +180,12 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
         const v = viewRef.current;
         if (!(v.name === 'chat' && message?.conversationId === v.id)) refresh();
       }),
+      socket.on('message.unsent', ({ conversationId }) => {
+        const v = viewRef.current;
+        if (!(v.name === 'chat' && conversationId === v.id)) refresh();
+      }),
       socket.on('open', () => {
-        if (viewRef.current.name === 'home') refresh();
+        if (viewRef.current.name === 'home' || viewRef.current.name === 'chat') refresh();
         // A dropped connection took us out of the queue: rejoin with the same choice.
         if (viewRef.current.name === 'waiting' && lastFind.current) {
           setMatchError('');
@@ -424,7 +445,7 @@ export default function App() {
       <div hidden={Boolean(legal) || resetToken !== null}>
       {user === undefined && <main className="screen"><p className="loading">One moment…</p></main>}
       {user === null && <Welcome key={welcomeMode || 'landing'} initialMode={welcomeMode === 'forgot' ? 'forgot' : welcomeMode === 'expired' ? 'login' : null} farewell={welcomeMode === 'deleted'} notice={welcomeMode === 'expired' ? 'You were signed out. Sign in again to pick up where you left off.' : ''} onSignedIn={(u) => refreshMe().catch(() => setUser(u))} onOpenLegal={openLegal} captchaSiteKey={captchaSiteKey} />}
-      {user && user.status !== 'active' && <Paused onSignOut={signOut} />}
+      {user && user.status !== 'active' && <Paused onSignOut={signOut} onCheck={refreshMeQuietly} />}
       {user && user.status === 'active' && (
         <Signedin
           key={user.id}

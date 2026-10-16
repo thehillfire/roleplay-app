@@ -35,7 +35,9 @@ const ACTION_LABELS = {
 // "Suspended after a report (Harassment)" rather than "report suspended (harassment)".
 function actionLabel(e) {
   const label = ACTION_LABELS[e.action] || e.action.replace(/_/g, ' ');
-  const detail = e.action.startsWith('report_') ? REASON_LABELS[e.detail] || e.detail : e.detail;
+  const detail = e.action.startsWith('report_') ? REASON_LABELS[e.detail] || e.detail
+    : e.action.startsWith('held_') && e.detail ? e.detail.split(', ').map((f) => FLAG_LABELS[f] || f).join(', ')
+    : e.detail;
   return detail ? `${label} (${detail})` : label;
 }
 
@@ -188,8 +190,9 @@ export default function Moderate({ onBack }) {
             <strong>{m.sender.handle} <StatusTag status={m.sender.status} /></strong>
             <small>{when(m.createdAt)}</small>
           </header>
+          {m.context?.length > 0 && <p className="hint">Just before:</p>}
           {m.context?.length > 0 && (
-            <ol className="transcript" aria-label="Just before">
+            <ol className="transcript context">
               {m.context.map((c, i) => (
                 <li key={i} className={c.fromSender ? 'reported' : 'reporter'}>
                   <span className="who-line">{c.fromSender ? m.sender.handle : 'the other person'}{c.unsent ? ' · unsent by sender' : ''}</span>
@@ -218,7 +221,7 @@ export default function Moderate({ onBack }) {
             <strong>{a.user.handle} <StatusTag status={a.user.status} /></strong>
             <small>{when(a.createdAt)}</small>
           </header>
-          {a.reason && <p className="meta"><span>Paused for: {a.reason}</span></p>}
+          {a.pausedBy && <p className="meta"><span>Paused: {actionLabel(a.pausedBy)}</span></p>}
           <p className="details">“{a.message}”</p>
           <div className="actions">
             <textarea
@@ -229,8 +232,15 @@ export default function Moderate({ onBack }) {
               placeholder="Optional note they'll see, e.g. why the pause stays"
               maxLength={500}
             />
-            <button className="btn primary" disabled={!!busy} onClick={() => act(a.id, () => api.admin.resolveAppeal(a.id, true, appealNotes[a.id]))}>Restore account</button>
-            <button className="btn" disabled={!!busy} onClick={() => act(a.id, () => api.admin.resolveAppeal(a.id, false, appealNotes[a.id]))}>Keep paused</button>
+            {(appealNotes[a.id] || '').length > 400 && <small className="hint">{500 - appealNotes[a.id].length} characters left</small>}
+            {a.user.status === 'deleted' ? (
+              <button className="btn" disabled={!!busy} onClick={() => act(a.id, () => api.admin.resolveAppeal(a.id, true))}>Close (account deleted)</button>
+            ) : (
+              <>
+                <button className="btn primary" disabled={!!busy} onClick={() => act(a.id, () => api.admin.resolveAppeal(a.id, true, appealNotes[a.id]))}>Restore account</button>
+                <button className="btn" disabled={!!busy} onClick={() => act(a.id, () => api.admin.resolveAppeal(a.id, false, appealNotes[a.id]))}>Keep paused</button>
+              </>
+            )}
           </div>
           {errorIn(a.id)}
         </article>

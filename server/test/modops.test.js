@@ -323,6 +323,23 @@ test('a denied appeal shows its outcome and note, and a new note can follow a we
   assert.equal((await person('POST', '/api/appeal', { message: 'I have thought about it.' })).status, 201);
 });
 
+test('after a restore, a later pause starts with a fresh appeal', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const mod = await moderator(s, 'mod-appeal-fresh@example.com');
+  const person = await signedUp(s.base);
+  const personId = (await s.db.query('SELECT id FROM users WHERE handle = $1', [person.user.handle])).rows[0].id;
+  await mod('POST', `/api/admin/users/${personId}/status`, { status: 'suspended' });
+  await person('POST', '/api/appeal', { message: 'first time' });
+  const [appeal] = (await mod('GET', '/api/admin/appeals')).body.appeals;
+  assert.deepEqual(appeal.pausedBy, { action: 'suspend', detail: null });
+  await mod('POST', `/api/admin/appeals/${appeal.id}/resolve`, { restore: false, note: 'not yet' });
+  await s.store.setUserStatus(personId, 'active'); // restored later from Look up
+  await s.store.setUserStatus(personId, 'suspended'); // and paused again for something new
+  assert.equal((await person('GET', '/api/appeal')).body.appeal, null, 'the old decision belonged to the old pause');
+  assert.equal((await person('POST', '/api/appeal', { message: 'this time is different' })).status, 201);
+});
+
 test('held messages come with the few messages just before them', async (t) => {
   const s = await start();
   t.after(s.stop);

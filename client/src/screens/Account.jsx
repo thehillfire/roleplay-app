@@ -38,6 +38,20 @@ export default function Account({ user, billing, pushKey, onUserChanged, onBack,
   };
   const money = (cents) => new Intl.NumberFormat(undefined, { style: 'currency', currency: billing?.currency || 'usd' }).format(cents / 100);
 
+  const [pushState, setPushState] = useState(() => (pushSupported() ? Notification.permission : 'unsupported'));
+  const turnOnReplies = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await enablePush(pushKey, api.pushSubscribe);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPushState(Notification.permission);
+      setBusy(false);
+    }
+  };
+
   // On call: this device needs notifications on, so ask for them when switching it on.
   const toggleOnCall = async () => {
     const on = !user.listenerAlerts;
@@ -49,6 +63,7 @@ export default function Account({ user, billing, pushKey, onUserChanged, onBack,
           ? 'Notifications are blocked for Kindred. Allow them in your browser\'s site settings (the icon next to the address), then try again.'
           : 'Allow notifications for Kindred first, then try again.');
       }
+      setPushState(Notification.permission);
       await api.setListenerAlerts(on);
       await onUserChanged();
     } catch (err) {
@@ -113,6 +128,17 @@ export default function Account({ user, billing, pushKey, onUserChanged, onBack,
 
       {pushKey && pushSupported() && (
         <section className="card rows">
+          <div className="row switch-row">
+            <span>
+              Notifications for replies
+              <small className="hint">
+                {pushState === 'granted' ? 'On for this device. They show an anonymous name, never what was written.'
+                  : pushState === 'denied' ? 'Blocked in this browser. You can allow them in the site settings (the icon next to the address).'
+                  : 'Get a notice when someone replies while Kindred is closed.'}
+              </small>
+            </span>
+            {pushState === 'default' && <button className="btn" onClick={turnOnReplies} disabled={busy}>Turn on</button>}
+          </div>
           <label className="row switch-row">
             <span>
               On call as a listener
@@ -120,7 +146,7 @@ export default function Account({ user, billing, pushKey, onUserChanged, onBack,
             </span>
             <input type="checkbox" role="switch" checked={user.listenerAlerts} onChange={toggleOnCall} disabled={busy} />
           </label>
-          {pushBlocked() && <p className="hint">Notifications are blocked for Kindred in this browser, so replies won't reach you while the app is closed. You can allow them in the site settings.</p>}
+
         </section>
       )}
 
