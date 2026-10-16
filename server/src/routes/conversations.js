@@ -84,7 +84,13 @@ module.exports = function register(app, { store, hub, payments, classifier, push
         feedback: { canRate, helpful: feedback },
       },
       // Flags are only shown to the sender, to explain why a message was held.
-      messages: messages.map(({ senderId, flags, ...m }) => ({ ...m, fromMe: senderId === req.user.id, ...(senderId === req.user.id && m.status === 'held' ? { flags } : {}) })),
+      // Crisis is the one signal the receiver gets too, so a listener opening the chat later still sees guidance.
+      messages: messages.map(({ senderId, flags, ...m }) => ({
+        ...m,
+        fromMe: senderId === req.user.id,
+        ...(senderId === req.user.id && m.status === 'held' ? { flags } : {}),
+        ...(senderId !== req.user.id && flags?.includes('crisis') ? { crisis: true } : {}),
+      })),
     });
   }));
 

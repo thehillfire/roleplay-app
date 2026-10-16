@@ -62,11 +62,17 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
   const typingTimer = useRef(null);
   const lastTypingSent = useRef(0);
 
+  const crisisChecked = useRef(false);
   const load = useCallback(() => {
     setError('');
     api.conversation(id).then((d) => {
       setConvo(d.conversation);
       setMessages(d.messages);
+      // Opening a chat whose recent messages from them mention crisis: show listener guidance once.
+      if (!crisisChecked.current) {
+        crisisChecked.current = true;
+        if (d.messages.slice(-10).some((m) => !m.fromMe && m.crisis)) setCrisis((c) => c || 'listener');
+      }
       setPartnerReadAt(d.conversation.partnerReadAt || 0);
       setHasMore(d.messages.length >= PAGE);
       markReadIfVisible(id);

@@ -91,3 +91,20 @@ test('messages for the next listener skip blocked pairs, can be withdrawn, and n
   await wait(50);
   assert.equal(lws.events.filter((e) => e.type === 'match.found').length, 0, 'withdrawn');
 });
+
+test('a listener picking up a message with crisis language gets the crisis signal', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const talker = await signedUp(s.base);
+  const res = await talker('POST', '/api/bottle', { body: "Honestly I can't do this anymore." });
+  assert.equal(res.body.crisis, true, 'the talker is shown resources right away');
+  const listener = await signedUp(s.base);
+  const lws = await listener.socket();
+  t.after(() => lws.close());
+  lws.send({ type: 'match.join', role: 'listen' });
+  const { conversationId } = await lws.next('match.found');
+  const [first] = (await listener('GET', `/api/conversations/${conversationId}`)).body.messages;
+  assert.equal(first.crisis, true);
+  const [own] = (await talker('GET', `/api/conversations/${conversationId}`)).body.messages;
+  assert.ok(!('crisis' in own), 'the sender view stays as it was');
+});
