@@ -59,7 +59,7 @@ e2e/      Playwright test: two strangers sign up, match and chat
 - `POST /api/conversations/:id/connect { name, contact? }` (request or accept), `…/connect/decline`, `…/connect/cancel`
 - `GET /api/account/export`, `POST /api/account/delete { password }`, `GET/POST /api/appeal { message }` (paused accounts)
 - `POST /api/billing/checkout` → Stripe Checkout URL. `POST /api/billing/webhook` (Stripe, signature-verified, idempotent)
-- WebSocket `/ws`. Send `match.join { role, topic }`, `match.leave`, `typing { conversationId }`. Receive `match.waiting`, `match.found`, `message`, `message.unsent`, `message.reacted`, `typing`, `read`, `conversation.ended`, `connect.updated`, `thanks`, `credits.updated`.
+- WebSocket `/ws`. Send `match.join { role, topic }`, `match.leave`, `typing { conversationId }`. Receive `match.waiting`, `match.found`, `presence`, `message`, `message.unsent`, `message.reacted`, `typing`, `read`, `conversation.ended`, `connect.updated`, `thanks`, `credits.updated`.
 
 ## Deploying
 

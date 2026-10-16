@@ -29,6 +29,10 @@ function createHub() {
       if (set.size === 0) sockets.delete(userId);
       return set.size;
     },
+    broadcast(event) {
+      const data = JSON.stringify(event);
+      for (const set of sockets.values()) for (const ws of set) if (ws.readyState === ws.OPEN) ws.send(data);
+    },
     push(userId, event) {
       const data = JSON.stringify(event);
       for (const ws of sockets.get(userId) || []) if (ws.readyState === ws.OPEN) ws.send(data);
@@ -57,6 +61,7 @@ function attachRealtime({
   server, hub, store, allowedOrigins = [], sameRoleAfterMs, sweepMs = 5000, log = console,
   // New people per day, so nobody can cycle through hundreds of strangers.
   dailyMatchLimit = envInt('DAILY_MATCH_LIMIT', 40),
+  presenceThrottleMs = 2000,
 }) {
   const joining = new Set(); // users with a match.join in flight (several tabs, double taps)
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4096 });
@@ -64,6 +69,7 @@ function attachRealtime({
   const matchmaker = createMatchmaker({
     sameRoleAfterMs,
     onMatch: (a, b) => {
+      presenceChanged(); // defined below; runs later, once matching is live
       (async () => {
         const [ua, ub] = await Promise.all([store.getUser(a.userId), store.getUser(b.userId)]);
         const convo = await store.openConversation(a.userId, b.userId);
@@ -76,6 +82,17 @@ function attachRealtime({
     },
   });
   hub.setWaitingCounter(() => matchmaker.waitingByRole());
+
+  // Tell everyone when the queue changes (at most every 2s), so "someone is waiting for a
+  // listener" shows up right away instead of on the next poll.
+  let presenceTimer = null;
+  const presenceChanged = () => {
+    if (presenceTimer) return;
+    presenceTimer = setTimeout(() => {
+      presenceTimer = null;
+      hub.broadcast({ type: 'presence', ...hub.stats() });
+    }, presenceThrottleMs);
+  };
   const sweep = setInterval(() => matchmaker.sweep(), sweepMs);
   sweep.unref();
 
@@ -126,6 +143,7 @@ function attachRealtime({
       if (ws.readyState !== ws.OPEN) return;
       ws.send(JSON.stringify({ type: 'match.waiting' }));
       matchmaker.join({ userId: user.id, role, topic, ageBand, blocked, known });
+      presenceChanged();
     };
 
     ws.on('message', async (raw) => {
@@ -145,7 +163,7 @@ function attachRealtime({
             joining.delete(user.id);
           }
         } else if (msg.type === 'match.leave') {
-          matchmaker.leave(user.id);
+          if (matchmaker.leave(user.id)) presenceChanged();
           ws.send(JSON.stringify({ type: 'match.left' }));
         } else if (msg.type === 'typing' && typeof msg.conversationId === 'string') {
           const m = await store.getMembership(user.id, msg.conversationId);
@@ -161,7 +179,7 @@ function attachRealtime({
     });
 
     ws.on('close', () => {
-      if (hub.remove(user.id, ws) === 0) matchmaker.leave(user.id);
+      if (hub.remove(user.id, ws) === 0 && matchmaker.leave(user.id)) presenceChanged();
     });
   });
 
@@ -178,6 +196,7 @@ function attachRealtime({
   return {
     matchmaker,
     close() {
+      clearTimeout(presenceTimer);
       clearInterval(sweep);
       clearInterval(heartbeat);
       for (const ws of wss.clients) ws.terminate();

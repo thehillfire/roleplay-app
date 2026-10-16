@@ -279,3 +279,19 @@ test('the receiver can react to a message with a gentle emoji', async (t) => {
   await bob('POST', url, { reaction: null });
   assert.equal((await alice('GET', `/api/conversations/${id}`)).body.messages[0].reaction, null);
 });
+
+test('queue changes broadcast presence to everyone online', async (t) => {
+  const s = await start({ realtime: { presenceThrottleMs: 20 } });
+  t.after(s.stop);
+  const alice = await signedUp(s.base);
+  const bob = await signedUp(s.base);
+  const aws = await alice.socket();
+  const bws = await bob.socket();
+  t.after(() => Promise.all([aws.close(), bws.close()]));
+  aws.send({ type: 'match.join', role: 'talk' });
+  const p = await bws.next('presence');
+  assert.equal(p.waitingToTalk, 1);
+  aws.send({ type: 'match.leave' });
+  const after = await bws.next('presence');
+  assert.equal(after.waitingToTalk, 0);
+});
