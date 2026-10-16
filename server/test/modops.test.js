@@ -287,3 +287,17 @@ test('an under-18 refusal followed by an older birthdate on the same browser wai
   // A different browser is unaffected.
   assert.equal((await signedUp(s.base)).user.status, 'active');
 });
+
+test('a moderator restoring an account clears an under-18 refusal flag on its browser', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const mod = await moderator(s, 'mod-typo@example.com');
+  const browser = client(s.base);
+  await browser('POST', '/api/auth/signup', adult({ birthdate: `${new Date().getUTCFullYear() - 15}-03-03` })); // a typo
+  const adultAccount = await browser('POST', '/api/auth/signup', adult({ birthdate: '1990-03-03' }));
+  assert.equal(adultAccount.body.user.status, 'review');
+  await mod('POST', `/api/admin/users/${adultAccount.body.user.id}/status`, { status: 'active' });
+  await browser('POST', '/api/auth/logout', {});
+  const next = await browser('POST', '/api/auth/signup', adult({ birthdate: '1985-05-05' }));
+  assert.equal(next.body.user.status, 'active', 'the next adult on that browser is not paused');
+});

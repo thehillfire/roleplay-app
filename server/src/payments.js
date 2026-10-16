@@ -69,6 +69,17 @@ function createPayments({
     if (!res.ok) throw Object.assign(new Error(`Stripe refund failed (${res.status})`), { status: 502 });
   }
 
+  // The payment behind an invoice (2025+ invoices no longer carry payment_intent).
+  async function invoicePaymentIntent(invoiceId) {
+    const res = await fetchImpl(`https://api.stripe.com/v1/invoice_payments?invoice=${encodeURIComponent(invoiceId)}`, {
+      headers: { Authorization: `Bearer ${secretKey}` },
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw Object.assign(new Error(`Stripe invoice payments failed (${res.status})`), { status: 502 });
+    return data.data?.[0]?.payment?.payment_intent || null;
+  }
+
   // Stripe-hosted page to update the card or cancel.
   function createPortal({ customerId, returnUrl }) {
     return stripe('billing_portal/sessions', new URLSearchParams({ customer: customerId, return_url: returnUrl }));
@@ -123,7 +134,7 @@ function createPayments({
     return `t=${t},v1=${v1}`;
   }
 
-  return { enabled, priceCents, plusPriceCents, currency, createCheckout, createSubscriptionCheckout, createPortal, cancelSubscription, refundPayment, verifyWebhook, sign };
+  return { enabled, priceCents, plusPriceCents, currency, createCheckout, createSubscriptionCheckout, createPortal, cancelSubscription, refundPayment, invoicePaymentIntent, verifyWebhook, sign };
 }
 
 module.exports = { createPayments };

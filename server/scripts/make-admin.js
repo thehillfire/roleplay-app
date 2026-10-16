@@ -13,11 +13,11 @@ const { createStore } = require('../src/store');
   const db = await createDb();
   const store = createStore(db);
   const user = await store.findUserByEmail(email);
-  // Only an account whose owner proved the inbox: anyone can sign up with someone else's address.
+  // Whoever runs this has shell access to the server, so they vouch for the account. Make sure
+  // it's really the person you mean: anyone can sign up with someone else's address.
   if (user && !user.emailVerified) {
-    await db.close();
-    console.error(`${email} hasn't confirmed their email yet. Ask them to use "Forgot password?" once, then run this again.`);
-    process.exit(1);
+    console.warn(`Note: ${email} hasn't confirmed their email. Marking it confirmed because you're promoting it by hand.`);
+    await store.markEmailVerified(user.id);
   }
   const ok = Boolean(user) && (await store.setUserRole(email, 'admin'));
   await db.close();

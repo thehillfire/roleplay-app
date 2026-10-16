@@ -6,10 +6,15 @@ module.exports = function register(app, { store, hub, payments }) {
   // A paid Plus invoice (first month or renewal): extend Plus to the end of the period and
   // grant the month's connect credits once (keyed by invoice id, so retries are harmless).
   // Reads both pre- and post-2025 Stripe invoice shapes.
-  async function stopDuplicate(subscriptionId, paymentIntentId, amount) {
+  async function stopDuplicate(subscriptionId, inv) {
     await payments.cancelSubscription(subscriptionId).catch((err) => console.error('duplicate subscription cancel failed', subscriptionId, err.message));
-    if (paymentIntentId && amount) {
-      await payments.refundPayment(paymentIntentId).catch((err) => console.error('duplicate subscription refund failed; refund by hand in Stripe', paymentIntentId, err.message));
+    if (!inv?.amount_paid) return;
+    try {
+      const paymentIntentId = inv.payment_intent || inv.payments?.data?.[0]?.payment?.payment_intent || (await payments.invoicePaymentIntent(inv.id));
+      if (!paymentIntentId) throw new Error('no payment found for the invoice');
+      await payments.refundPayment(paymentIntentId);
+    } catch (err) {
+      console.error(`duplicate subscription ${subscriptionId}: refund invoice ${inv.id} by hand in Stripe (${err.message})`);
     }
   }
 
@@ -27,7 +32,7 @@ module.exports = function register(app, { store, hub, payments }) {
         user = owner;
       } else if (owner?.plusSubscriptionId && owner.plusSubscriptionId !== subscriptionId) {
         // A second subscription (two checkouts paid at once): stop it and give the money back.
-        await stopDuplicate(subscriptionId, inv.payment_intent || inv.payments?.data?.[0]?.payment?.payment_intent, inv.amount_paid);
+        await stopDuplicate(subscriptionId, inv);
         return;
       }
     }

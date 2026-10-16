@@ -11,7 +11,7 @@ Kindred is one Node process: API, WebSocket and the built web app on one port. I
 1. Push this repo to GitHub.
 2. In Render, choose **New → Blueprint** and select the repo. `render.yaml` creates the web service and a Postgres database and wires `DATABASE_URL` for you.
 3. When prompted, fill in:
-   - `ADMIN_EMAILS`: your email, so you can moderate. You become a moderator after confirming that email from the link Kindred sends, so set up email (below) first.
+   - `ADMIN_EMAILS`: your email, so you can moderate. Sign up, then use **Forgot password?** once. Completing that reset makes you a moderator, so set up email (below) first. Without email, run `npm run make-admin -- you@example.com` from the server's shell instead.
    - `PUBLIC_URL`: your site's address, e.g. `https://kindred.example.com`. It's required in production. Emailed links and Stripe redirects never trust the request's Host header.
    - `VAPID_*`: run `npm run vapid` locally and paste the three lines (optional, enables notifications).
    - `STRIPE_*`: see "Payments" below (optional; connecting is free without it).
@@ -42,7 +42,7 @@ Use the connection string with SSL:
 
 ## Email (password reset)
 
-Create a [Resend](https://resend.com) account, verify your sending domain, and set `RESEND_API_KEY`, `MAIL_FROM` (for example `Kindred <no-reply@yourdomain.com>`) and `PUBLIC_URL` (your site's address, used in the emailed link). Without these, reset links are only printed to the server log, which is fine for testing but useless for real users.
+Create a [Resend](https://resend.com) account, verify your sending domain, and set `RESEND_API_KEY`, `MAIL_FROM` (for example `Kindred <no-reply@yourdomain.com>`) and `PUBLIC_URL` (your site's address, used in the emailed link). Without these, emails are printed to the server log in development. In production they are dropped with a warning, since they contain sign-in links.
 
 ## Bot protection (recommended)
 

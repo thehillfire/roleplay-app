@@ -24,6 +24,11 @@ function createPush({
     if (!enabled) return;
     const subs = await store.pushSubscriptions(userId);
     await Promise.all(subs.map(async (sub) => {
+      // Saved before the allowlist existed: drop it rather than POST to it.
+      if (!endpointAllowed(sub.endpoint)) {
+        await store.deletePushSubscription(sub.endpoint);
+        return;
+      }
       try {
         await send(sub, JSON.stringify(payload));
       } catch (err) {

@@ -401,6 +401,12 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         );
       } else if (rowCount > 0 && status === 'active') {
         await db.query('DELETE FROM banned_devices WHERE user_id = $1', [userId]);
+        // A moderator vouched for this person: an under-18 refusal on their browser was a typo
+        // or someone else, so it shouldn't pause the next adult there either.
+        await db.query(
+          'DELETE FROM banned_devices WHERE user_id = $1 AND device_hash IN (SELECT device_hash FROM user_devices WHERE user_id = $2)',
+          [UNDERAGE_SIGNUP, userId],
+        );
       }
       return rowCount > 0;
     },

@@ -8,6 +8,7 @@ function setup() {
   const fetchImpl = async (url, init) => {
     calls.push({ url, method: init.method, form: new URLSearchParams(init.body || '') });
     if (calls.failNext) { calls.failNext = false; return { ok: false, status: 500, json: async () => ({}) }; }
+    if (url.includes('/invoice_payments')) return { ok: true, status: 200, json: async () => ({ data: [{ payment: { payment_intent: 'pi_looked_up' } }] }) };
     return { ok: true, status: 200, json: async () => ({ url: url.includes('portal') ? 'https://billing.stripe.com/p/session' : 'https://checkout.stripe.com/c/pay/cs_sub' }) };
   };
   return { calls, payments: createPayments({ secretKey: 'sk_test_x', webhookSecret: 'whsec_x', fetchImpl }) };
@@ -176,4 +177,14 @@ test('Plus: a second subscription paid at the same time is cancelled and refunde
   const me = (await api('GET', '/api/auth/me')).body.user;
   assert.equal(me.connectCredits, 3, 'no extra credits for the duplicate');
   assert.equal((await s.store.getUser(id)).plusSubscriptionId, 'sub_first', 'the first stays linked');
+});
+
+test('Plus: a duplicate on the 2025+ invoice shape (no payment_intent) is still refunded', async (t) => {
+  const { calls, payments } = setup();
+  const s = await start({ payments });
+  t.after(s.stop);
+  const { id } = await plusMember(s, payments, { subscription: 'sub_keep' });
+  await hook(s, payments, { type: 'invoice.paid', data: { object: { id: 'in_new_shape', amount_paid: 499, parent: { subscription_details: { subscription: 'sub_dup2', metadata: { user_id: id } } }, billing_reason: 'subscription_create', lines: { data: [{ period: { end: periodEnd() } }] } } } });
+  assert.ok(calls.some((c) => c.url === 'https://api.stripe.com/v1/invoice_payments?invoice=in_new_shape'));
+  assert.equal(calls.find((c) => c.url === 'https://api.stripe.com/v1/refunds').form.get('payment_intent'), 'pi_looked_up');
 });

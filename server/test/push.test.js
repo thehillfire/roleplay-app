@@ -105,3 +105,27 @@ test('push subscriptions must point at a real push service', async (t) => {
     assert.equal((await a('POST', '/api/push/subscribe', { subscription: { endpoint, keys } })).status, 201, endpoint);
   }
 });
+
+test('a push subscription saved before the allowlist is dropped instead of used', async (t) => {
+  const sent = [];
+  const push = createPush({ publicKey: 'pub', privateKey: 'priv', sendImpl: async (subscription) => { sent.push(subscription.endpoint); } });
+  const s = await start({ push });
+  t.after(s.stop);
+  const alice = await signedUp(s.base);
+  const bob = await signedUp(s.base);
+  const bobId = (await s.db.query('SELECT id FROM users WHERE handle = $1', [bob.user.handle])).rows[0].id;
+  await s.store.savePushSubscription(bobId, { endpoint: 'https://169.254.169.254/old', keys: { p256dh: 'k', auth: 'a' } });
+  const aws = await alice.socket();
+  const bws = await bob.socket();
+  aws.send({ type: 'match.join', role: 'talk' });
+  await aws.next('match.waiting');
+  bws.send({ type: 'match.join', role: 'listen' });
+  const { conversationId } = await aws.next('match.found');
+  await bws.close();
+  await new Promise((r) => setTimeout(r, 30));
+  await alice('POST', `/api/conversations/${conversationId}/messages`, { body: 'hello?' });
+  await new Promise((r) => setTimeout(r, 30));
+  assert.deepEqual(sent, []);
+  assert.deepEqual(await s.store.pushSubscriptions(bobId), []);
+  await aws.close();
+});
