@@ -86,6 +86,9 @@ function attachRealtime({
     onMatch: (a, b) => {
       presenceChanged(); // defined below; runs later, once matching is live
       (async () => {
+        // Matched live: any message either left for the next listener is no longer needed.
+        const withdrawn = await Promise.all([store.withdrawBottle(a.userId), store.withdrawBottle(b.userId)]);
+        if (withdrawn.some(Boolean)) refreshBottles();
         const [ua, ub] = await Promise.all([store.getUser(a.userId), store.getUser(b.userId)]);
         const convo = await store.openConversation(a.userId, b.userId);
         hub.push(a.userId, { type: 'match.found', conversationId: convo.id, partner: { handle: ub.handle }, isNew: convo.isNew });
@@ -122,18 +125,32 @@ function attachRealtime({
   bottleTimer.unref();
 
   // A listener nobody is waiting for live picks up the oldest message left for the next listener.
+  const underDailyCap = async (userId) => {
+    const [today, u] = await Promise.all([store.conversationsStartedSince(userId, Date.now() - DAY_MS), store.getUser(userId)]);
+    return today < (u?.plusUntil > Date.now() ? dailyMatchLimit * 3 : dailyMatchLimit);
+  };
   const answerBottle = async (listener, blocked) => {
     const candidates = await store.openBottleCandidates(listener.id, Date.now() - BOTTLE_TTL_MS);
     for (const b of candidates) {
       if (blocked.has(b.userId)) continue;
+      if (matchmaker.isQueued(b.userId)) continue; // they're searching live right now; live matching handles them
+      if (!(await underDailyCap(b.userId))) continue; // the daily new-people cap applies to messages too
       if (!(await store.claimBottle(b.id, listener.id))) continue; // another listener got it
       if (!matchmaker.leave(listener.id)) { // matched live meanwhile (or left): put it back
         await store.releaseBottle(b.id);
         return;
       }
-      const convo = await store.openConversation(b.userId, listener.id);
-      await store.addMessage({ conversationId: convo.id, senderId: b.userId, body: b.body, flags: b.crisis ? ['crisis'] : undefined });
-      await store.setBottleConversation(b.id, convo.id);
+      let convo;
+      try {
+        convo = await store.openConversation(b.userId, listener.id);
+        await store.addMessage({ conversationId: convo.id, senderId: b.userId, body: b.body, flags: b.crisis ? ['crisis'] : undefined });
+        await store.setBottleConversation(b.id, convo.id);
+      } catch (err) {
+        log.error('answering a waiting message failed', err);
+        await store.releaseBottle(b.id).catch(() => {});
+        hub.push(listener.id, { type: 'match.error', error: 'Matching hiccuped. Try again.' });
+        return;
+      }
       hub.push(listener.id, { type: 'match.found', conversationId: convo.id, partner: { handle: b.handle }, isNew: convo.isNew, fromMessage: true });
       hub.push(b.userId, { type: 'bottle.answered', conversationId: convo.id, partner: { handle: listener.handle } });
       if (!hub.isOnline(b.userId) && push?.enabled) {

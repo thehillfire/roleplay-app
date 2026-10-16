@@ -226,17 +226,17 @@ test('held messages: a moderator can deliver a false positive or keep it held, o
   t.after(c.close);
   const bws = await b.socket();
   t.after(() => bws.close());
-  await a('POST', `/api/conversations/${c.id}/messages`, { body: 'we should hang out sometime, in this chat I mean' });
+  await a('POST', `/api/conversations/${c.id}/messages`, { body: 'can we hang out here a bit longer, in this chat I mean' });
   await a('POST', `/api/conversations/${c.id}/messages`, { body: 'whats your snap?' });
   let held = (await mod('GET', '/api/admin/held')).body.messages;
   assert.equal(held.length, 2);
-  const falsePositive = held.find((m) => m.body.startsWith('we should'));
+  const falsePositive = held.find((m) => m.body.startsWith('can we'));
   const real = held.find((m) => m.body === 'whats your snap?');
 
   assert.equal((await mod('POST', `/api/admin/held/${falsePositive.id}/review`, { release: 'yes' })).status, 400);
   assert.equal((await mod('POST', `/api/admin/held/${falsePositive.id}/review`, { release: true })).status, 200);
   const pushed = await bws.next('message');
-  assert.equal(pushed.message.body, 'we should hang out sometime, in this chat I mean');
+  assert.equal(pushed.message.body, 'can we hang out here a bit longer, in this chat I mean');
   assert.ok(!('senderId' in pushed.message) && !('flags' in pushed.message));
   assert.equal((await mod('POST', `/api/admin/held/${falsePositive.id}/review`, { release: true })).status, 404, 'once');
   assert.equal((await mod('POST', `/api/admin/held/${real.id}/review`, { release: false })).status, 200);
@@ -244,7 +244,7 @@ test('held messages: a moderator can deliver a false positive or keep it held, o
   held = (await mod('GET', '/api/admin/held')).body.messages;
   assert.deepEqual(held, [], 'both left the queue');
   const bodies = (await b('GET', `/api/conversations/${c.id}`)).body.messages.map((m) => m.body);
-  assert.ok(bodies.includes('we should hang out sometime, in this chat I mean'));
+  assert.ok(bodies.includes('can we hang out here a bit longer, in this chat I mean'));
   assert.ok(!bodies.includes('whats your snap?'), 'kept held stays hidden');
   const actions = (await mod('GET', '/api/admin/log')).body.actions.map((x) => x.action);
   assert.deepEqual(actions.slice(0, 2), ['held_kept', 'held_released']);

@@ -2,7 +2,7 @@
 const { badRequest } = require('../validate');
 const { httpError, asyncRoute } = require('./common');
 
-module.exports = function register(app, { store, hub, mailer, member }) {
+module.exports = function register(app, { store, hub, mailer, push, member }) {
   // --- Moderation (admins) ---
 
   const admin = (req, res, next) => member(req, res, () => {
@@ -88,8 +88,16 @@ module.exports = function register(app, { store, hub, mailer, member }) {
     const message = await store.reviewHeldMessage(pending.id, req.body.release);
     if (!message) throw httpError(404, 'That message was already reviewed.');
     if (req.body.release) {
-      const { senderId, flags, ...out } = message; // eslint-disable-line no-unused-vars
-      hub.push(membership.partnerId, { type: 'message', message: { ...out, fromMe: false } });
+      const { senderId, flags, ...out } = message;
+      const crisis = flags.includes('crisis');
+      hub.push(membership.partnerId, { type: 'message', message: { ...out, fromMe: false, ...(crisis ? { crisis: true } : {}) } });
+      // Same as a normal send: notify them if they're away, unless they muted this chat.
+      const ctx = await store.sendContext(senderId, message.conversationId);
+      if (!hub.isOnline(membership.partnerId) && ctx && !ctx.partnerMuted && push?.enabled) {
+        const sender = await store.getUser(senderId);
+        push.notify(store, membership.partnerId, { title: 'Kindred', body: `New message from ${sender.handle}`, conversationId: message.conversationId, tag: message.conversationId })
+          .catch((err) => console.warn('push notify failed', err.message));
+      }
       hub.push(senderId, { type: 'message.released', conversationId: message.conversationId, messageId: message.id });
     }
     await store.logModAction({ moderatorId: req.user.id, targetId: pending.senderId, action: req.body.release ? 'held_released' : 'held_kept', detail: pending.flags.join(', ') });

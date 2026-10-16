@@ -108,3 +108,50 @@ test('a listener picking up a message with crisis language gets the crisis signa
   const [own] = (await talker('GET', `/api/conversations/${conversationId}`)).body.messages;
   assert.ok(!('crisis' in own), 'the sender view stays as it was');
 });
+
+test('a talker with a waiting message who matches live is not given a second listener', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const talker = await signedUp(s.base);
+  await talker('POST', '/api/bottle', { body: 'Anyone around? Just need to vent for a bit.' });
+  const tws = await talker.socket();
+  t.after(() => tws.close());
+  tws.send({ type: 'match.join', role: 'talk' });
+  await tws.next('match.waiting');
+  // While they search live, a listener is matched live (not via the message).
+  const first = await signedUp(s.base);
+  const fws = await first.socket();
+  t.after(() => fws.close());
+  fws.send({ type: 'match.join', role: 'listen' });
+  await fws.next('match.found');
+  await wait(50);
+  assert.equal((await talker('GET', '/api/bottle')).body.bottle, null, 'withdrawn by the live match');
+  const second = await signedUp(s.base);
+  const sws = await second.socket();
+  t.after(() => sws.close());
+  sws.send({ type: 'match.join', role: 'listen' });
+  await sws.next('match.waiting');
+  await wait(50);
+  assert.equal(sws.events.filter((e) => e.type === 'match.found').length, 0);
+});
+
+test('waiting messages respect the daily new-people cap', async (t) => {
+  const s = await start({ realtime: { dailyMatchLimit: 1 } });
+  t.after(s.stop);
+  const talker = await signedUp(s.base);
+  await talker('POST', '/api/bottle', { body: 'First one. Long day.' });
+  const l1 = await signedUp(s.base);
+  const w1 = await l1.socket();
+  t.after(() => w1.close());
+  w1.send({ type: 'match.join', role: 'listen' });
+  await w1.next('match.found');
+  // Already met one new person today with a limit of 1: the next message waits, unanswered.
+  await talker('POST', '/api/bottle', { body: 'Second one. Still a long day.' });
+  const l2 = await signedUp(s.base);
+  const w2 = await l2.socket();
+  t.after(() => w2.close());
+  w2.send({ type: 'match.join', role: 'listen' });
+  await w2.next('match.waiting');
+  await wait(50);
+  assert.equal(w2.events.filter((e) => e.type === 'match.found').length, 0);
+});

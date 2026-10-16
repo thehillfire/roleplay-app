@@ -3,7 +3,10 @@
 // the talker is notified.
 const { str, badRequest } = require('../validate');
 const { screenMessage } = require('../moderation');
-const { asyncRoute, BOTTLE_TTL_MS } = require('./common');
+const { httpError, asyncRoute, BOTTLE_TTL_MS, DAY_MS } = require('./common');
+const { envInt } = require('../env');
+
+const DAILY_MATCH_LIMIT = envInt('DAILY_MATCH_LIMIT', 40);
 
 module.exports = function register(app, { store, hub, classifier, messageLimiter, member }) {
   app.get('/api/bottle', member, asyncRoute(async (req, res) => {
@@ -12,6 +15,10 @@ module.exports = function register(app, { store, hub, classifier, messageLimiter
 
   app.post('/api/bottle', member, messageLimiter, asyncRoute(async (req, res) => {
     const body = str(req.body.body, 'message', 500);
+    const limit = req.user.plusUntil > Date.now() ? DAILY_MATCH_LIMIT * 3 : DAILY_MATCH_LIMIT;
+    if ((await store.conversationsStartedSince(req.user.id, Date.now() - DAY_MS)) >= limit) {
+      throw httpError(429, "You've met a lot of new people today. You can keep talking with anyone in your list, and this opens again tomorrow.");
+    }
     // No review queue for these, so anything a chat message would be held for is refused.
     const screen = screenMessage(body);
     let ok = screen.deliver;
@@ -22,7 +29,7 @@ module.exports = function register(app, { store, hub, classifier, messageLimiter
     res.status(201).json({ ok: true, crisis: screen.crisis });
   }));
 
-  app.post('/api/bottle/withdraw', member, asyncRoute(async (req, res) => {
+  app.post('/api/bottle/withdraw', member, messageLimiter, asyncRoute(async (req, res) => {
     await store.withdrawBottle(req.user.id);
     hub.bottlesChanged();
     res.json({ ok: true });

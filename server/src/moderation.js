@@ -78,12 +78,19 @@ const LOCATION_PATTERNS = [
 ];
 
 // Strangers arranging to meet, or asking for photos (no photos in Kindred: it means elsewhere).
+// Only proposals aimed at the person you're talking to, not stories ("my sister keeps saying we
+// should hang out", "my ex wants to meet up tonight", "he kept telling me to send pics").
+const NOT_REPORTED = String.raw`(?<!\b(said|says|saying|told\s+me|tells\s+me|telling\s+me|asked\s+me|keeps|kept|wants|wanted)\s+(to\s+)?)`;
 const MEETUP_PATTERNS = [
-  /\b(wanna|want\s+to)\s+(meet|hang\s*out|link)\s+(up|you|u|irl|in\s+person|sometime)\b/,
-  /\b(let'?s|lets|we\s+should|can\s+we|could\s+we|should\s+we)\s+(meet|hang\s*out|link\s*up)\b/,
-  /\bmeet\s+(me|up)\s+(at|in|irl|tonight|tomorrow|later|sometime|somewhere)\b/,
-  /\bmeet\s+(irl|in\s+person)\b/,
-  /\bsend\s+(me\s+)?(a\s+)?(selfie|pic|photo|picture)s?\b(?!\s+of\s+(your|ur)\s+(dog|cat|pet|garden|food|view))/,
+  /\b(wanna|want\s+to)\s+(meet|hang\s*out|link)\s+(you|u)\b/,
+  /\b(do|d)\s+(you|u)\s+(wanna|want\s+to)\s+(meet|hang\s*out|link)(\s+up)?\b/,
+  /\b(u|you)\s+(wanna|want\s+to)\s+(meet|hang\s*out|link)\s*(up)?\s*\?/,
+  /^\s*(wanna|want\s+to)\s+(meet|hang\s*out|link)(\s+up)?\b/,
+  new RegExp(`${NOT_REPORTED}\\b(let'?s|lets|can\\s+we|could\\s+we|should\\s+we)\\s+(meet|hang\\s*out|link\\s*up)\\b`),
+  /\bmeet\s+me\s+(at|in|irl|tonight|tomorrow|later|sometime|somewhere)\b/,
+  /\bmeet\s+(you|u)\s+(irl|in\s+person)\b/,
+  /\b(we|us)\s+(should\s+)?meet\s+(irl|in\s+person)\b/,
+  new RegExp(`${NOT_REPORTED}\\b(send|text)\\s+me\\s+(a\\s+)?(selfie|pic|photo|picture)s?\\b(?!\\s+of\\s+(your|ur)\\s+(dog|cat|pet|garden|food|view))`),
   /\b(quieres|quieren)\s+(vernos|que\s+nos\s+veamos|salir\s+conmigo)\b/,
   /\bnos\s+vemos\s+en\s+persona\b/,
   /\b(mandame|enviame|pasame)\s+(una\s+)?(foto|selfie)\b/,
@@ -115,7 +122,7 @@ const withAgeDigits = (t) => t.replace(/\b(ten|eleven|twelve|thirteen|fourteen|f
 // Unambiguous: pauses the account.
 const MINOR_PATTERNS = [
   /\b(i'?m|im|i\s+am)\s+(only\s+|just\s+)?a\s+(1[0-7]|[1-9])[\s-]*(years?|yrs?)[\s-]*old\b/, // "I'm a 15 year old girl"
-  /\b(i\s+)?just\s+turned\s+(1[0-7]|[1-9])\b(?!\s*(minutes|hours|days|weeks|months|percent|%))/,
+  /\b(i'?m|im|i\s+am|i)\s+(just\s+)?turned\s+(1[0-7]|[1-9])\b(?!\s*(years?|yrs?|minutes|hours|days|weeks|months|percent|%))/,
   /\b(i'?m|im|i\s+am)\s+(only\s+|just\s+)?(1[0-7]|[1-9])\s*(years?\s*old|yrs?\s*old|y\/?o)\b/,
   /\b(i'?m|im|i\s+am)\s+(a\s+)?(minor|underage)\b/,
   /\b(i'?m|im|i\s+am)\s+in\s+(middle\s+school|high\s+school|junior\s+high|(6|7|8|9|10|11|12)(th)?\s+grade)\b/,
@@ -133,12 +140,12 @@ const BARE_AGE = /\b(i'?m|im|i\s+am)\s+(only\s+|just\s+)?(1[3-7])(?=\s*([.!?,;)]
 // Self-labels people use in chat: "16f", "15 m here", "16 yo", "17 years old here", "age: 15",
 // "turning 18 next month", "my 16th birthday is next week". Held for a moderator, no pause.
 const SELF_ID_MAYBE = [
-  /^\s*(hi|hey|hello|yo|hola)?[\s,!]*(1[3-7])\s*(f|m|male|female|girl|boy|guy|nb|yo|y\/o|yrs?|years?\s+old)\b/,
-  /\b(age|edad|asl)\s*[:=-]?\s*(1[3-7])\b/,
+  /^\s*(hi|hey|hello|yo|hola)?[\s,!]*(1[3-7])\s*(f|m|male|female|girl|boy|guy|nb|yo|y\/o|(yrs?|years?)\s+old)\b/,
+  /\b(age|edad|asl)\s*[:=]\s*(1[3-7])\b/, // "age: 15", not "since age 13"
   /\b(1[3-7])\s*(years?\s+old|yrs?\s+old|yo|y\/o)\s+here\b/,
   /\b(me|yo)\s*[:=-]\s*(1[3-7])\b/,
   /(^\s*|\b(i'?m|im|i\s+am|i'?ll\s+be|i\s+will\s+be)\s+)turn(ing)?\s+(16|17|18)\s+(next|in|this|soon|tomorrow)\b/,
-  /\b(i'?m|im|i\s+am)\s+(1[3-7])\s*(yrs?|years?)\b(?!\s+(of|into|in|at|on|with|clean|sober|married|together|later))/,
+  /\b(i'?m|im|i\s+am)\s+(1[3-7])\s*(yrs?|years?)\b(?!\s+(of|into|in|at|on|with|out|since|ago|from|clean|sober|married|together|later))/,
   /\bmy\s+(1[3-8])(th)?\s+(birthday|bday)\s+(is\s+)?(next|this|tomorrow|today|coming|soon)\b/,
 ];
 // Spanish "tengo 15 (años)" the same way; "tengo 15 años trabajando aquí" (years of work) doesn't match.
@@ -207,17 +214,21 @@ const CRISIS_PATTERNS = [
 // on purpose: the optional ML classifier and reports cover the rest.
 const HATE_PATTERNS = [
   /\bn+[i1!]+g+(a+|e+r+|u+h+|a+z+|e+r+z+|a+s+|e+r+s+)\b/,
-  /\bf+a+g+(s|g+o+t+s?)?\b/,
-  /\b(kike|kikes|chink|chinks|spic|spics|wetback|wetbacks|beaner|beaners|tranny|trannies|raghead|towelhead|gook|gooks)\b/,
+  /\bf+a+g+g+o+t+s?\b/,
+  /\b(you|u|ur|stupid|dumb|fucking|fuckin|little|such\s+a)\s+f+a+g+s?\b/, // bare "fag" is also British for a cigarette
+  /\bchinks?\b(?!\s+in\s+(my|the|his|her|their|your|our)\s+armou?r)/,
+  /\b(kike|kikes|spic|spics|wetback|wetbacks|beaner|beaners|tranny|trannies|raghead|towelhead|gook|gooks)\b/,
   /\b(maricon|maricones|joto|jotos|sudaca|sudacas)\b/,
 ];
 
 // Telling someone to kill themselves is abuse, not a crisis.
+// Not when someone is telling you it happened to them ("kids at school told me kys").
+const QUOTED = String.raw`(?<!\b(told\s+me|tell\s+me|tells\s+me|telling\s+me|said|says|saying|called\s+me|me\s+that)\s+(to\s+)?)`;
 const ABUSE_PATTERNS = [
-  /\bkys\b/,
-  /\b(go|just|you\s+should|u\s+should)\s+(kill|unalive)\s+(your\s*self|yourself|urself|ur\s*self)\b/,
-  /\b(matate|suicidate)\b/,
-  /\b(you|u)\s+should\s+(just\s+)?die\b/,
+  new RegExp(`${QUOTED}\\bkys\\b`),
+  new RegExp(`${QUOTED}\\b(go|just|you\\s+should|u\\s+should)\\s+(kill|unalive)\\s+(your\\s*self|yourself|urself|ur\\s*self)\\b`),
+  new RegExp(`${QUOTED}\\b(matate|suicidate)\\b`),
+  new RegExp(`${QUOTED}\\b(you|u)\\s+should\\s+(just\\s+)?die\\b`),
 ];
 
 const any = (patterns, t) => patterns.some((re) => re.test(t));
