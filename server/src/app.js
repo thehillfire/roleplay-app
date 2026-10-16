@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
@@ -703,8 +704,11 @@ function createApp({
 
   // In production the built client is served from the same origin.
   if (staticDir) {
+    // Social previews need absolute URLs, so the page gets PUBLIC_URL filled in once at startup.
+    const indexHtml = fs.readFileSync(path.join(staticDir, 'index.html'), 'utf8')
+      .replaceAll('__PUBLIC_URL__', (publicUrl || '').replace(/\/$/, ''));
     app.use(express.static(staticDir, { index: false, maxAge: '1h' }));
-    app.get('/{*splat}', (req, res) => res.sendFile(path.join(staticDir, 'index.html')));
+    app.get('/{*splat}', (req, res) => res.type('html').set('Cache-Control', 'no-cache').send(indexHtml));
   }
 
   app.use((req, res) => res.status(404).json({ error: 'Not found' }));
