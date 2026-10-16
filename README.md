@@ -2,7 +2,7 @@
 
 Anonymous 1:1 texting for adults who need to talk. Tap **Talk to someone**, get matched with a kind stranger, vent or listen. Keep chatting with past matches by their anonymous handle (like `QuietHeron42`). Nobody learns who anyone is unless both people choose to connect.
 
-Roadmap and status: [`docs/ROADMAP.md`](docs/ROADMAP.md).
+**Going live?** Start with [`docs/LAUNCH.md`](docs/LAUNCH.md) (accounts to create, pricing, first users, risks), then [`docs/DEPLOY.md`](docs/DEPLOY.md). Roadmap and status: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Quick start
 
