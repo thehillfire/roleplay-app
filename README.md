@@ -18,6 +18,7 @@ No keys needed (see `.env.example` for optional Postgres and Stripe settings). D
 | `npm run dev` | Server (auto-restart) + Vite dev server, proxying `/api` and `/ws` |
 | `npm run build` | Builds the web app into `dist/` |
 | `npm start` | Serves API, WebSocket and the built app on one port (3000) |
+| `npm run verify` | Everything CI checks, in one go: tests, build, a throwaway server, e2e and accessibility |
 | `npm test` | Server tests on in-memory SQLite |
 | `npm run test:pg` | Same tests on Postgres (`TEST_DATABASE_URL=postgres://…`) |
 | `npm run e2e` | Two-browser smoke test against a running server (`BASE_URL`, `CHROMIUM_PATH`) |

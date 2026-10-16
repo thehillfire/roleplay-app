@@ -14,7 +14,8 @@
     "e2e": "node e2e/smoke.mjs",
     "make-admin": "node --disable-warning=ExperimentalWarning server/scripts/make-admin.js",
     "vapid": "node server/scripts/vapid.js",
-    "a11y": "node e2e/a11y.mjs"
+    "a11y": "node e2e/a11y.mjs",
+    "verify": "bash scripts/verify.sh"
   },
   "dependencies": {
     "dotenv": "^18.0.8",
