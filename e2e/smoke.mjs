@@ -255,7 +255,7 @@ if (process.env.MAIL_LOG) {
   const bobEmail = await bob.evaluate(async () => (await (await fetch('/api/account/export')).json()).account.email);
   await bob.goto(BASE);
   await bob.getByRole('button', { name: 'Account' }).click();
-  await bob.getByRole('button', { name: 'Sign out' }).click();
+  await bob.getByRole('button', { name: 'Sign out', exact: true }).click();
   await bob.getByRole('button', { name: 'I have an account' }).click();
   await bob.getByRole('button', { name: 'Forgot password?' }).click();
   await bob.getByLabel('Email').fill(bobEmail);
