@@ -7,6 +7,7 @@ const { screenMessage } = require('./moderation');
 const { createPayments } = require('./payments');
 const { createPush } = require('./push');
 const { createMailer } = require('./mailer');
+const { envInt } = require('./env');
 const crypto = require('crypto');
 
 const RESET_TTL_MS = 60 * 60 * 1000;
@@ -56,7 +57,7 @@ function connectionView(c, userId) {
 function createApp({
   store,
   hub,
-  authRateLimit = { max: Number(process.env.AUTH_RATE_LIMIT) || 10, windowMs: 60000 },
+  authRateLimit = { max: envInt('AUTH_RATE_LIMIT', 10), windowMs: 60000 },
   messageRateLimit = { max: 30, windowMs: 60000 },
   staticDir,
   log = process.env.NODE_ENV === 'test' || process.env.REQUEST_LOG === 'off' ? null : console,
@@ -104,6 +105,8 @@ function createApp({
       if (session.payment_status === 'paid' && userId && (await store.getUser(userId))) {
         const credits = Math.max(1, Math.min(10, Number(session.metadata?.credits) || 1));
         const granted = await store.recordPayment({ id: session.id, userId, amountCents: session.amount_total || 0, credits });
+        // Money: make sure it's on disk before telling Stripe we have it (Stripe won't retry a 200).
+        await store.flush();
         if (granted) hub.push(userId, { type: 'credits.updated' });
       }
     }
@@ -337,7 +340,7 @@ function createApp({
       store.getConnection(req.conversation.id).then((c) => connectionView(c, req.user.id)),
       store.messageCounts(req.conversation.id, req.user.id),
       store.myFeedback(req.conversation.id, req.user.id),
-      store.partnerReadAt(req.user.id, req.conversation.id),
+      req.conversation.partnerReadAt,
     ]);
     // Ask "did this help?" once a real exchange has happened.
     const canRate = counts.mine >= 2 && counts.theirs >= 2;
@@ -485,7 +488,8 @@ function createApp({
     const since = Date.now() - AUTO_PAUSE.window;
     const [all, minor] = await Promise.all([
       store.distinctReporters(partnerId, since, { minReporterAgeMs: autoPauseMinReporterAgeMs }),
-      store.distinctReporters(partnerId, since, { reason: 'minor', minReporterAgeMs: autoPauseMinReporterAgeMs }),
+      // Child safety outranks brigading: every reporter counts for "under 18" (a pause is reversible).
+      store.distinctReporters(partnerId, since, { reason: 'minor' }),
     ]);
     if (all >= AUTO_PAUSE.reporters || minor >= AUTO_PAUSE.minorReporters) {
       const reported = await store.getUser(partnerId);
@@ -505,7 +509,7 @@ function createApp({
   });
 
   app.get('/api/admin/stats', admin, asyncRoute(async (req, res) => {
-    res.json({ ...(await store.adminStats()), online: hub.stats().online, waiting: hub.stats().waiting });
+    res.json({ ...(await store.adminStats()), ...hub.stats() });
   }));
 
   app.get('/api/admin/reports', admin, asyncRoute(async (req, res) => {
@@ -542,9 +546,7 @@ function createApp({
   app.post('/api/conversations/:id/read', member, conversation, asyncRoute(async (req, res) => {
     const at = await store.markRead(req.user.id, req.conversation.id);
     // Lets the other person show "Seen" under their latest message.
-    if (!(await store.isBlocked(req.user.id, req.conversation.partnerId))) {
-      hub.push(req.conversation.partnerId, { type: 'read', conversationId: req.conversation.id, at });
-    }
+    hub.push(req.conversation.partnerId, { type: 'read', conversationId: req.conversation.id, at });
     res.json({ ok: true });
   }));
 

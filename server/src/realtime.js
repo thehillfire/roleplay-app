@@ -1,6 +1,7 @@
 const { WebSocketServer } = require('ws');
 const { createMatchmaker } = require('./matchmaker');
 const { readCookie, hashToken, COOKIE } = require('./auth');
+const { envInt } = require('./env');
 
 const TOPIC_MAX = 30;
 
@@ -52,8 +53,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 function attachRealtime({
   server, hub, store, allowedOrigins = [], sameRoleAfterMs, sweepMs = 5000, log = console,
   // New people per day, so nobody can cycle through hundreds of strangers.
-  dailyMatchLimit = Number(process.env.DAILY_MATCH_LIMIT) || 40,
+  dailyMatchLimit = envInt('DAILY_MATCH_LIMIT', 40),
 }) {
+  const joining = new Set(); // users with a match.join in flight (several tabs, double taps)
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4096 });
 
   const matchmaker = createMatchmaker({
@@ -103,6 +105,25 @@ function attachRealtime({
     let windowStart = Date.now();
     let count = 0;
 
+    // Joins the match queue unless today's cap is reached or the socket went away meanwhile.
+    const handleJoin = async (msg) => {
+      const role = typeof msg.role === 'string' ? msg.role : 'either';
+      const topic = typeof msg.topic === 'string' ? msg.topic.trim().toLowerCase().slice(0, TOPIC_MAX) : '';
+      const [blocked, known, today] = await Promise.all([
+        store.blockedIds(user.id),
+        store.partnerIds(user.id),
+        store.conversationsStartedSince(user.id, Date.now() - DAY_MS),
+      ]);
+      if (today >= dailyMatchLimit) {
+        ws.send(JSON.stringify({ type: 'match.error', error: "You've met a lot of new people today. You can keep talking with anyone in your list, and matching opens again tomorrow." }));
+        return;
+      }
+      // The socket may have closed while we looked those up; never queue someone who's gone.
+      if (ws.readyState !== ws.OPEN) return;
+      ws.send(JSON.stringify({ type: 'match.waiting' }));
+      matchmaker.join({ userId: user.id, role, topic, blocked, known });
+    };
+
     ws.on('message', async (raw) => {
       const t = Date.now();
       if (t - windowStart > 10000) { windowStart = t; count = 0; }
@@ -112,21 +133,13 @@ function attachRealtime({
       try { msg = JSON.parse(raw); } catch { return; }
       try {
         if (msg.type === 'match.join') {
-          const role = typeof msg.role === 'string' ? msg.role : 'either';
-          const topic = typeof msg.topic === 'string' ? msg.topic.trim().toLowerCase().slice(0, TOPIC_MAX) : '';
-          const [blocked, known, today] = await Promise.all([
-            store.blockedIds(user.id),
-            store.partnerIds(user.id),
-            store.conversationsStartedSince(user.id, Date.now() - DAY_MS),
-          ]);
-          if (today >= dailyMatchLimit) {
-            ws.send(JSON.stringify({ type: 'match.error', error: "You've met a lot of new people today. You can keep talking with anyone in your list, and matching opens again tomorrow." }));
-            return;
+          if (joining.has(user.id)) return;
+          joining.add(user.id);
+          try {
+            await handleJoin(msg);
+          } finally {
+            joining.delete(user.id);
           }
-          // The socket may have closed while we looked those up; never queue someone who's gone.
-          if (ws.readyState !== ws.OPEN) return;
-          ws.send(JSON.stringify({ type: 'match.waiting' }));
-          matchmaker.join({ userId: user.id, role, topic, blocked, known });
         } else if (msg.type === 'match.leave') {
           matchmaker.leave(user.id);
           ws.send(JSON.stringify({ type: 'match.left' }));

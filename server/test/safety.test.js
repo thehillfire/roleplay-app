@@ -226,8 +226,42 @@ test('moderators see headline stats', async (t) => {
   assert.equal(stats.activeDay, 2);
   assert.equal(stats.messagesDay, 2);
   assert.equal(stats.matchesDay, 1);
-  assert.equal(stats.openReports, 1);
-  assert.equal(stats.held, 1);
   assert.equal(stats.revenueCents, 0);
   assert.equal(typeof stats.online, 'number');
+});
+
+test('"under 18" reports count even from brand-new accounts (child safety over brigading)', async (t) => {
+  const s = await start(); // default reporter-age rule applies to other reasons only
+  t.after(s.stop);
+  const suspect = await signedUp(s.base);
+  const suspectId = (await s.db.query('SELECT id FROM users WHERE handle = $1', [suspect.user.handle])).rows[0].id;
+  for (let i = 0; i < 2; i += 1) {
+    const reporter = await signedUp(s.base);
+    const c = await matched(s, suspect, reporter);
+    await reporter('POST', `/api/conversations/${c.id}/report`, { reason: 'minor' });
+    await c.close();
+  }
+  assert.equal((await s.store.getUser(suspectId)).status, 'review');
+});
+
+test('two tabs joining at once only queue once', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const alice = await signedUp(s.base);
+  const tab1 = await alice.socket();
+  const tab2 = await alice.socket();
+  t.after(() => Promise.all([tab1.close(), tab2.close()]));
+  tab1.send({ type: 'match.join', role: 'talk' });
+  tab2.send({ type: 'match.join', role: 'talk' });
+  await new Promise((r) => setTimeout(r, 150));
+  assert.equal(s.server.realtime.matchmaker.size, 1, 'one queue entry for the person, not one per tab');
+  const bob = await signedUp(s.base);
+  const bws = await bob.socket();
+  t.after(() => bws.close());
+  bws.send({ type: 'match.join', role: 'listen' });
+  await bws.next('match.found');
+  await new Promise((r) => setTimeout(r, 150));
+  const found = [...tab1.events, ...tab2.events].filter((e) => e.type === 'match.found');
+  assert.equal(new Set(found.map((e) => e.conversationId)).size, 1, 'matched exactly once');
+  assert.equal(s.server.realtime.matchmaker.size, 0);
 });

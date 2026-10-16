@@ -178,6 +178,11 @@ function createSqlite(file) {
       const info = stmt.run(...params);
       return { rows: [], rowCount: Number(info.changes) };
     },
+    // With synchronous=NORMAL, the latest commits live only in the WAL until a checkpoint; this
+    // pushes them into the database file with a full sync (used after payments).
+    async flush() {
+      db.exec('PRAGMA wal_checkpoint(FULL)');
+    },
     async close() {
       db.close();
     },

@@ -39,7 +39,7 @@ export default function Onboarding({ handle, onDone }) {
   const last = i === CARDS.length - 1;
   return (
     <div className="sheet-backdrop onboarding">
-      <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="onboard-title">
+      <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="onboard-title" onKeyDown={(e) => e.key === 'Escape' && finish()}>
         <p className="hint">{i === 0 ? `Welcome, ${handle}.` : `${i + 1} of ${CARDS.length}`}</p>
         <h2 id="onboard-title">{card.title}</h2>
         <p className="onboard-body">{card.body}</p>

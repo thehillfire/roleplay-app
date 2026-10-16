@@ -192,10 +192,16 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
 
     // Returns { id, partnerId } if the user is in the conversation, else null.
     async getMembership(userId, conversationId) {
-      const { rows } = await db.query('SELECT user_a, user_b FROM conversations WHERE id = $1', [conversationId]);
+      const { rows } = await db.query('SELECT user_a, user_b, read_a, read_b FROM conversations WHERE id = $1', [conversationId]);
       const row = rows[0];
       if (!row || (row.user_a !== userId && row.user_b !== userId)) return null;
-      return { id: conversationId, partnerId: row.user_a === userId ? row.user_b : row.user_a };
+      const iAmA = row.user_a === userId;
+      return { id: conversationId, partnerId: iAmA ? row.user_b : row.user_a, partnerReadAt: num(iAmA ? row.read_b : row.read_a) };
+    },
+
+    // Forces committed data to disk where the database defers it (SQLite WAL); no-op on Postgres.
+    async flush() {
+      if (db.flush) await db.flush();
     },
 
     async partnerIds(userId) {
@@ -306,14 +312,6 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         [userId, conversationId, at],
       );
       return at;
-    },
-
-    // When the other person last read this conversation (for "Seen").
-    async partnerReadAt(userId, conversationId) {
-      const { rows } = await db.query('SELECT user_a, read_a, read_b FROM conversations WHERE id = $1', [conversationId]);
-      const r = rows[0];
-      if (!r) return 0;
-      return num(r.user_a === userId ? r.read_b : r.read_a);
     },
 
     // --- safety ---
@@ -600,20 +598,18 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       const day = t - 24 * 60 * 60 * 1000;
       const week = t - 7 * 24 * 60 * 60 * 1000;
       const one = async (sql, params = []) => Number(Object.values((await db.query(sql, params)).rows[0])[0]) || 0;
-      const [users, signupsDay, signupsWeek, activeDay, messagesDay, matchesDay, openReports, held, connectsAccepted, revenueCents, helpfulWeek] = await Promise.all([
+      const [users, signupsDay, signupsWeek, activeDay, messagesDay, matchesDay, connectsAccepted, revenueCents, helpfulWeek] = await Promise.all([
         one("SELECT COUNT(*) FROM users WHERE status <> 'deleted'"),
-        one('SELECT COUNT(*) FROM users WHERE created_at >= $1', [day]),
-        one('SELECT COUNT(*) FROM users WHERE created_at >= $1', [week]),
+        one("SELECT COUNT(*) FROM users WHERE created_at >= $1 AND status <> 'deleted'", [day]),
+        one("SELECT COUNT(*) FROM users WHERE created_at >= $1 AND status <> 'deleted'", [week]),
         one("SELECT COUNT(DISTINCT sender_id) FROM messages WHERE created_at >= $1 AND status = 'delivered'", [day]),
         one("SELECT COUNT(*) FROM messages WHERE created_at >= $1 AND status = 'delivered'", [day]),
         one('SELECT COUNT(*) FROM conversations WHERE created_at >= $1', [day]),
-        one("SELECT COUNT(*) FROM reports WHERE status = 'open'"),
-        one("SELECT COUNT(*) FROM messages WHERE status = 'held' AND created_at >= $1", [week]),
         one("SELECT COUNT(*) FROM connections WHERE status = 'accepted'"),
         one('SELECT COALESCE(SUM(amount_cents), 0) FROM payments'),
         one('SELECT COUNT(*) FROM feedback WHERE helpful = 1 AND created_at >= $1', [week]),
       ]);
-      return { users, signupsDay, signupsWeek, activeDay, messagesDay, matchesDay, openReports, held, connectsAccepted, revenueCents, helpfulWeek };
+      return { users, signupsDay, signupsWeek, activeDay, messagesDay, matchesDay, connectsAccepted, revenueCents, helpfulWeek };
     },
 
     async listHeldMessages({ limit = 50 } = {}) {

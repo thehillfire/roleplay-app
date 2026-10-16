@@ -15,6 +15,11 @@ const OPENERS = [
 
 // On touch devices Enter makes a new line (people write paragraphs when they vent);
 // on keyboards it sends. Shift+Enter always makes a new line.
+// Only count something as read when the chat is actually on screen.
+const markReadIfVisible = (id) => {
+  if (document.visibilityState === 'visible') api.markRead(id).catch(() => {});
+};
+
 const touchKeyboard = () => window.matchMedia?.('(pointer: coarse)').matches;
 
 function formatTime(ts) {
@@ -49,7 +54,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
       setMessages(d.messages);
       setPartnerReadAt(d.conversation.partnerReadAt || 0);
       setHasMore(d.messages.length >= PAGE);
-      api.markRead(id).catch(() => {});
+      markReadIfVisible(id);
     }, (err) => setError(err.message));
   }, [id]);
 
@@ -62,7 +67,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
       setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
       setPartnerTyping(false);
       if (message.crisis) setCrisis('listener');
-      api.markRead(id).catch(() => {});
+      markReadIfVisible(id);
     });
     const offTyping = socket.on('typing', ({ conversationId }) => {
       if (conversationId !== id) return;
@@ -83,7 +88,14 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     });
     // After a reconnect, refetch in case messages arrived while offline.
     const offOpen = socket.on('open', load);
-    return () => { offMessage(); offTyping(); offEnded(); offRead(); offConnect(); offOpen(); clearTimeout(typingTimer.current); };
+    // Coming back to the tab/app marks what arrived meanwhile as read.
+    const onVisible = () => markReadIfVisible(id);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      offMessage(); offTyping(); offEnded(); offRead(); offConnect(); offOpen();
+      document.removeEventListener('visibilitychange', onVisible);
+      clearTimeout(typingTimer.current);
+    };
   }, [socket, id, load, onCreditsChanged]);
 
   // Follow the newest message (not older pages loaded above).

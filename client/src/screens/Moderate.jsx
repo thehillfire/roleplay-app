@@ -24,11 +24,12 @@ export default function Moderate({ onBack }) {
 
   const load = useCallback(() => {
     setError('');
-    Promise.all([api.admin.reports(), api.admin.held(), api.admin.stats()]).then(([r, h, st]) => {
+    Promise.all([api.admin.reports(), api.admin.held()]).then(([r, h]) => {
       setReports(r);
       setHeld(h);
-      setStats(st);
     }, (err) => setError(err.message));
+    // Stats are nice to have; they must never keep the queues from loading.
+    api.admin.stats().then(setStats, () => setStats(null));
   }, []);
   useEffect(load, [load]);
 

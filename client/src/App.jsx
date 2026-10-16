@@ -120,6 +120,7 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onDeleted, onPaused,
   useEffect(() => {
     const unread = (conversations || []).reduce((n, c) => n + c.unread, 0);
     document.title = unread && view.name === 'home' ? `(${unread}) Kindred` : 'Kindred';
+    return () => { document.title = 'Kindred'; };
   }, [conversations, view.name]);
 
   const find = ({ role, topic }) => {
