@@ -54,7 +54,8 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     res.json({
       conversations: conversations.map(({ partner, ...c }) => ({
         ...c,
-        partner: { handle: partner.handle, online: !c.ended && hub.isOnline(partner.id) },
+        ended: Boolean(c.endedReason),
+        partner: { handle: partner.handle, online: !c.endedReason && hub.isOnline(partner.id) },
       })),
     });
   }));
@@ -65,6 +66,7 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     const endedAt = await store.endedByPartnerRecently(req.user.id, partner.id);
     const blocked = await store.isBlocked(req.user.id, partner.id);
     if (blocked && !endedAt) throw httpError(404, 'Conversation not found.');
+    const endedReason = partner.status === 'deleted' ? 'left' : endedAt ? 'ended' : partner.status !== 'active' ? 'unavailable' : null;
     const before = Number(req.query.before) || undefined;
     const beforeId = typeof req.query.beforeId === 'string' ? req.query.beforeId.slice(0, 64) : undefined;
     const messages = await store.listMessages(req.user.id, req.conversation.id, { before, beforeId });
@@ -79,11 +81,12 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     res.json({
       conversation: {
         id: req.conversation.id,
-        partner: { handle: partner.handle, online: !endedAt && hub.isOnline(partner.id) },
+        partner: { handle: partner.handle, online: !endedReason && hub.isOnline(partner.id) },
         connection,
         partnerReadAt,
         muted: req.conversation.muted,
-        ended: Boolean(endedAt),
+        ended: Boolean(endedReason),
+        endedReason,
         feedback: { canRate, helpful: feedback },
       },
       // Flags are only shown to the sender, to explain why a message was held.
@@ -105,6 +108,7 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     const { id, partnerId } = ctx;
     if (ctx.blocked) throw httpError(403, "You can't message this person.");
     if (ctx.partnerStatus === 'deleted') throw httpError(403, 'This person has left Kindred.');
+    if (ctx.partnerStatus !== 'active') throw httpError(403, "This person isn't available right now.");
 
     const screen = screenMessage(body, { connected: ctx.connected });
     if (isCopyPasteSpam(req.user.id, id, body)) {

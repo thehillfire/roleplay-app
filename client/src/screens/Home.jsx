@@ -138,7 +138,7 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
                       </span>
                       <span className="convo-time">{timeAgo(c.lastMessageAt)}</span>
                     </span>
-                    {c.ended && <span className="convo-preview">Ended by them · open to report</span>}
+                    {c.ended && <span className="convo-preview">{c.endedReason === 'left' ? 'Left Kindred' : c.endedReason === 'unavailable' ? 'Not available right now' : 'Ended by them · open to report'}</span>}
                     {!c.ended && <span className={c.unread ? 'convo-preview unread' : 'convo-preview'}>
                       {c.lastMessage ? `${c.lastMessage.fromMe ? 'You: ' : ''}${c.lastMessage.body}` : 'Say hello'}
                     </span>}

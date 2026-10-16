@@ -116,7 +116,17 @@ function attachRealtime({
     },
   });
   hub.setWaitingCounter(() => matchmaker.waitingByRole());
-  hub.onDisconnect((userId) => { if (matchmaker.leave(userId)) presenceChanged(); });
+  hub.onDisconnect((userId) => {
+    if (matchmaker.leave(userId)) presenceChanged();
+    // Paused, suspended or deleted (not just signed out everywhere): tell their chat partners why
+    // the conversation stopped, instead of leaving them typing to no one.
+    (async () => {
+      const u = await store.getUser(userId);
+      if (!u || u.status === 'active') return;
+      const reason = u.status === 'deleted' ? 'left' : 'unavailable';
+      for (const c of await store.listConversations(userId)) hub.push(c.partner.id, { type: 'conversation.ended', conversationId: c.id, reason });
+    })().catch((err) => log.error('notifying partners failed', err));
+  });
   // match.leave can arrive while a join is still looking things up: count leaves per user so the
   // join notices and doesn't queue someone who already said stop.
   const leaves = new Map(); // userId -> number of leaves seen

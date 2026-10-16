@@ -293,7 +293,8 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
                    ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_body,
                 (SELECT m.sender_id FROM messages m WHERE m.conversation_id = c.id AND (m.status = 'delivered' OR (m.sender_id = $1 AND m.status = 'held'))
                    ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_sender,
-                EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = p.id AND b.blocked_id = $1) AS ended
+                EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = p.id AND b.blocked_id = $1) AS ended,
+                p.status AS partner_status
            FROM conversations c
            JOIN users p ON p.id = CASE WHEN c.user_a = $1 THEN c.user_b ELSE c.user_a END
           WHERE (c.user_a = $1 OR c.user_b = $1)
@@ -313,6 +314,10 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         lastMessageAt: num(r.last_message_at),
         createdAt: num(r.created_at),
         ended: r.ended === true || Number(r.ended) === 1,
+        // Why it can't continue, if it can't: they ended it, left Kindred, or are paused/suspended.
+        endedReason: r.partner_status === 'deleted' ? 'left'
+          : (r.ended === true || Number(r.ended) === 1) ? 'ended'
+            : r.partner_status !== 'active' ? 'unavailable' : null,
       }));
     },
 

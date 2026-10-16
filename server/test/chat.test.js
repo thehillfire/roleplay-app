@@ -358,3 +358,30 @@ test('after a block, reactions, unsends and read receipts no longer reach the ot
   await new Promise((r) => setTimeout(r, 30));
   assert.equal(aws.events.slice(before).filter((e) => ['read', 'message.unsent', 'message.reacted'].includes(e.type)).length, 0);
 });
+
+test('when a partner leaves or is suspended, the other person is told why, live and on reload', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const { alice, bob, aws, bws, am } = await matchPair(s);
+  t.after(() => Promise.all([aws.close(), bws.close()]));
+  const id = am.conversationId;
+  const bobId = (await s.db.query('SELECT id FROM users WHERE handle = $1', [bob.user.handle])).rows[0].id;
+
+  // Bob is suspended: Alice hears it live, the chat reads "unavailable", and sending is refused kindly.
+  await s.store.setUserStatus(bobId, 'suspended');
+  s.hub.disconnect(bobId);
+  assert.deepEqual(await aws.next('conversation.ended'), { type: 'conversation.ended', conversationId: id, reason: 'unavailable', seen: true });
+  const view = (await alice('GET', `/api/conversations/${id}`)).body.conversation;
+  assert.deepEqual([view.ended, view.endedReason, view.partner.online], [true, 'unavailable', false]);
+  assert.equal((await alice('POST', `/api/conversations/${id}/messages`, { body: 'are you there?' })).body.error, "This person isn't available right now.");
+  assert.equal((await alice('GET', '/api/conversations')).body.conversations[0].endedReason, 'unavailable');
+
+  // Restored: the conversation is open again.
+  await s.store.setUserStatus(bobId, 'active');
+  assert.equal((await alice('GET', `/api/conversations/${id}`)).body.conversation.ended, false);
+
+  // Bob deletes his account: "left".
+  await bob('POST', '/api/account/delete', { password: 'quiet-harbor-9' });
+  assert.equal((await alice('GET', `/api/conversations/${id}`)).body.conversation.endedReason, 'left');
+  assert.equal((await alice('GET', '/api/conversations')).body.conversations[0].endedReason, 'left');
+});

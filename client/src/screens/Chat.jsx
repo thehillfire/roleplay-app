@@ -72,7 +72,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     setError('');
     api.conversation(id).then((d) => {
       setConvo(d.conversation);
-      if (d.conversation.ended) setEnded(true);
+      if (d.conversation.ended) setEnded(d.conversation.endedReason || 'ended');
       // Merge rather than replace: a message pushed live while this request was in flight
       // (e.g. their first line, sent the moment you matched) isn't in this response yet.
       // A reconnect reloads the latest page: keep earlier pages already loaded above it.
@@ -114,8 +114,8 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
       clearTimeout(typingTimer.current);
       typingTimer.current = setTimeout(() => setPartnerTyping(false), 4000);
     });
-    const offEnded = socket.on('conversation.ended', ({ conversationId }) => {
-      if (conversationId === id) setEnded(true);
+    const offEnded = socket.on('conversation.ended', ({ conversationId, reason }) => {
+      if (conversationId === id) setEnded(reason || 'ended');
     });
     const offReacted = socket.on('message.reacted', ({ conversationId, messageId, reaction }) => {
       if (conversationId !== id) return;
@@ -188,7 +188,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
       if (res.paused) onPaused();
     } catch (err) {
       if (err.status === 403 && /paused/.test(err.message)) onPaused();
-      else if (err.status === 403) setEnded(true);
+      else if (err.status === 403) setEnded(/left Kindred/.test(err.message) ? 'left' : /available/.test(err.message) ? 'unavailable' : 'ended');
       else setSendError(err.message);
     } finally {
       setSending(false);
@@ -491,8 +491,13 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
 
       {ended ? (
         <div className="composer ended">
-          <p>This conversation has ended.</p>
-          <p className="hint">Did something they said cross a line? You can still report it; a moderator reads every report. If you're hurting, you can call or text <a href="tel:988">988</a> (US) any time.</p>
+          <p>{ended === 'left' ? `${convo.partner.handle} left Kindred.`
+            : ended === 'unavailable' ? `${convo.partner.handle} isn't available right now.`
+              : 'This conversation has ended.'}</p>
+          <p className="hint">
+            {ended === 'ended' ? 'Did something they said cross a line? You can still report it; a moderator reads every report. ' : 'You can find someone new any time. '}
+            If you're hurting, you can call or text <a href="tel:988">988</a> (US).
+          </p>
           <div className="sheet-actions">
             <button className="btn" onClick={() => setReporting(true)}>Report this conversation</button>
             <button className="btn" onClick={onBack}>Back to conversations</button>
