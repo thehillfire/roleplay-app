@@ -137,3 +137,33 @@ test('Spanish: everyday venting is delivered untouched', () => {
     assert.deepEqual(r.flags, [], text);
   }
 });
+
+test('asking for contact details, dodged spellings, location questions and sexual openers are held', () => {
+  const cases = [
+    ["what's your snap?", 'contact'],
+    ['whats ur insta', 'contact'],
+    ['can I get your number', 'contact'],
+    ['give me your number', 'contact'],
+    ['do you have discord?', 'contact'],
+    ['sn@p: heron22', 'contact'],
+    ['i n s t a: heron22', 'contact'],
+    ['hmu on telegram', 'contact'],
+    ['cuál es tu snap', 'contact'],
+    ['pásame tu número', 'contact'],
+    ['where do you live', 'location'],
+    ['what city are you in', 'location'],
+    ['dónde vives?', 'location'],
+    ['u horny?', 'sexual'],
+    ['wanna see my dick', 'sexual'],
+  ];
+  for (const [text, flag] of cases) assert.ok(flagsOf(text).includes(flag), `${text} → ${flag}`);
+  assert.deepEqual(flagsOf("what's your snap?", { connected: true }), [], 'fine once both connected');
+  for (const text of [
+    'what is your number one worry right now',
+    'whats your phone doing',
+    'where are you from?',
+    'my boss is such a dick',
+    'I need to find me on my own path',
+    'do you have kids?',
+  ]) assert.deepEqual(flagsOf(text), [], text);
+});

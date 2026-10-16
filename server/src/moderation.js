@@ -7,6 +7,7 @@
 //   age_probe   asking someone's age or grade: held (18+ app; common grooming opener)
 //   minor       sender clearly says they're under 18: held, account paused for review
 //   minor_maybe a bare "I'm 15": held for a moderator, account NOT paused (too ambiguous)
+//   location    asking where someone lives (city, town, address): held (anonymity)
 //   sexual      sexual solicitation: held
 //   crisis      self-harm / suicide language: DELIVERED, sender is shown crisis resources
 
@@ -30,7 +31,25 @@ function hasPhoneNumber(t) {
   return /(?:\+?\d[\s().-]*){7,}/.test(spelled);
 }
 
+// Undo the usual dodges before looking for platform names: "sn@p", "1nsta", "i n s t a".
+const LEET = { '@': 'a', 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', $: 's', 7: 't' };
+const deobfuscate = (t) => t
+  .replace(/[@0134$57]/g, (c) => LEET[c])
+  .replace(/\b(?:[a-z][\s.*_-]){2,}[a-z]\b/g, (m) => m.replace(/[\s.*_-]/g, ''));
+const PLATFORMS = 'snap(chat)?|insta(gram)?|ig|tiktok|whats\\s?app|telegram|discord|kik|wickr|signal|facebook|fb|twitter|onlyfans|venmo|cash\\s?app|paypal';
+const CONTACT_INFO = `number|num|#|digits|cell|phone(\\s+number)?|email|e-mail|socials?|handle|${PLATFORMS}`;
+const OBFUSCATED_CONTACT = new RegExp(`\\b(${PLATFORMS})\\b\\s*(is\\b|:|at\\b|@|-)\\s*\\S`);
+
 const CONTACT_PATTERNS = [
+  // Asking for contact details counts too (it's how people get pulled off-platform).
+  // Only when the question ends there: "what's your number?" yes, "what's your number one worry" no.
+  new RegExp(`\\b(what'?s|whats|wats|what\\s+is)\\s+(your|ur|yo)\\s+(${CONTACT_INFO})\\s*($|[?.!,]|\\s+(pls|please|plz|so|then|bro|lol|babe|hun)\\b)`),
+  new RegExp(`\\b(can|could|may)\\s+i\\s+(get|have)\\s+(your|ur)\\s+(${CONTACT_INFO})\\b`),
+  new RegExp(`\\b(give|send|drop|text)\\s+me\\s+(your|ur)\\s+(${CONTACT_INFO})\\b`),
+  new RegExp(`\\b(do|d|you|u)\\s+(you\\s+|u\\s+)?(have|got|use|on)\\s+(${PLATFORMS})\\s*\\?`),
+  new RegExp(`\\b(hmu|hit\\s+me\\s+up|find\\s+me|follow\\s+me|dm\\s+me|message\\s+me|add\\s+me)\\s+(on|at)\\s+(${PLATFORMS})\\b`),
+  /\b(cual|que)\s+es\s+tu\s+(numero|cel(ular)?|telefono|correo|snap|insta|whats(app)?|discord|telegram)\b/,
+  /\b(pasame|dame|mandame|enviame)\s+tu\s+(numero|cel(ular)?|telefono|correo|snap|insta|whats(app)?|discord|telegram)\b/,
   /[a-z0-9._%+-]+\s*@\s*[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}/, // emails
   /[a-z0-9._%+-]+\s*(\(at\)|\[at\]|\sat\s)\s*[a-z0-9-]+\s*(\(dot\)|\[dot\]|\sdot\s|\.)\s*(com|net|org|edu|gov|io|co|me|us|uk|ca)\b/, // "jane at gmail dot com"
   /\b(https?:\/\/|www\.)\S+/,
@@ -43,6 +62,15 @@ const CONTACT_PATTERNS = [
   /\b(agregame|escribeme|llamame|marcame|textea(me)?)\s+(a|al|en|por)\b/,
   /\b(mandame|enviame)\s+(un\s+)?(mensaje|whats|dm)\s+(a|al|en|por)\b/,
   /\bmi\s+(numero|cel(ular)?|telefono|correo|email|insta|snap|whats(app)?|direccion)\s*(es\b|:|=|-)/,
+];
+
+// Where someone lives, closely enough to find them. "Where are you from?" (a country) is fine.
+const LOCATION_PATTERNS = [
+  /\bwhere\s+(do|d)\s+(you|u)\s+live\b/,
+  /\bwhat\s+(city|town|state|neighbou?rhood|zip(\s*code)?|area|street)\s+(are|r|do)\s+(you|u)\s+(in|from|live\s+in|live)\b/,
+  /\bwhat'?s\s+(your|ur)\s+(address|zip(\s*code)?|city|town)\b/,
+  /\b(donde|en\s+que\s+(ciudad|pueblo|colonia|estado))\s+vives\b/,
+  /\b(cual|que)\s+es\s+tu\s+(direccion|ciudad|colonia|codigo\s+postal)\b/,
 ];
 
 const AGE_PROBE_PATTERNS = [
@@ -87,6 +115,9 @@ const SEXUAL_PATTERNS = [
   /\b(sext|sexting|dick\s*pic|d\s*pic)\b/,
   /\b(hook\s*up|hookup|fwb)\b/,
   /\bwhat\s+are\s+(you|u)\s+wearing\b/,
+  /\b((are|r)\s+)?(you|u)\s+horny\b/,
+  /\b(i'?m|im)\s+(so\s+)?horny\b/,
+  /\b(see|suck|touch|rate)\s+my\s+(dick|cock|d|boobs|tits)\b/,
   // Spanish
   /\b(manda(me)?|envia(me)?|pasa(me)?)\s+(el\s+|tu\s+|un\s+)?(pack|packs|nudes?)\b/,
   /\bfotos?\s+(desnud[ao]s?|sin\s+ropa|intimas?|hot)\b/,
@@ -120,7 +151,8 @@ const any = (patterns, t) => patterns.some((re) => re.test(t));
 function screenMessage(body, { connected = false } = {}) {
   const t = normalize(body);
   const flags = [];
-  if (!connected && (hasPhoneNumber(t) || any(CONTACT_PATTERNS, t))) flags.push('contact');
+  if (!connected && (hasPhoneNumber(t) || any(CONTACT_PATTERNS, t) || OBFUSCATED_CONTACT.test(deobfuscate(t)))) flags.push('contact');
+  if (!connected && any(LOCATION_PATTERNS, t)) flags.push('location');
   if (any(AGE_PROBE_PATTERNS, t)) flags.push('age_probe');
   if (any(MINOR_PATTERNS, t)) flags.push('minor');
   else if ((BARE_AGE.test(t) || BARE_AGE_ES.test(t)) && !RATING_CONTEXT.test(t)) flags.push('minor_maybe');
