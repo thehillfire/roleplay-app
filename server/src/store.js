@@ -1074,6 +1074,32 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return rowCount === 1;
     },
 
+    // --- connect asks (the daily limit per chat) ---
+
+    // Records the ask first and counts after, so of two parallel asks at least one sees the other.
+    // Returns the ask's id, or null (and removes it) when it goes over `max` since `since`.
+    async recordConnectAsk(userId, conversationId, { max, since }) {
+      const id = newId();
+      await db.query('INSERT INTO connect_asks (id, user_id, conversation_id, created_at) VALUES ($1, $2, $3, $4)', [id, userId, conversationId, now()]);
+      const { rows } = await db.query(
+        'SELECT COUNT(*) AS n FROM connect_asks WHERE user_id = $1 AND conversation_id = $2 AND created_at > $3',
+        [userId, conversationId, since],
+      );
+      if (Number(rows[0].n) <= max) return id;
+      await store.withdrawConnectAsk(id);
+      return null;
+    },
+
+    // An ask that didn't go through (no credit, lost a race) doesn't count.
+    async withdrawConnectAsk(id) {
+      await db.query('DELETE FROM connect_asks WHERE id = $1', [id]);
+    },
+
+    async purgeOldConnectAsks(before) {
+      const { rowCount } = await db.query('DELETE FROM connect_asks WHERE created_at < $1', [before]);
+      return rowCount;
+    },
+
     // All of them older than `before`: answered ones already live on as the first chat message
     // (under the normal message retention), so the copy here shouldn't outlast that.
     async purgeOldBottles(before) {

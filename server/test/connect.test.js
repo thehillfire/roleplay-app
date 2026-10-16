@@ -176,19 +176,27 @@ test('asking to connect, cancelling and asking again stops after three asks a da
   const fourth = await p.alice('POST', `/api/conversations/${p.id}/connect`, { name: 'Jav' });
   assert.equal(fourth.status, 429);
   assert.match(fourth.body.error, /try again tomorrow/);
+  const { rows } = await s.db.query('SELECT COUNT(*) AS n FROM connect_asks');
+  assert.equal(Number(rows[0].n), 3, 'kept in the database (survives a restart); the refused ask is not counted');
   // The other person can still ask (and that accept path stays open).
   assert.equal((await p.bob('POST', `/api/conversations/${p.id}/connect`, { name: 'Robert' })).status, 200);
   assert.equal((await p.alice('POST', `/api/conversations/${p.id}/connect`, { name: 'Jav' })).body.connection.status, 'accepted');
 });
 
-test('a burst of parallel connect asks still counts each one', async (t) => {
+test('a burst of parallel connect asks never gets past the daily limit', async (t) => {
   const s = await start({ payments: createPayments({ secretKey: '', webhookSecret: '' }) });
   t.after(s.stop);
   const p = await pair(s);
   t.after(p.close);
-  for (let i = 0; i < 3; i++) {
+  let granted = 0;
+  for (let i = 0; i < 5; i++) {
     const results = await Promise.all([1, 2, 3].map(() => p.alice('POST', `/api/conversations/${p.id}/connect`, { name: 'Jav' })));
-    if (results.some((r) => r.status === 200)) await p.alice('POST', `/api/conversations/${p.id}/connect/cancel`, {});
+    const ok = results.filter((r) => r.status === 200).length;
+    assert.ok(ok <= 1, 'one request per chat at a time');
+    granted += ok;
+    if (ok) await p.alice('POST', `/api/conversations/${p.id}/connect/cancel`, {});
   }
-  assert.equal((await p.alice('POST', `/api/conversations/${p.id}/connect`, { name: 'Jav' })).status, 429);
+  assert.ok(granted >= 1 && granted <= 3, `granted ${granted}`);
+  const { rows } = await s.db.query('SELECT COUNT(*) AS n FROM connect_asks');
+  assert.equal(Number(rows[0].n), granted, 'refused and failed asks are not counted');
 });

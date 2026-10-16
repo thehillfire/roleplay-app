@@ -214,16 +214,8 @@ module.exports = function register(app, { store, hub, payments, classifier, push
 
   // Asking, cancelling and asking again would ping the other person each time (free when payments
   // are off, and a refund each cancel when they're on). A few asks a day per chat is plenty.
+  // Kept in the database, so a restart or a second server doesn't reset it.
   const CONNECT_ASKS_PER_DAY = 3;
-  const connectAsks = new Map(); // `${userId}:${conversationId}` -> timestamps
-  const recentAsks = (key) => {
-    const since = Date.now() - 24 * 60 * 60 * 1000;
-    if (connectAsks.size > 10000) for (const [k, v] of connectAsks) if (v[v.length - 1] <= since) connectAsks.delete(k);
-    const list = (connectAsks.get(key) || []).filter((t) => t > since);
-    if (list.length) connectAsks.set(key, list);
-    else connectAsks.delete(key);
-    return list;
-  };
 
   app.post('/api/conversations/:id/connect', member, conversation, asyncRoute(async (req, res) => {
     const { id, partnerId } = req.conversation;
@@ -241,27 +233,16 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     } else if (existing?.status === 'declined') {
       throw httpError(409, "They chose to stay anonymous. Let's respect that.");
     } else {
-      const askKey = `${req.user.id}:${id}`;
-      if (recentAsks(askKey).length >= CONNECT_ASKS_PER_DAY) {
-        throw httpError(429, "You've asked a few times today. Give them some room and try again tomorrow.");
-      }
-      // Counted before any await, so a burst of parallel asks can't all pass the check.
-      const askedAt = Date.now();
-      connectAsks.set(askKey, [...recentAsks(askKey), askedAt]);
-      const unask = () => { // drop this one ask; another in the same millisecond keeps its count
-        const list = recentAsks(askKey);
-        const i = list.indexOf(askedAt);
-        if (i !== -1) list.splice(i, 1);
-        if (list.length) connectAsks.set(askKey, list);
-        else connectAsks.delete(askKey);
-      };
+      const askId = await store.recordConnectAsk(req.user.id, id, { max: CONNECT_ASKS_PER_DAY, since: Date.now() - 24 * 60 * 60 * 1000 });
+      if (!askId) throw httpError(429, "You've asked a few times today. Give them some room and try again tomorrow.");
+      const unask = () => store.withdrawConnectAsk(askId);
       const paid = payments.enabled;
       if (paid && !(await store.spendCredit(req.user.id))) {
-        unask();
+        await unask();
         return res.status(402).json({ error: 'Connecting needs a credit.', needsCredit: true });
       }
       if (!(await store.createConnectRequest({ conversationId: id, requesterId: req.user.id, ...reveal, paid }))) {
-        unask();
+        await unask();
         if (paid) await store.addCredits(req.user.id, 1); // lost a race with their request; refund
         throw httpError(409, 'They just sent you a request. Open it to accept.');
       }

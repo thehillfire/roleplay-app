@@ -306,6 +306,16 @@ const MIGRATIONS = [
   [
     "UPDATE appeals SET status = 'past' WHERE status = 'resolved' AND decision IS NULL",
   ],
+  // 28: connect asks per chat, so the daily limit holds across restarts and servers
+  [
+    `CREATE TABLE IF NOT EXISTS connect_asks (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      conversation_id TEXT NOT NULL,
+      created_at BIGINT NOT NULL
+    )`,
+    'CREATE INDEX IF NOT EXISTS connect_asks_idx ON connect_asks(user_id, conversation_id, created_at)',
+  ],
 ];
 
 async function migrate(db) {
