@@ -177,6 +177,13 @@ await bob.getByText('Message unsent').waitFor();
 assert.equal(await bob.locator('.bubble', { hasText: 'I overshared' }).count(), 0);
 step('unsend removes a message for both');
 
+// "Say goodbye…" drafts a kind sign-off without sending it
+await bob.getByRole('button', { name: 'Conversation options' }).click();
+await bob.getByRole('menuitem', { name: 'Say goodbye…' }).click();
+assert.match(await bob.getByLabel('Message').inputValue(), /Thank you for talking with me/);
+await bob.getByLabel('Message').fill('');
+step('goodbye drafted, not sent');
+
 // Crisis language: sender sees resources, listener sees guidance
 await alice.getByLabel('Message').fill('some days I just want to die');
 await alice.getByLabel('Message').press('Enter');

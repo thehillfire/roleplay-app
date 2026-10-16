@@ -265,7 +265,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     },
 
     // `visibleOnly` leaves out conversations the user hid, unless something happened since.
-    async listConversations(userId, { visibleOnly = false } = {}) {
+    async listConversations(userId, { visibleOnly = false, limit } = {}) {
       const visible = visibleOnly ? 'AND (CASE WHEN c.user_a = $1 THEN c.hidden_a ELSE c.hidden_b END) < c.last_message_at' : '';
       const { rows } = await db.query(
         `SELECT c.id, c.last_message_at, c.created_at,
@@ -283,8 +283,9 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
           WHERE (c.user_a = $1 OR c.user_b = $1)
             AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = $1 AND b.blocked_id = p.id) OR (b.blocker_id = p.id AND b.blocked_id = $1))
             ${visible}
-          ORDER BY c.last_message_at DESC`,
-        [userId],
+          ORDER BY c.last_message_at DESC
+          ${limit ? 'LIMIT $2' : ''}`,
+        limit ? [userId, limit] : [userId],
       );
       return rows.map((r) => ({
         id: r.id,

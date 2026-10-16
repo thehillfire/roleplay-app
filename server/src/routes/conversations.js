@@ -50,7 +50,7 @@ module.exports = function register(app, { store, hub, payments, classifier, push
   // --- Conversations ---
 
   app.get('/api/conversations', member, asyncRoute(async (req, res) => {
-    const conversations = await store.listConversations(req.user.id, { visibleOnly: true });
+    const conversations = await store.listConversations(req.user.id, { visibleOnly: true, limit: 200 });
     res.json({
       conversations: conversations.map(({ partner, ...c }) => ({
         ...c,

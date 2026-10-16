@@ -14,6 +14,9 @@ const OPENERS = [
   "I just need to vent for a minute, if that's okay.",
   'Hi! How are you really doing today?',
 ];
+// Leaving without a word hurts when someone just opened up. One tap drafts a warm
+// goodbye they can edit before sending; the conversation stays open.
+const GOODBYE = "I need to head off now. Thank you for talking with me. Take care of yourself, and come back anytime 💙";
 
 // On touch devices Enter makes a new line (people write paragraphs when they vent);
 // on keyboards it sends. Shift+Enter always makes a new line.
@@ -322,6 +325,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
                 {convo.connection?.status === 'none' && (
                   <button role="menuitem" onClick={() => { setMenuOpen(false); setConnectSheet('request'); }}>Connect…</button>
                 )}
+                <button role="menuitem" onClick={() => { setMenuOpen(false); setDraft(GOODBYE); document.querySelector('.composer textarea')?.focus(); }}>Say goodbye…</button>
                 <button role="menuitem" onClick={hide}>Hide from my list</button>
                 <button role="menuitem" onClick={() => close('end')}>End conversation</button>
                 <button role="menuitem" onClick={() => { setMenuOpen(false); setReporting(true); }}>Report</button>
