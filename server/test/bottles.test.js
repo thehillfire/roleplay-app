@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { start, signedUp } = require('./helpers');
 const { createPush } = require('../src/push');
 
-const sub = { endpoint: 'https://push.example.com/send/bottle', keys: { p256dh: 'BPk-key', auth: 'auth-secret' } };
+const sub = { endpoint: 'https://fcm.googleapis.com/fcm/send/bottle', keys: { p256dh: 'BPk-key', auth: 'auth-secret' } };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 test('a message left for the next listener starts a conversation when one turns up', async (t) => {

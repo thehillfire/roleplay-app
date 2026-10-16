@@ -109,7 +109,7 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
   app.post('/api/push/subscribe', member, asyncRoute(async (req, res) => {
     if (!push.enabled) throw httpError(503, 'Notifications are not set up on this server.');
     const sub = req.body.subscription;
-    const valid = sub && typeof sub.endpoint === 'string' && /^https:\/\//.test(sub.endpoint) && sub.endpoint.length < 1000
+    const valid = sub && typeof sub.endpoint === 'string' && sub.endpoint.length < 1000 && push.endpointAllowed(sub.endpoint)
       && sub.keys && typeof sub.keys.p256dh === 'string' && typeof sub.keys.auth === 'string';
     if (!valid) throw badRequest('Invalid push subscription');
     await store.savePushSubscription(req.user.id, { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } });

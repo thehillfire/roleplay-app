@@ -338,3 +338,18 @@ test('hiding a conversation tidies the list until there is something new', async
   const stranger = await signedUp(s.base);
   assert.equal((await stranger('POST', `/api/conversations/${id}/hide`, {})).status, 404);
 });
+
+test('after a block, reactions, unsends and read receipts no longer reach the other person', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const { alice, bob, aws, bws, am } = await matchPair(s);
+  t.after(() => Promise.all([aws.close(), bws.close()]));
+  const id = am.conversationId;
+  const sent = (await bob('POST', `/api/conversations/${id}/messages`, { body: 'hello' })).body.message;
+  await alice('POST', `/api/conversations/${id}/block`, {});
+  assert.equal((await bob('POST', `/api/conversations/${id}/read`, {})).status, 403);
+  assert.equal((await bob('POST', `/api/conversations/${id}/messages/${sent.id}/unsend`, {})).status, 403);
+  const before = aws.events.length;
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(aws.events.slice(before).filter((e) => ['read', 'message.unsent', 'message.reacted'].includes(e.type)).length, 0);
+});

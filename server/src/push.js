@@ -8,6 +8,9 @@ function createPush({
   subject = process.env.VAPID_SUBJECT || 'mailto:support@example.com',
   sendImpl,
   log = console,
+  // The browsers' push services. Anything else would let a client make the server POST
+  // to any URL it likes (including internal ones) whenever they get a message.
+  allowedHosts = ['fcm.googleapis.com', 'push.services.mozilla.com', 'notify.windows.com', 'push.apple.com'],
 } = {}) {
   const enabled = Boolean(publicKey && privateKey);
   const send = sendImpl || ((subscription, payload) => webpush.sendNotification(subscription, payload, {
@@ -30,7 +33,16 @@ function createPush({
     }));
   }
 
-  return { enabled, publicKey: enabled ? publicKey : null, notify };
+  const endpointAllowed = (endpoint) => {
+    try {
+      const { protocol, hostname } = new URL(endpoint);
+      return protocol === 'https:' && allowedHosts.some((h) => hostname === h || hostname.endsWith(`.${h}`));
+    } catch {
+      return false;
+    }
+  };
+
+  return { enabled, publicKey: enabled ? publicKey : null, notify, endpointAllowed };
 }
 
 module.exports = { createPush };

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { start, signedUp } = require('./helpers');
 const { createPush } = require('../src/push');
 
-const sub = (n) => ({ endpoint: `https://push.example.com/send/${n}`, keys: { p256dh: 'BPk-key', auth: 'auth-secret' } });
+const sub = (n) => ({ endpoint: `https://fcm.googleapis.com/fcm/send/${n}`, keys: { p256dh: 'BPk-key', auth: 'auth-secret' } });
 
 test('offline partners get a push with the handle but never the message text', async (t) => {
   const sent = [];
@@ -90,4 +90,18 @@ test('a muted conversation sends no push, but messages still arrive', async (t) 
   await new Promise((r) => setTimeout(r, 30));
   assert.equal(sent.length, 1);
   await aws.close();
+});
+
+test('push subscriptions must point at a real push service', async (t) => {
+  const push = createPush({ publicKey: 'pub', privateKey: 'priv', sendImpl: async () => {} });
+  const s = await start({ push });
+  t.after(s.stop);
+  const a = await signedUp(s.base);
+  const keys = { p256dh: 'BPk-key', auth: 'auth-secret' };
+  for (const endpoint of ['https://169.254.169.254/latest/meta-data', 'https://evil.example/collect', 'https://fcm.googleapis.com.evil.example/x']) {
+    assert.equal((await a('POST', '/api/push/subscribe', { subscription: { endpoint, keys } })).status, 400, endpoint);
+  }
+  for (const endpoint of ['https://fcm.googleapis.com/fcm/send/abc', 'https://updates.push.services.mozilla.com/wpush/v2/abc', 'https://web.push.apple.com/abc']) {
+    assert.equal((await a('POST', '/api/push/subscribe', { subscription: { endpoint, keys } })).status, 201, endpoint);
+  }
 });

@@ -303,7 +303,14 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     res.status(201).json({ ok: true });
   }));
 
-  app.post('/api/conversations/:id/messages/:messageId/react', member, conversation, asyncRoute(async (req, res) => {
+  // Reactions, unsends and read receipts all reach the other person live, so none of them may
+  // cross a block (or be sent in a flood).
+  const notBlocked = asyncRoute(async (req, res, next) => {
+    if (await store.isBlocked(req.user.id, req.conversation.partnerId)) throw httpError(403, 'This conversation has ended.');
+    next();
+  });
+
+  app.post('/api/conversations/:id/messages/:messageId/react', member, messageLimiter, conversation, notBlocked, asyncRoute(async (req, res) => {
     const reaction = req.body.reaction ?? null;
     if (reaction !== null && !REACTIONS.includes(reaction)) throw badRequest('Unknown reaction');
     if (!(await store.setReaction(req.user.id, req.conversation.id, req.params.messageId, reaction))) {
@@ -313,14 +320,14 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     res.json({ reaction });
   }));
 
-  app.post('/api/conversations/:id/messages/:messageId/unsend', member, conversation, asyncRoute(async (req, res) => {
+  app.post('/api/conversations/:id/messages/:messageId/unsend', member, messageLimiter, conversation, notBlocked, asyncRoute(async (req, res) => {
     const ok = await store.unsendMessage(req.user.id, req.conversation.id, req.params.messageId, UNSEND_WINDOW_MS);
     if (!ok) throw httpError(409, 'Messages can only be unsent for 5 minutes after sending.');
     hub.push(req.conversation.partnerId, { type: 'message.unsent', conversationId: req.conversation.id, messageId: req.params.messageId });
     res.json({ ok: true });
   }));
 
-  app.post('/api/conversations/:id/read', member, conversation, asyncRoute(async (req, res) => {
+  app.post('/api/conversations/:id/read', member, conversation, notBlocked, asyncRoute(async (req, res) => {
     const at = await store.markRead(req.user.id, req.conversation.id);
     // Lets the other person show "Seen" under their latest message.
     hub.push(req.conversation.partnerId, { type: 'read', conversationId: req.conversation.id, at });

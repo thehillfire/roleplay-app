@@ -5,12 +5,15 @@ function createMailer({
   from = process.env.MAIL_FROM || 'Kindred <no-reply@example.com>',
   fetchImpl = fetch,
   log = console,
+  // Bodies hold reset and confirmation links: never write them to production logs.
+  logBodies = process.env.NODE_ENV !== 'production',
 } = {}) {
   return {
     enabled: Boolean(apiKey),
     async send({ to, subject, text }) {
       if (!apiKey) {
-        log.log(`[mail] to=${to} subject="${subject}"\n${text}`);
+        if (logBodies) log.log(`[mail] to=${to} subject="${subject}"\n${text}`);
+        else log.warn(`[mail] not sent (set RESEND_API_KEY): "${subject}"`);
         return;
       }
       const res = await fetchImpl('https://api.resend.com/emails', {
