@@ -94,3 +94,32 @@ test('mutating API calls must be JSON (CSRF guard)', async (t) => {
   });
   assert.equal(res.status, 415);
 });
+
+test('an account locks after 10 wrong passwords, whatever the IP', async (t) => {
+  const s = await start({ authRateLimit: { max: 1000, windowMs: 60000 } });
+  t.after(s.stop);
+  const creds = adult();
+  await client(s.base)('POST', '/api/auth/signup', creds);
+  for (let i = 0; i < 10; i += 1) {
+    const res = await fetch(`${s.base}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': `10.9.0.${i}` },
+      body: JSON.stringify({ email: creds.email, password: 'wrong-guess' }),
+    });
+    assert.equal(res.status, 401);
+  }
+  const locked = await client(s.base)('POST', '/api/auth/login', { email: creds.email, password: creds.password });
+  assert.equal(locked.status, 429, 'even the right password waits out the lock');
+  assert.match(locked.body.error, /Too many attempts/);
+  const other = await client(s.base)('POST', '/api/auth/signup', adult());
+  assert.equal(other.status, 201, 'other accounts unaffected');
+});
+
+test('health fails when the database is down', async (t) => {
+  const s = await start();
+  t.after(() => new Promise((r) => { s.server.realtime.close(); s.server.closeAllConnections?.(); s.server.close(r); }));
+  assert.equal((await fetch(`${s.base}/api/health`)).status, 200);
+  await s.db.close();
+  const res = await fetch(`${s.base}/api/health`);
+  assert.equal(res.status, 503);
+});

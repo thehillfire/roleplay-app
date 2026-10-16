@@ -142,6 +142,23 @@ function createApp({
   app.use('/api', auth.loadUser());
 
   const authLimiter = createRateLimiter(authRateLimit);
+  // Failed logins per account, whatever IPs they come from (slow down distributed guessing).
+  const failedLogins = new Map(); // email -> { count, resetAt }
+  const LOGIN_FAILS = { max: 10, windowMs: 15 * 60 * 1000 };
+  const loginLocked = (email) => {
+    const e = failedLogins.get(email);
+    return Boolean(e && Date.now() < e.resetAt && e.count >= LOGIN_FAILS.max);
+  };
+  const noteFailedLogin = (email) => {
+    const t = Date.now();
+    const e = failedLogins.get(email);
+    if (!e || t > e.resetAt) {
+      if (failedLogins.size > 50000) failedLogins.clear(); // crude bound on memory
+      failedLogins.set(email, { count: 1, resetAt: t + LOGIN_FAILS.windowMs });
+    } else {
+      e.count += 1;
+    }
+  };
   // Emails a confirmation link. Moderator rights (ADMIN_EMAILS) need a confirmed inbox, so
   // registering someone else's address first gets you nothing.
   const sendVerification = async (req, user) => {
@@ -182,7 +199,15 @@ function createApp({
     next();
   });
 
-  app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+  // Load balancers use this: it fails when the database is unreachable.
+  app.get('/api/health', asyncRoute(async (req, res) => {
+    try {
+      await store.ping();
+      res.json({ status: 'ok' });
+    } catch {
+      res.status(503).json({ status: 'database unavailable' });
+    }
+  }));
 
   // Rough live numbers for the home screen ("12 people here now").
   app.get('/api/presence', member, (req, res) => res.json(hub.stats()));
@@ -200,9 +225,14 @@ function createApp({
 
   app.post('/api/auth/login', authLimiter, asyncRoute(async (req, res) => {
     const { email, password } = parseCredentials(req.body, { signup: false });
+    if (loginLocked(email)) throw httpError(429, 'Too many attempts for this account. Try again in 15 minutes, or reset your password.');
     const found = await store.findUserByEmail(email);
     const ok = await verifyPassword(password, found?.passwordHash);
-    if (!found || !ok) throw httpError(401, 'Email or password is incorrect.');
+    if (!found || !ok) {
+      noteFailedLogin(email);
+      throw httpError(401, 'Email or password is incorrect.');
+    }
+    failedLogins.delete(email);
     const user = await promoteIfAdmin(found);
     await auth.startSession(req, res, user.id);
     res.json({ user: publicUser(user) });

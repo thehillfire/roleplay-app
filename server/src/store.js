@@ -49,6 +49,10 @@ function reportFromRow(row) {
 
 function createStore(db, { now = Date.now, rng = Math.random } = {}) {
   const store = {
+    async ping() {
+      await db.query('SELECT 1');
+    },
+
     // --- users & sessions ---
 
     async createUser({ email, passwordHash, birthdate }) {
