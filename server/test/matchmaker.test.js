@@ -73,3 +73,21 @@ test('nobody matches themselves', () => {
   mm.sweep();
   assert.deepEqual(matches, []);
 });
+
+test('people near the same age are preferred, but never required', () => {
+  const { mm, matches } = setup();
+  mm.join({ userId: 'older', role: 'listen', ageBand: '50+' });
+  mm.join({ userId: 'peer', role: 'listen', ageBand: '18-24' });
+  mm.join({ userId: 'student', role: 'talk', ageBand: '18-24' });
+  assert.deepEqual(matches, [['peer', 'student']]);
+  mm.join({ userId: 'another', role: 'talk', ageBand: '25-34' });
+  assert.deepEqual(matches[1], ['another', 'older'], 'different bands still match');
+});
+
+test('topic outweighs age band', () => {
+  const { mm, matches } = setup();
+  mm.join({ userId: 'sameAge', role: 'listen', ageBand: '25-34' });
+  mm.join({ userId: 'sameTopic', role: 'listen', topic: 'money', ageBand: '50+' });
+  mm.join({ userId: 'me', role: 'talk', topic: 'money', ageBand: '25-34' });
+  assert.deepEqual(matches, [['me', 'sameTopic']]);
+});

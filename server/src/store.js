@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { randomHandle } = require('./handles');
+const { ageOn } = require('./validate');
 
 const newId = () => crypto.randomUUID();
 const num = (v) => (v === null || v === undefined ? v : Number(v));
@@ -79,6 +80,14 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     async findUserByEmail(email) {
       const { rows } = await db.query('SELECT * FROM users WHERE email = $1', [email]);
       return rows[0] ? { ...userFromRow(rows[0]), passwordHash: rows[0].password_hash } : null;
+    },
+
+    // Coarse age band used only for matching preference: '18-24' | '25-34' | '35-49' | '50+'.
+    async ageBand(userId) {
+      const { rows } = await db.query('SELECT birthdate FROM users WHERE id = $1', [userId]);
+      const age = ageOn(rows[0]?.birthdate, new Date(now()));
+      if (!Number.isFinite(age)) return '';
+      return age < 25 ? '18-24' : age < 35 ? '25-34' : age < 50 ? '35-49' : '50+';
     },
 
     async getUser(id) {

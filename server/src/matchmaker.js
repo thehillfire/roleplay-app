@@ -2,6 +2,7 @@
 // realtime layer feeds it and opens conversations when it reports a match.
 //
 // Roles: 'talk' (needs to vent), 'listen' (here to support), 'either'.
+// Preferences (soft, only break ties): same topic, same age band, someone new.
 // talk<->listen and anything<->either match right away. talk<->talk and
 // listen<->listen only pair up once both have waited `sameRoleAfterMs`, so nobody
 // waits forever when the queue is lopsided.
@@ -23,6 +24,8 @@ function createMatchmaker({ onMatch, now = Date.now, sameRoleAfterMs = 30000 }) 
     if (!fit && (t - a.joinedAt < sameRoleAfterMs || t - b.joinedAt < sameRoleAfterMs)) return -Infinity;
     let s = fit ? 10 : 0;
     if (a.topic && a.topic === b.topic) s += 3;
+    // People tend to be more at ease with someone near their age (never shown to anyone).
+    if (a.ageBand && a.ageBand === b.ageBand) s += 2;
     // "Random" should mostly mean new people; past partners are a fallback.
     if (a.known.has(b.userId) || b.known.has(a.userId)) s -= 5;
     return s;
@@ -48,9 +51,9 @@ function createMatchmaker({ onMatch, now = Date.now, sameRoleAfterMs = 30000 }) 
   }
 
   return {
-    join({ userId, role = 'either', topic = '', blocked = new Set(), known = new Set() }) {
+    join({ userId, role = 'either', topic = '', ageBand = '', blocked = new Set(), known = new Set() }) {
       queue.delete(userId);
-      const entry = { userId, role: ROLES.includes(role) ? role : 'either', topic, blocked, known, joinedAt: now() };
+      const entry = { userId, role: ROLES.includes(role) ? role : 'either', topic, ageBand, blocked, known, joinedAt: now() };
       const partner = bestPartner(entry, entry.joinedAt);
       if (partner) {
         pair(partner, entry);

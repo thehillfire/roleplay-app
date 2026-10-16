@@ -109,10 +109,11 @@ function attachRealtime({
     const handleJoin = async (msg) => {
       const role = typeof msg.role === 'string' ? msg.role : 'either';
       const topic = typeof msg.topic === 'string' ? msg.topic.trim().toLowerCase().slice(0, TOPIC_MAX) : '';
-      const [blocked, known, today] = await Promise.all([
+      const [blocked, known, today, ageBand] = await Promise.all([
         store.blockedIds(user.id),
         store.partnerIds(user.id),
         store.conversationsStartedSince(user.id, Date.now() - DAY_MS),
+        store.ageBand(user.id),
       ]);
       if (today >= dailyMatchLimit) {
         ws.send(JSON.stringify({ type: 'match.error', error: "You've met a lot of new people today. You can keep talking with anyone in your list, and matching opens again tomorrow." }));
@@ -121,7 +122,7 @@ function attachRealtime({
       // The socket may have closed while we looked those up; never queue someone who's gone.
       if (ws.readyState !== ws.OPEN) return;
       ws.send(JSON.stringify({ type: 'match.waiting' }));
-      matchmaker.join({ userId: user.id, role, topic, blocked, known });
+      matchmaker.join({ userId: user.id, role, topic, ageBand, blocked, known });
     };
 
     ws.on('message', async (raw) => {
