@@ -17,6 +17,7 @@ function userFromRow(row) {
     connectCredits: num(row.connect_credits) || 0,
     emailVerified: Boolean(row.email_verified_at),
     plusUntil: num(row.plus_until) || 0,
+    listenerAlerts: Boolean(num(row.listener_alerts)),
     stripeCustomerId: row.stripe_customer_id || null,
     createdAt: num(row.created_at),
   };
@@ -584,6 +585,33 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
 
     async deletePushSubscriptionsFor(userId) {
       await db.query('DELETE FROM push_subscriptions WHERE user_id = $1', [userId]);
+    },
+
+    // --- listeners on call ---
+
+    async setListenerAlerts(userId, on) {
+      await db.query('UPDATE users SET listener_alerts = $1 WHERE id = $2', [on ? 1 : 0, userId]);
+    },
+
+    // Opted-in listeners with a device to notify who haven't been alerted since `before`,
+    // longest-rested first so alerts rotate through everyone.
+    async listenerAlertCandidates({ before, limit }) {
+      const { rows } = await db.query(
+        `SELECT id FROM users WHERE listener_alerts = 1 AND status = 'active' AND listener_alerted_at < $1
+           AND EXISTS (SELECT 1 FROM push_subscriptions p WHERE p.user_id = users.id)
+         ORDER BY listener_alerted_at LIMIT $2`,
+        [before, limit],
+      );
+      return rows.map((r) => r.id);
+    },
+
+    // Claims one listener for an alert; false when another alert just did.
+    async claimListenerAlert(userId, before, now) {
+      const { rowCount } = await db.query(
+        'UPDATE users SET listener_alerted_at = $1 WHERE id = $2 AND listener_alerted_at < $3',
+        [now, userId, before],
+      );
+      return rowCount === 1;
     },
 
     async pushSubscriptions(userId) {

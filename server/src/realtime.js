@@ -62,6 +62,10 @@ function attachRealtime({
   // New people per day, so nobody can cycle through hundreds of strangers.
   dailyMatchLimit = envInt('DAILY_MATCH_LIMIT', 40),
   presenceThrottleMs = 2000,
+  push = null,
+  // Listeners "on call" get a push when a talker has waited this long with nobody to listen.
+  // Each listener hears at most once per cooldown; each talker triggers at most one alert per perTalkerMs.
+  listenerAlert = { afterMs: envInt('LISTENER_ALERT_AFTER_MS', 20000), cooldownMs: 3 * 60 * 60 * 1000, perTalkerMs: 15 * 60 * 1000, batch: 3 },
 }) {
   const joining = new Set(); // users with a match.join in flight (several tabs, double taps)
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4096 });
@@ -95,6 +99,39 @@ function attachRealtime({
   };
   const sweep = setInterval(() => matchmaker.sweep(), sweepMs);
   sweep.unref();
+
+  const alertTimers = new Map(); // talker -> pending timer
+  const lastAlertFor = new Map(); // talker -> when their wait last alerted listeners
+  const alertListeners = async (talkerId, blocked) => {
+    const now = Date.now();
+    const before = now - listenerAlert.cooldownMs;
+    const ids = await store.listenerAlertCandidates({ before, limit: listenerAlert.batch * 5 });
+    let sent = 0;
+    for (const id of ids) {
+      if (sent >= listenerAlert.batch) break;
+      // People with the app open already see the "waiting for a listener" banner.
+      if (id === talkerId || blocked.has(id) || hub.isOnline(id)) continue;
+      if (!(await store.claimListenerAlert(id, before, now))) continue;
+      sent += 1;
+      // Nothing about who is waiting: lock screens are public.
+      push.notify(store, id, { title: 'Someone needs a listener', body: 'A person on Kindred is waiting to talk. Open the app if you have a few minutes.', tag: 'listener-needed' })
+        .catch((err) => log.error('listener alert failed', err));
+    }
+  };
+  const scheduleListenerAlert = (talkerId, blocked) => {
+    if (!push?.enabled || alertTimers.has(talkerId)) return;
+    if (Date.now() - (lastAlertFor.get(talkerId) || 0) < listenerAlert.perTalkerMs) return;
+    const timer = setTimeout(() => {
+      alertTimers.delete(talkerId);
+      if (!matchmaker.isQueued(talkerId)) return; // matched or left meanwhile
+      const t = Date.now();
+      if (lastAlertFor.size > 10000) for (const [k, v] of lastAlertFor) if (t - v > listenerAlert.perTalkerMs) lastAlertFor.delete(k);
+      lastAlertFor.set(talkerId, t);
+      alertListeners(talkerId, blocked).catch((err) => log.error('listener alert failed', err));
+    }, listenerAlert.afterMs);
+    timer.unref();
+    alertTimers.set(talkerId, timer);
+  };
 
   server.on('upgrade', async (req, socket, head) => {
     const reject = (code, text) => {
@@ -145,8 +182,9 @@ function attachRealtime({
       // The socket may have closed while we looked those up; never queue someone who's gone.
       if (ws.readyState !== ws.OPEN) return;
       ws.send(JSON.stringify({ type: 'match.waiting' }));
-      matchmaker.join({ userId: user.id, role, topic, ageBand, blocked, known });
+      const matched = matchmaker.join({ userId: user.id, role, topic, ageBand, blocked, known });
       presenceChanged();
+      if (!matched && role === 'talk') scheduleListenerAlert(user.id, blocked);
     };
 
     ws.on('message', async (raw) => {
@@ -200,6 +238,7 @@ function attachRealtime({
     matchmaker,
     close() {
       clearTimeout(presenceTimer);
+      for (const timer of alertTimers.values()) clearTimeout(timer);
       clearInterval(sweep);
       clearInterval(heartbeat);
       for (const ws of wss.clients) ws.terminate();

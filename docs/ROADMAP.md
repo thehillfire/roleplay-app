@@ -55,6 +55,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Accessibility pass: axe-core audit of 8 screens in CI (`npm run a11y`, zero violations), dialog semantics, Escape to close, reduced motion
 - [x] Ad slot on the home screen only (never inside chats), non-personalized, off unless `ADSENSE_CLIENT`/`ADSENSE_SLOT` are set; CSP opens for Google ad hosts only then
 - [x] Load test (`scripts/load-test.js`): ~700 msg/s on one server; hot send path cut from 7 queries to 3
+- [x] Listeners on call: opt-in push when someone has waited ~20s with nobody to listen (at most once per 3 hours per listener, never says who)
 - [ ] Scale past one server: Redis pub/sub for realtime + shared queue (only needed beyond several thousand concurrent chatters)
 
 ## Known limits

@@ -74,4 +74,12 @@ module.exports = function register(app, { store, hub, auth, push, authLimiter, m
     if (typeof req.body.endpoint === 'string') await store.deletePushSubscription(req.body.endpoint, req.user.id);
     res.json({ ok: true });
   }));
+
+  // "On call": a push when someone has been waiting to talk with nobody to listen.
+  app.post('/api/account/listener-alerts', member, asyncRoute(async (req, res) => {
+    if (typeof req.body.on !== 'boolean') throw httpError(400, 'Say on or off.');
+    if (req.body.on && !push.enabled) throw httpError(503, "Notifications aren't set up yet.");
+    await store.setListenerAlerts(req.user.id, req.body.on);
+    res.json({ listenerAlerts: req.body.on });
+  }));
 };

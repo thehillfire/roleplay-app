@@ -193,6 +193,11 @@ const MIGRATIONS = [
     'ALTER TABLE users ADD COLUMN plus_subscription_id TEXT',
     'ALTER TABLE users ADD COLUMN plus_until BIGINT',
   ],
+  // 14: listeners "on call" (opt-in push when someone is waiting to talk)
+  [
+    'ALTER TABLE users ADD COLUMN listener_alerts INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE users ADD COLUMN listener_alerted_at BIGINT NOT NULL DEFAULT 0',
+  ],
 ];
 
 async function migrate(db) {

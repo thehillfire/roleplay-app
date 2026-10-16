@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { api } from '../api.js';
 import { TEXT_SIZES, getTextSize, setTextSize } from '../textSize.js';
+import { enablePush, pushSupported } from '../notifications.js';
 
-export default function Account({ user, billing, onBack, onSignOut, onSignOutEverywhere, onDeleted, onOpenLegal }) {
+export default function Account({ user, billing, pushKey, onUserChanged, onBack, onSignOut, onSignOutEverywhere, onDeleted, onOpenLegal }) {
   const [confirming, setConfirming] = useState(false);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -35,6 +36,24 @@ export default function Account({ user, billing, onBack, onSignOut, onSignOutEve
     }
   };
   const money = (cents) => new Intl.NumberFormat(undefined, { style: 'currency', currency: billing?.currency || 'usd' }).format(cents / 100);
+
+  // On call: this device needs notifications on, so ask for them when switching it on.
+  const toggleOnCall = async () => {
+    const on = !user.listenerAlerts;
+    setBusy(true);
+    setError('');
+    try {
+      if (on && !(await enablePush(pushKey, api.pushSubscribe))) {
+        throw new Error('Allow notifications for Kindred in your browser settings first.');
+      }
+      await api.setListenerAlerts(on);
+      await onUserChanged();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const remove = async (e) => {
     e.preventDefault();
@@ -80,6 +99,18 @@ export default function Account({ user, billing, onBack, onSignOut, onSignOutEve
               <button className="btn primary" onClick={() => goTo(api.subscribePlus)} disabled={busy}>Get Plus</button>
             </>
           )}
+        </section>
+      )}
+
+      {pushKey && pushSupported() && (
+        <section className="card rows">
+          <label className="row switch-row">
+            <span>
+              On call as a listener
+              <small className="hint">A notification when someone has been waiting to talk and nobody is free. At most once every few hours, and never who it is.</small>
+            </span>
+            <input type="checkbox" role="switch" checked={user.listenerAlerts} onChange={toggleOnCall} disabled={busy} />
+          </label>
         </section>
       )}
 

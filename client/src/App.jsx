@@ -181,7 +181,7 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
         />
       )}
       {view.name === 'moderate' && <Moderate onBack={goHome} />}
-      {view.name === 'account' && <Account user={user} billing={billing} onBack={goHome} onSignOut={onSignOut} onSignOutEverywhere={onSignOutEverywhere} onDeleted={onDeleted} onOpenLegal={onOpenLegal} />}
+      {view.name === 'account' && <Account user={user} billing={billing} pushKey={pushKey} onUserChanged={onRefreshMe} onBack={goHome} onSignOut={onSignOut} onSignOutEverywhere={onSignOutEverywhere} onDeleted={onDeleted} onOpenLegal={onOpenLegal} />}
       {view.name === 'waiting' && <Waiting onCancel={cancel} error={matchError} />}
       {view.name === 'chat' && (
         <Chat
