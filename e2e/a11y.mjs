@@ -14,7 +14,9 @@ let onboardingAudited = false;
 async function audit(page, name) {
   await page.waitForTimeout(400);
   await page.addScriptTag({ content: axeSource });
-  const result = await page.evaluate(() => window.axe.run(document, { resultTypes: ['violations'] }));
+  // The match/connect splash is decorative (aria-hidden) and gone in under 2s; mid-animation it
+  // would be measured against whatever is behind it, so the audit checks the screen under it.
+  const result = await page.evaluate(() => window.axe.run({ include: [document], exclude: [['.hype']] }, { resultTypes: ['violations'] }));
   const serious = result.violations.filter((v) => ['serious', 'critical'].includes(v.impact));
   for (const v of result.violations) {
     console.log(`${serious.includes(v) ? '✗' : '·'} [${name}] ${v.impact} ${v.id}: ${v.help}`);
