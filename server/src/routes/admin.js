@@ -76,6 +76,26 @@ module.exports = function register(app, { store, hub, mailer, member }) {
     res.json({ messages: await store.listHeldMessages() });
   }));
 
+  // Deliver a held message after all (the screener was wrong), or keep it held. Both clear it.
+  app.post('/api/admin/held/:id/review', admin, asyncRoute(async (req, res) => {
+    if (typeof req.body.release !== 'boolean') throw badRequest('release must be true or false');
+    const pending = await store.pendingHeldMessage(req.params.id);
+    if (!pending) throw httpError(404, 'That message was already reviewed.');
+    const membership = await store.getMembership(pending.senderId, pending.conversationId);
+    if (req.body.release && (!membership || (await store.isBlocked(pending.senderId, membership.partnerId)))) {
+      throw httpError(409, 'This conversation has ended, so it can only stay held.');
+    }
+    const message = await store.reviewHeldMessage(pending.id, req.body.release);
+    if (!message) throw httpError(404, 'That message was already reviewed.');
+    if (req.body.release) {
+      const { senderId, flags, ...out } = message; // eslint-disable-line no-unused-vars
+      hub.push(membership.partnerId, { type: 'message', message: { ...out, fromMe: false } });
+      hub.push(senderId, { type: 'message.released', conversationId: message.conversationId, messageId: message.id });
+    }
+    await store.logModAction({ moderatorId: req.user.id, targetId: pending.senderId, action: req.body.release ? 'held_released' : 'held_kept', detail: pending.flags.join(', ') });
+    res.json({ ok: true });
+  }));
+
   app.get('/api/admin/users', admin, asyncRoute(async (req, res) => {
     const handle = typeof req.query.handle === 'string' ? req.query.handle.trim().replace(/^@/, '') : '';
     if (!handle || handle.length > 40) throw badRequest('Enter a handle.');

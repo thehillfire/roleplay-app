@@ -65,6 +65,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Optional Cloudflare Turnstile bot check at signup (TURNSTILE_SITE_KEY/SECRET_KEY), verified server-side
 - [x] Mute notifications per conversation (messages still arrive; 🔕 in the chat header)
 - [x] Spanish in the screener (contact details, age questions, minors, sexual content, crisis) and Spanish 988 info on the crisis card
+- [x] Held queue: moderators can Deliver anyway (false positive) or Keep held; reviewed messages leave the queue
 - [ ] Scale past one server: Redis pub/sub for realtime + shared queue (only needed beyond several thousand concurrent chatters)
 
 ## Known limits

@@ -158,6 +158,8 @@ export default function Moderate({ onBack }) {
           <p className="details">{m.body}</p>
           <p className="meta">{m.flags.map((f) => <span key={f} className="tag flag">{FLAG_LABELS[f] || f}</span>)}</p>
           <div className="actions">
+            <button className="btn" disabled={!!busy} onClick={() => act(m.id, () => api.admin.reviewHeld(m.id, true))}>Deliver anyway</button>
+            <button className="btn" disabled={!!busy} onClick={() => act(m.id, () => api.admin.reviewHeld(m.id, false))}>Keep held</button>
             {m.sender.status === 'active' && <button className="btn danger" disabled={!!busy} onClick={() => act(m.id, () => api.admin.setStatus(m.sender.id, 'suspended'))}>Suspend sender</button>}
             {(m.sender.status === 'review' || m.sender.status === 'suspended') && (
               <button className="btn" disabled={!!busy} onClick={() => act(m.id, () => api.admin.setStatus(m.sender.id, 'active'))}>Restore sender</button>

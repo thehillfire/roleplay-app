@@ -63,6 +63,7 @@ export const api = {
     resolve: (id, resolution) => request('POST', `/api/admin/reports/${enc(id)}/resolve`, { resolution }),
     support: () => request('GET', '/api/admin/support').then((d) => d.requests),
     resolveSupport: (id, reply) => request('POST', `/api/admin/support/${enc(id)}/resolve`, { reply }),
+    reviewHeld: (id, release) => request('POST', `/api/admin/held/${enc(id)}/review`, { release }),
     held: () => request('GET', '/api/admin/held').then((d) => d.messages),
     lookup: (handle) => request('GET', `/api/admin/users?handle=${enc(handle)}`).then((d) => d.user),
     setStatus: (userId, status) => request('POST', `/api/admin/users/${enc(userId)}/status`, { status }),

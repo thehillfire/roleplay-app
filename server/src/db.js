@@ -249,6 +249,10 @@ const MIGRATIONS = [
     'ALTER TABLE conversations ADD COLUMN muted_a INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE conversations ADD COLUMN muted_b INTEGER NOT NULL DEFAULT 0',
   ],
+  // 21: held messages a moderator has reviewed leave the queue
+  [
+    'ALTER TABLE messages ADD COLUMN reviewed_at BIGINT',
+  ],
 ];
 
 async function migrate(db) {

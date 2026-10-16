@@ -270,7 +270,10 @@ if (process.env.MOD_EMAIL && process.env.MAIL_LOG) {
   assert.match(await card.innerText(), /Harassment/);
   assert.match(await card.innerText(), /Rent is due Friday/);
   await mod.getByRole('tab', { name: /Held/ }).click();
-  await mod.locator('.report', { hasText: aliceHandle }).filter({ hasText: '555 123 4567' }).first().waitFor();
+  const heldCard = mod.locator('.report', { hasText: aliceHandle }).filter({ hasText: '555 123 4567' }).first();
+  await heldCard.waitFor();
+  await heldCard.getByRole('button', { name: 'Keep held' }).click();
+  await mod.locator('.report', { hasText: '555 123 4567' }).first().waitFor({ state: 'detached' });
   await mod.getByRole('tab', { name: /Reports/ }).click();
   await mod.shot('8-moderate');
   await card.getByRole('button', { name: `Suspend ${aliceHandle}` }).click();

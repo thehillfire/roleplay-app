@@ -97,6 +97,11 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
       if (conversationId !== id) return;
       setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reaction } : m)));
     });
+    // A moderator delivered one of my held messages after all.
+    const offReleased = socket.on('message.released', ({ conversationId, messageId }) => {
+      if (conversationId !== id) return;
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, status: 'delivered', flags: undefined } : m)));
+    });
     const offUnsent = socket.on('message.unsent', ({ conversationId, messageId }) => {
       if (conversationId !== id) return;
       setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, status: 'unsent', body: '' } : m)));
@@ -115,7 +120,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     const onVisible = () => markReadIfVisible(id);
     document.addEventListener('visibilitychange', onVisible);
     return () => {
-      offMessage(); offTyping(); offEnded(); offReacted(); offUnsent(); offRead(); offConnect(); offOpen();
+      offMessage(); offTyping(); offEnded(); offReacted(); offReleased(); offUnsent(); offRead(); offConnect(); offOpen();
       document.removeEventListener('visibilitychange', onVisible);
       clearTimeout(typingTimer.current);
     };

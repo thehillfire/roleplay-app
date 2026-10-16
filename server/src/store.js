@@ -946,10 +946,29 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     async listHeldMessages({ limit = 50 } = {}) {
       const { rows } = await db.query(
         `SELECT m.*, u.handle AS sender_handle, u.status AS sender_status FROM messages m JOIN users u ON u.id = m.sender_id
-          WHERE m.status = 'held' ORDER BY m.created_at DESC LIMIT $1`,
+          WHERE m.status = 'held' AND m.reviewed_at IS NULL ORDER BY m.created_at DESC LIMIT $1`,
         [limit],
       );
       return rows.map((r) => ({ ...messageFromRow(r), sender: { id: r.sender_id, handle: r.sender_handle, status: r.sender_status } }));
+    },
+
+    async pendingHeldMessage(messageId) {
+      const { rows } = await db.query("SELECT * FROM messages WHERE id = $1 AND status = 'held' AND reviewed_at IS NULL", [messageId]);
+      return rows[0] ? messageFromRow(rows[0]) : null;
+    },
+
+    // A moderator's decision on a held message, exactly once: deliver it after all (a false
+    // positive), or keep it held. Either way it leaves the queue. Returns the message or null.
+    async reviewHeldMessage(messageId, release) {
+      const t = now();
+      const { rowCount } = await db.query(
+        `UPDATE messages SET reviewed_at = $1${release ? ", status = 'delivered'" : ''} WHERE id = $2 AND status = 'held' AND reviewed_at IS NULL`,
+        [t, messageId],
+      );
+      if (rowCount !== 1) return null;
+      const { rows: [row] } = await db.query('SELECT * FROM messages WHERE id = $1', [messageId]);
+      if (release) await db.query('UPDATE conversations SET last_message_at = $1 WHERE id = $2 AND last_message_at < $1', [t, row.conversation_id]);
+      return messageFromRow(row);
     },
   };
   return store;
