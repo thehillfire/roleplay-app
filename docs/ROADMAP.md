@@ -32,6 +32,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Deployment: Dockerfile (tested: production mode, non-root, clean SIGTERM), Render Blueprint, docs/DEPLOY.md
 
 ## 5. Community & launch readiness
+- [x] Abuse resistance: daily cap on new matches; only reporters with day-old accounts count toward auto-pause
 - [x] Texting basics: "Seen" receipts, unread count in the tab title, wait-time hint
 - [x] Email confirmation (moderator rights require it)
 - [x] Forgot password: emailed single-use, one-hour reset link (Resend, or the server log in development); signs out other sessions

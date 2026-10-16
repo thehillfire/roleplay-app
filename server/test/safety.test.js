@@ -87,7 +87,7 @@ test('block ends the conversation for both and hides it', async (t) => {
 });
 
 test('reports snapshot the chat, block by default, and auto-pause repeat offenders', async (t) => {
-  const s = await start();
+  const s = await start({ autoPauseMinReporterAgeMs: 0 });
   t.after(s.stop);
   const troll = await signedUp(s.base);
   const trollId = await idOf(s, troll);
@@ -177,4 +177,31 @@ test('moderators cannot restore or suspend an account its owner deleted', async 
   await gone('POST', '/api/account/delete', { password: 'quiet-harbor-9' });
   assert.equal((await mod('POST', `/api/admin/users/${goneId}/status`, { status: 'active' })).status, 409);
   assert.equal((await s.store.getUser(goneId)).status, 'deleted');
+});
+
+test('fresh throwaway accounts cannot brigade someone into a pause', async (t) => {
+  const s = await start(); // default: reporters must be at least a day old to count
+  t.after(s.stop);
+  const target = await signedUp(s.base);
+  const targetId = (await s.db.query('SELECT id FROM users WHERE handle = $1', [target.user.handle])).rows[0].id;
+  for (let i = 0; i < 3; i += 1) {
+    const sock = await signedUp(s.base);
+    const c = await matched(s, target, sock);
+    await sock('POST', `/api/conversations/${c.id}/report`, { reason: 'harassment' });
+    await c.close();
+  }
+  assert.equal((await s.store.getUser(targetId)).status, 'active');
+  assert.equal((await s.store.listReports()).length, 3, 'reports still reach moderators');
+});
+
+test('there is a daily cap on meeting new people', async (t) => {
+  const s = await start({ realtime: { dailyMatchLimit: 1 } });
+  t.after(s.stop);
+  const alice = await signedUp(s.base);
+  const c = await matched(s, alice, await signedUp(s.base));
+  t.after(c.close);
+  c.aws.send({ type: 'match.join', role: 'talk' });
+  const err = await c.aws.next('match.error');
+  assert.match(err.error, /met a lot of new people today/);
+  assert.equal(s.server.realtime.matchmaker.size, 0);
 });

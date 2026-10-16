@@ -14,7 +14,7 @@ const VERIFY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const REPORT_REASONS = ['harassment', 'sexual', 'minor', 'hate', 'spam', 'self_harm', 'other'];
 // Auto-pause (pending human review) when this many different people report someone within a week.
-const AUTO_PAUSE = { window: 7 * 24 * 60 * 60 * 1000, reporters: 3, minorReporters: 2 };
+const AUTO_PAUSE = { window: 7 * 24 * 60 * 60 * 1000, reporters: 3, minorReporters: 2, minReporterAgeMs: 24 * 60 * 60 * 1000 };
 
 function createRateLimiter({ max, windowMs, now = Date.now, key = (req) => req.ip }) {
   const hits = new Map();
@@ -60,6 +60,7 @@ function createApp({
   messageRateLimit = { max: 30, windowMs: 60000 },
   staticDir,
   payments = createPayments(),
+  autoPauseMinReporterAgeMs = AUTO_PAUSE.minReporterAgeMs,
   push = createPush(),
   mailer = createMailer(),
   publicUrl = process.env.PUBLIC_URL,
@@ -466,8 +467,8 @@ function createApp({
     }
     const since = Date.now() - AUTO_PAUSE.window;
     const [all, minor] = await Promise.all([
-      store.distinctReporters(partnerId, since),
-      store.distinctReporters(partnerId, since, 'minor'),
+      store.distinctReporters(partnerId, since, { minReporterAgeMs: autoPauseMinReporterAgeMs }),
+      store.distinctReporters(partnerId, since, { reason: 'minor', minReporterAgeMs: autoPauseMinReporterAgeMs }),
     ]);
     if (all >= AUTO_PAUSE.reporters || minor >= AUTO_PAUSE.minorReporters) {
       const reported = await store.getUser(partnerId);

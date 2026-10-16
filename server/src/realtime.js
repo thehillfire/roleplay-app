@@ -47,7 +47,13 @@ function originAllowed(req, allowedOrigins) {
   }
 }
 
-function attachRealtime({ server, hub, store, allowedOrigins = [], sameRoleAfterMs, sweepMs = 5000, log = console }) {
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function attachRealtime({
+  server, hub, store, allowedOrigins = [], sameRoleAfterMs, sweepMs = 5000, log = console,
+  // New people per day, so nobody can cycle through hundreds of strangers.
+  dailyMatchLimit = Number(process.env.DAILY_MATCH_LIMIT) || 40,
+}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4096 });
 
   const matchmaker = createMatchmaker({
@@ -108,7 +114,15 @@ function attachRealtime({ server, hub, store, allowedOrigins = [], sameRoleAfter
         if (msg.type === 'match.join') {
           const role = typeof msg.role === 'string' ? msg.role : 'either';
           const topic = typeof msg.topic === 'string' ? msg.topic.trim().toLowerCase().slice(0, TOPIC_MAX) : '';
-          const [blocked, known] = await Promise.all([store.blockedIds(user.id), store.partnerIds(user.id)]);
+          const [blocked, known, today] = await Promise.all([
+            store.blockedIds(user.id),
+            store.partnerIds(user.id),
+            store.conversationsStartedSince(user.id, Date.now() - DAY_MS),
+          ]);
+          if (today >= dailyMatchLimit) {
+            ws.send(JSON.stringify({ type: 'match.error', error: "You've met a lot of new people today. You can keep talking with anyone in your list, and matching opens again tomorrow." }));
+            return;
+          }
           // The socket may have closed while we looked those up; never queue someone who's gone.
           if (ws.readyState !== ws.OPEN) return;
           ws.send(JSON.stringify({ type: 'match.waiting' }));

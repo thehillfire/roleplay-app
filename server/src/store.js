@@ -323,16 +323,28 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     },
 
     // Distinct people who reported this user since `since`, optionally for one reason.
-    async distinctReporters(reportedId, since, reason) {
-      const params = [reportedId, since];
+    // Distinct people who reported this user since `since`. Only reporters whose accounts were at
+    // least `minReporterAgeMs` old when they reported count, so fresh throwaway accounts can't brigade.
+    async distinctReporters(reportedId, since, { reason, minReporterAgeMs = 0 } = {}) {
+      const params = [reportedId, since, minReporterAgeMs];
       let extra = '';
       if (reason) {
         params.push(reason);
-        extra = 'AND reason = $3';
+        extra = 'AND r.reason = $4';
       }
       const { rows } = await db.query(
-        `SELECT COUNT(DISTINCT reporter_id) AS n FROM reports WHERE reported_id = $1 AND created_at >= $2 ${extra}`,
+        `SELECT COUNT(DISTINCT r.reporter_id) AS n FROM reports r JOIN users u ON u.id = r.reporter_id
+          WHERE r.reported_id = $1 AND r.created_at >= $2 AND r.created_at - u.created_at >= $3 ${extra}`,
         params,
+      );
+      return Number(rows[0].n);
+    },
+
+    // New conversations this user started (by matching) since `since`.
+    async conversationsStartedSince(userId, since) {
+      const { rows } = await db.query(
+        'SELECT COUNT(*) AS n FROM conversations WHERE (user_a = $1 OR user_b = $1) AND created_at >= $2',
+        [userId, since],
       );
       return Number(rows[0].n);
     },
