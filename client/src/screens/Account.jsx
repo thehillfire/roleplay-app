@@ -146,7 +146,7 @@ export default function Account({ user, billing, pushKey, onUserChanged, onBack,
       </section>
 
       {confirming && (
-        <form className="card form" onSubmit={remove}>
+        <form className="card form" onSubmit={remove} ref={(el) => { if (el && !el.dataset.shown) { el.dataset.shown = '1'; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.querySelector('input')?.focus({ preventScroll: true }); } }}>
           <p>Deleting removes your email, password and anything you revealed through Connect right away. People you talked to will see that you left.</p>
           <p className="hint">Messages and reports are kept for 90 days only so moderators can finish any safety review, then they're erased.</p>
           <label>

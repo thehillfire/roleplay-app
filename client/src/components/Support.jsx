@@ -44,7 +44,7 @@ export default function Support({ emailVerified }) {
       <h2 className="section-title">Contact support</h2>
       {sent && (
         <p className="hint" role="status">
-          Thanks, we got it. {emailVerified ? "We'll reply by email." : "We'll reply by email once you confirm your address (see the link on Home)."}
+          Thanks, we got it. {emailVerified ? "We'll reply here and by email." : "We'll reply here. Confirm your email (link on Home) to get replies by email too."}
         </p>
       )}
       {open ? (

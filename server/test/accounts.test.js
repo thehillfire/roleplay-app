@@ -174,3 +174,15 @@ test('TRUST_PROXY=0: a faked X-Forwarded-For does not get a fresh rate-limit buc
   }
   assert.deepEqual(statuses, [200, 200, 429, 429]);
 });
+
+test('signup refuses the most common passwords', async (t) => {
+  const s = await start({ authRateLimit: { max: 1000, windowMs: 60000 } });
+  t.after(s.stop);
+  for (const password of ['password', '12345678', 'Password123']) {
+    const res = await client(s.base)('POST', '/api/auth/signup', adult({ password }));
+    assert.equal(res.status, 400, password);
+    assert.match(res.body.error, /too easy to guess/);
+  }
+  const named = await client(s.base)('POST', '/api/auth/signup', adult({ email: 'riverstone@example.com', password: 'riverstone' }));
+  assert.equal(named.status, 400, 'not the email name either');
+});

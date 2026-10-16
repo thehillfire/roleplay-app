@@ -10,8 +10,8 @@ const GUIDELINES = [
   'If someone is in danger, point them to real help (call or text 988 in the US).',
 ];
 
-export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey }) {
-  const [mode, setMode] = useState(null); // null | 'signup' | 'login' | 'forgot'
+export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey, initialMode = null, farewell = false }) {
+  const [mode, setMode] = useState(initialMode); // null | 'signup' | 'login' | 'forgot'
   const [sent, setSent] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -79,6 +79,7 @@ export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey }) {
   if (!mode) {
     return (
       <main className="screen welcome">
+        {farewell && <p className="notice" role="status">Your account was deleted. Take care of yourself, and you're welcome back any time.</p>}
         <header className="hero">
           <h1>Kindred</h1>
           <p className="tagline">Talk to someone. Nobody has to know.</p>

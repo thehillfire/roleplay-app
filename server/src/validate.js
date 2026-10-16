@@ -1,6 +1,15 @@
 const MIN_AGE = 18;
 const MAX_MESSAGE = 2000;
 
+// The passwords people try first. Not a full breach list, just the obvious ones.
+const COMMON_PASSWORDS = new Set([
+  'password', 'password1', 'password12', 'password123', 'passw0rd', '12345678', '123456789', '1234567890', '87654321',
+  '11111111', '00000000', 'qwertyui', 'qwerty123', 'qwertyuiop', 'abcd1234', 'abc12345', 'iloveyou', 'iloveyou1',
+  'letmein1', 'welcome1', 'welcome123', 'sunshine', 'princess', 'football', 'baseball', 'superman', 'whatever',
+  'trustno1', 'starwars', 'monkey123', 'dragon123', 'changeme', 'asdfghjk', 'asdf1234', 'zxcvbnm1', '1q2w3e4r',
+  'kindred1', 'kindred123', 'loveyou1', 'mypassword', 'secret123', 'admin123',
+]);
+
 function badRequest(message) {
   return Object.assign(new Error(message), { status: 400, expose: true });
 }
@@ -39,6 +48,9 @@ function parseCredentials(body = {}, { signup, today } = {}) {
     throw badRequest(signup ? 'Password must be at least 8 characters' : 'password is required');
   }
   if (body.password.length > 200) throw badRequest('Password must be at most 200 characters');
+  if (signup && (COMMON_PASSWORDS.has(body.password.toLowerCase()) || body.password.toLowerCase() === email.split('@')[0])) {
+    throw badRequest('That password is too easy to guess. Try a few words that mean something to you.');
+  }
   const out = { email, password: body.password };
   if (signup) {
     const age = ageOn(body.birthdate, today);

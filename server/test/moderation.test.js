@@ -269,3 +269,13 @@ test('invisible characters and look-alike letters do not slip past the screener'
   ]) assert.ok(flagsOf(text).includes(flag), JSON.stringify(text));
   for (const text of ['Привет, как дела?', 'καλημέρα']) assert.deepEqual(flagsOf(text), [], text);
 });
+
+test('QA regressions: crisis phrasing, insults aimed at the other person, street addresses', () => {
+  for (const text of ["I've been thinking about ending it all", "honestly I don't see the point anymore", 'there is no point anymore']) {
+    assert.equal(screenMessage(text).crisis, true, text);
+  }
+  for (const text of ['you sound pathetic and nobody cares, loser', "you're such a loser", 'nobody cares about you', 'shut up, loser']) {
+    assert.ok(flagsOf(text).includes('harassment'), text);
+  }
+  assert.ok(flagsOf('I live at 42 Elm Street in Dayton').includes('location'));
+});

@@ -92,7 +92,12 @@ test('blocked people are never matched and cannot message', async (t) => {
   await s.store.block(aliceId, bobId);
 
   assert.equal((await bob('POST', `/api/conversations/${am.conversationId}/messages`, { body: 'hello?' })).status, 403);
-  assert.equal((await bob('GET', '/api/conversations')).body.conversations.length, 0);
+  // Bob was the one blocked: he still sees it, ended and read-only, so he can report it this week.
+  const [ended] = (await bob('GET', '/api/conversations')).body.conversations;
+  assert.equal(ended.ended, true);
+  assert.equal(ended.partner.online, false);
+  assert.equal((await bob('GET', `/api/conversations/${am.conversationId}`)).body.conversation.ended, true);
+  assert.equal((await alice('GET', '/api/conversations')).body.conversations.length, 0, 'gone for the person who blocked');
 
   aws.send({ type: 'match.join', role: 'talk' });
   await aws.next('match.waiting');

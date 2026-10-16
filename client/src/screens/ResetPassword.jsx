@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api.js';
 
-export default function ResetPassword({ token, onDone }) {
+export default function ResetPassword({ token, onDone, onRequestNew }) {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -29,7 +29,11 @@ export default function ResetPassword({ token, onDone }) {
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} maxLength={200} autoComplete="new-password" required />
         </label>
         {error && <p className="form-error" role="alert">{error}</p>}
-        <button className="btn primary" type="submit" disabled={busy || !token}>{busy ? 'Saving…' : 'Save and sign in'}</button>
+        {(error && /expired|already used|request a new/i.test(error)) || !token ? (
+          <button className="btn primary" type="button" onClick={onRequestNew}>Send me a new link</button>
+        ) : (
+          <button className="btn primary" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save and sign in'}</button>
+        )}
         <p className="hint">This signs you out on every other device.</p>
       </form>
     </main>

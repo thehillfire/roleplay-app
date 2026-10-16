@@ -15,6 +15,7 @@ async function person(name) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
+  page.on('dialog', (d) => d.accept()); // confirmations (suspend, block, sign out everywhere): say yes
   page.on('console', (m) => m.type() === 'error' && !/status of 4\d\d/.test(m.text()) && errors.push(`${name}: ${m.text()}`));
   page.shot = async (file) => SHOTS && (await page.waitForTimeout(500), await page.screenshot({ path: `${SHOTS}/${file}.png` }));
   return page;
@@ -317,7 +318,9 @@ if (process.env.MOD_EMAIL && process.env.MAIL_LOG) {
   const profile = mod.locator('.report', { hasText: aliceHandle });
   await profile.getByText('appeal granted').waitFor();
   assert.match(await profile.innerText(), /Reports against: 0 open · 1 total/);
+  // A reload keeps her in her last chat (now ended by Bob, read-only and reportable); go home from there.
   await alice.reload();
+  await alice.locator('.chat-head .back').click();
   await alice.getByRole('button', { name: 'Find someone' }).waitFor();
   step('appeal granted and logged; account restored');
 

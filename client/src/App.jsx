@@ -31,7 +31,7 @@ function Paused({ onSignOut }) {
     <main className="screen paused">
       <div className="card">
         <h1 className="find-title">Your account is paused</h1>
-        <p>A moderator is taking a look at a recent report or message. This usually happens when something may break the guidelines, for example if it looks like someone under 18 is using Kindred.</p>
+        <p>A moderator is taking a look at your account. This can follow a report, a message our safety check flagged, or something about the sign-up, such as an age that didn't add up. It isn't a final decision.</p>
         <p className="hint">If you need support right now, call or text <a href="tel:988">988</a> (US) or visit <a href="https://findahelpline.com" target="_blank" rel="noreferrer">findahelpline.com</a>.</p>
       </div>
       {appeal && (
@@ -55,12 +55,18 @@ function Paused({ onSignOut }) {
 }
 
 function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere, onDeleted, onPaused, onRefreshMe, onOpenLegal, initialNotice, externalNotice }) {
-  const [view, setView] = useState({ name: 'home' });
+  // A reload mid-chat stays in the chat (the browser keeps history.state across reloads). Opening
+  // the site afresh (typing the address, a link) starts at home even if the state survived.
+  const restoreChat = () => {
+    const nav = performance.getEntriesByType?.('navigation')?.[0]?.type;
+    return (nav === 'reload' || nav === 'back_forward') && window.history.state?.view?.name === 'chat';
+  };
+  const [view, setView] = useState(() => (restoreChat() ? window.history.state.view : { name: 'home' }));
 
   // Browser history: home is the root entry; other screens are pushed on top so the
   // phone's back button (and swipe back) returns to the previous screen instead of leaving.
   useEffect(() => {
-    window.history.replaceState({ view: { name: 'home' } }, '');
+    if (!restoreChat()) window.history.replaceState({ view: { name: 'home' } }, '');
     const onPop = (e) => {
       if (e.state?.legal) return;
       const next = e.state?.view || { name: 'home' };
@@ -307,7 +313,7 @@ export default function App() {
 
   const deleted = () => {
     // A fresh page: the next person's Back button can't walk into the previous account's screens.
-    window.location.replace('/');
+    window.location.replace('/?deleted=1');
   };
 
   // /privacy and /terms are readable signed in or out. They overlay the app
@@ -318,6 +324,12 @@ export default function App() {
   };
   const [legal, setLegal] = useState(legalFromPath);
   // Reset links look like /reset#<token>; the token stays out of server logs and referrers.
+  // Where the signed-out screen starts: after deleting an account, or from a dead reset link.
+  const [welcomeMode, setWelcomeMode] = useState(() => {
+    if (new URLSearchParams(window.location.search).get('deleted') !== '1') return null;
+    window.history.replaceState(null, '', '/');
+    return 'deleted';
+  });
   const [resetToken, setResetToken] = useState(() => (window.location.pathname === '/reset' ? window.location.hash.slice(1) || '' : null));
   // Email confirmation links look like /verify#<token>.
   const [verifyNotice, setVerifyNotice] = useState('');
@@ -362,10 +374,16 @@ export default function App() {
     <div className="app">
       <div className="sky" aria-hidden="true" />
       {legal && <Legal doc={legal} onBack={closeLegal} />}
-      {resetToken !== null && !legal && <ResetPassword token={resetToken} onDone={finishReset} />}
+      {resetToken !== null && !legal && (
+        <ResetPassword
+          token={resetToken}
+          onDone={finishReset}
+          onRequestNew={() => { window.history.replaceState(null, '', '/'); setResetToken(null); setWelcomeMode('forgot'); }}
+        />
+      )}
       <div hidden={Boolean(legal) || resetToken !== null}>
       {user === undefined && <main className="screen"><p className="loading">One moment…</p></main>}
-      {user === null && <Welcome onSignedIn={(u) => refreshMe().catch(() => setUser(u))} onOpenLegal={openLegal} captchaSiteKey={captchaSiteKey} />}
+      {user === null && <Welcome key={welcomeMode || 'landing'} initialMode={welcomeMode === 'forgot' ? 'forgot' : null} farewell={welcomeMode === 'deleted'} onSignedIn={(u) => refreshMe().catch(() => setUser(u))} onOpenLegal={openLegal} captchaSiteKey={captchaSiteKey} />}
       {user && user.status !== 'active' && <Paused onSignOut={signOut} />}
       {user && user.status === 'active' && (
         <Signedin

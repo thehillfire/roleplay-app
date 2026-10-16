@@ -54,15 +54,17 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     res.json({
       conversations: conversations.map(({ partner, ...c }) => ({
         ...c,
-        partner: { handle: partner.handle, online: hub.isOnline(partner.id) },
+        partner: { handle: partner.handle, online: !c.ended && hub.isOnline(partner.id) },
       })),
     });
   }));
 
   app.get('/api/conversations/:id', member, conversation, asyncRoute(async (req, res) => {
     const partner = await store.getUser(req.conversation.partnerId);
+    // Ended by them recently: readable (so it can be reported), but nothing more.
+    const endedAt = await store.endedByPartnerRecently(req.user.id, partner.id);
     const blocked = await store.isBlocked(req.user.id, partner.id);
-    if (blocked) throw httpError(404, 'Conversation not found.');
+    if (blocked && !endedAt) throw httpError(404, 'Conversation not found.');
     const before = Number(req.query.before) || undefined;
     const beforeId = typeof req.query.beforeId === 'string' ? req.query.beforeId.slice(0, 64) : undefined;
     const messages = await store.listMessages(req.user.id, req.conversation.id, { before, beforeId });
@@ -77,10 +79,11 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     res.json({
       conversation: {
         id: req.conversation.id,
-        partner: { handle: partner.handle, online: hub.isOnline(partner.id) },
+        partner: { handle: partner.handle, online: !endedAt && hub.isOnline(partner.id) },
         connection,
         partnerReadAt,
         muted: req.conversation.muted,
+        ended: Boolean(endedAt),
         feedback: { canRate, helpful: feedback },
       },
       // Flags are only shown to the sender, to explain why a message was held.

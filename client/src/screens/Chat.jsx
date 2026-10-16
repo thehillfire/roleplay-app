@@ -48,6 +48,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
   const [feedbackDone, setFeedbackDone] = useState(false);
   const [kindNote, setKindNote] = useState(null); // null, or the note being written after "it helped"
   const [kindError, setKindError] = useState('');
+  const [kindSent, setKindSent] = useState(false);
   const [partnerReadAt, setPartnerReadAt] = useState(0);
   const [reactingTo, setReactingTo] = useState(null); // message id with the picker open
   const [selected, setSelected] = useState(null); // tapped message: shows its actions
@@ -70,6 +71,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     setError('');
     api.conversation(id).then((d) => {
       setConvo(d.conversation);
+      if (d.conversation.ended) setEnded(true);
       // Merge rather than replace: a message pushed live while this request was in flight
       // (e.g. their first line, sent the moment you matched) isn't in this response yet.
       // A reconnect reloads the latest page: keep earlier pages already loaded above it.
@@ -328,6 +330,8 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     try {
       await api.sendKindWords(id, kindNote);
       setKindNote(null);
+      setKindSent(true);
+      setTimeout(() => setKindSent(false), 4000);
     } catch (err) {
       setKindError(err.message);
     }
@@ -375,15 +379,15 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
             <button ref={menuButton} className="icon-btn" aria-label="Conversation options" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>⋯</button>
             {menuOpen && (
               <div className="menu" role="menu" ref={menuRef}>
-                {convo.connection?.status === 'none' && (
+                {!ended && convo.connection?.status === 'none' && (
                   <button role="menuitem" onClick={() => { setMenuOpen(false); setConnectSheet('request'); }}>Connect…</button>
                 )}
-                <button role="menuitem" onClick={() => { setMenuOpen(false); setDraft(GOODBYE); document.querySelector('.composer textarea')?.focus(); }}>Say goodbye…</button>
-                <button role="menuitem" onClick={toggleMute}>{convo.muted ? 'Unmute notifications' : 'Mute notifications'}</button>
-                <button role="menuitem" onClick={hide}>Hide from my list</button>
-                <button role="menuitem" onClick={() => close('end')}>End conversation</button>
+                {!ended && <button role="menuitem" onClick={() => { setMenuOpen(false); setDraft(GOODBYE); document.querySelector('.composer textarea')?.focus(); }}>Say goodbye…</button>}
+                {!ended && <button role="menuitem" onClick={toggleMute}>{convo.muted ? 'Unmute notifications' : 'Mute notifications'}</button>}
+                {!ended && <button role="menuitem" onClick={hide}>Hide from my list</button>}
+                {!ended && <button role="menuitem" onClick={() => close('end')}>End conversation</button>}
                 <button role="menuitem" onClick={() => { setMenuOpen(false); setReporting(true); }}>Report</button>
-                <button role="menuitem" onClick={() => close('block')}>Block</button>
+                {!ended && <button role="menuitem" onClick={() => close('block')}>Block</button>}
               </div>
             )}
           </div>
@@ -460,6 +464,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
         </div>
       )}
 
+      {kindSent && <p className="feedback-bar" role="status">💙 Sent. They'll find your kind words on their home screen.</p>}
       {kindNote !== null && (
         <form className="feedback-bar kind-note" onSubmit={sendKindNote}>
           <span>Thanks sent. Want to leave {convo.partner.handle} a few kind words? They'll see them on their home screen, not next to your name.</span>
@@ -473,7 +478,11 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
       {ended ? (
         <div className="composer ended">
           <p>This conversation has ended.</p>
-          <button className="btn" onClick={onBack}>Back to conversations</button>
+          <p className="hint">Did something they said cross a line? You can still report it; a moderator reads every report. If you're hurting, you can call or text <a href="tel:988">988</a> (US) any time.</p>
+          <div className="sheet-actions">
+            <button className="btn" onClick={() => setReporting(true)}>Report this conversation</button>
+            <button className="btn" onClick={onBack}>Back to conversations</button>
+          </div>
         </div>
       ) : (
       <form className="composer" onSubmit={(e) => { e.preventDefault(); send(); }}>

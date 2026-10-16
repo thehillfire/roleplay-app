@@ -141,7 +141,7 @@ export default function Moderate({ onBack }) {
           <div className="actions">
             <button className="btn" disabled={!!busy} onClick={() => act(r.id, () => api.admin.resolve(r.id, 'dismissed'))}>Dismiss</button>
             <button className="btn" disabled={!!busy} onClick={() => act(r.id, () => api.admin.resolve(r.id, 'warned'))}>Warn</button>
-            <button className="btn danger" disabled={!!busy} onClick={() => act(r.id, () => api.admin.resolve(r.id, 'suspended'))}>Suspend {r.reported.handle}</button>
+            <button className="btn danger" disabled={!!busy} onClick={() => window.confirm(`Suspend ${r.reported.handle}?`) && act(r.id, () => api.admin.resolve(r.id, 'suspended'))}>Suspend {r.reported.handle}</button>
           </div>
           {(r.reported.status === 'review' || r.reported.status === 'suspended') && (
             <button className="link" disabled={!!busy} onClick={() => act(`u-${r.reported.id}`, () => api.admin.setStatus(r.reported.id, 'active'))}>
@@ -177,6 +177,7 @@ export default function Moderate({ onBack }) {
             <strong>{a.user.handle} <StatusTag status={a.user.status} /></strong>
             <small>{when(a.createdAt)}</small>
           </header>
+          {a.reason && <p className="meta"><span>Paused for: {a.reason}</span></p>}
           <p className="details">“{a.message}”</p>
           <div className="actions">
             <button className="btn primary" disabled={!!busy} onClick={() => act(a.id, () => api.admin.resolveAppeal(a.id, true))}>Restore account</button>
@@ -202,7 +203,9 @@ export default function Moderate({ onBack }) {
             maxLength={4000}
           />
           <div className="actions">
-            <button className="btn primary" disabled={!!busy || !(replies[r.id] || '').trim()} onClick={() => act(r.id, () => api.admin.resolveSupport(r.id, replies[r.id]))}>Send reply</button>
+            {r.user.status !== 'deleted' && (
+              <button className="btn primary" disabled={!!busy || !(replies[r.id] || '').trim()} onClick={() => act(r.id, () => api.admin.resolveSupport(r.id, replies[r.id]))}>Send reply</button>
+            )}
             <button className="btn" disabled={!!busy} onClick={() => act(r.id, () => api.admin.resolveSupport(r.id, ''))}>Close without reply</button>
           </div>
         </article>

@@ -82,8 +82,15 @@ test('block ends the conversation for both and hides it', async (t) => {
   assert.equal((await bob('POST', `/api/conversations/${c.id}/block`, {})).status, 200);
   assert.equal((await c.aws.next('conversation.ended')).conversationId, c.id);
   assert.equal((await alice('POST', `/api/conversations/${c.id}/messages`, { body: 'hey' })).status, 403);
-  assert.equal((await alice('GET', '/api/conversations')).body.conversations.length, 0);
+  // Bob blocked: gone for him. Alice keeps it read-only for a week so she can report it.
   assert.equal((await bob('GET', '/api/conversations')).body.conversations.length, 0);
+  const [ended] = (await alice('GET', '/api/conversations')).body.conversations;
+  assert.equal(ended.ended, true);
+  assert.equal((await alice('POST', `/api/conversations/${c.id}/report`, { reason: 'harassment', block: false })).status, 201, 'still reportable');
+  // After a week it's gone for her too.
+  await s.db.query('UPDATE blocks SET created_at = $1', [Date.now() - 8 * 24 * 60 * 60 * 1000]);
+  assert.equal((await alice('GET', '/api/conversations')).body.conversations.length, 0);
+  assert.equal((await alice('GET', `/api/conversations/${c.id}`)).status, 404);
 });
 
 test('reports snapshot the chat, block by default, and auto-pause repeat offenders', async (t) => {

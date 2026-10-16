@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 
 // Your message for the next listener, while nobody has picked it up yet.
-export default function WaitingMessage({ refreshKey }) {
+export default function WaitingMessage({ refreshKey, onChange = () => {} }) {
   const [bottle, setBottle] = useState(null);
   useEffect(() => {
     api.bottle().then(setBottle, () => {});
   }, [refreshKey]);
+  useEffect(() => onChange(Boolean(bottle)), [bottle, onChange]);
   if (!bottle) return null;
   const withdraw = async () => {
     setBottle(null);

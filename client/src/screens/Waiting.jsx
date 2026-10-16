@@ -91,7 +91,8 @@ export default function Waiting({ onCancel, error, presence, canLeaveMessage, on
       <p className="loading" role="status">{error || (breathe ? BREATH[phase].label : LINES[i])}</p>
       {breathe && !error && <p className="hint">Still looking for someone. You'll see them the moment they're here.</p>}
       {presence?.online > 1 && <p className="presence"><span className="dot" aria-hidden="true" /> {presence.online} people here now</p>}
-      {slow && !error && <p className="hint">It's quiet right now. Choosing <strong>Either</strong> or no topic widens the search.</p>}
+      {slow && !error && !listening && <p className="hint">It's quiet right now. Choosing <strong>Either</strong> or no topic widens the search.</p>}
+      {slow && !error && listening && <p className="hint">It's quiet right now: nobody needs a listener this minute. Thank you for being here.</p>}
       {offer && !error && canLeaveMessage && !writing && (
         <button className="btn" onClick={() => setWriting(true)}>Leave a message for the next listener</button>
       )}

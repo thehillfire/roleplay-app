@@ -3,7 +3,8 @@ const { randomHandle } = require('./handles');
 const { ageOn } = require('./validate');
 
 const newId = () => crypto.randomUUID();
-const UNDERAGE_SIGNUP = 'underage-signup'; // banned_devices marker: refused at signup as under 18
+const UNDERAGE_SIGNUP = 'underage-signup';
+const ENDED_VISIBLE_MS = 7 * 24 * 60 * 60 * 1000; // a conversation the other person ended stays readable this long // banned_devices marker: refused at signup as under 18
 const num = (v) => (v === null || v === undefined ? v : Number(v));
 const pairKey = (a, b) => (a < b ? `${a}:${b}` : `${b}:${a}`);
 
@@ -291,15 +292,18 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
                 (SELECT m.body FROM messages m WHERE m.conversation_id = c.id AND (m.status = 'delivered' OR (m.sender_id = $1 AND m.status = 'held'))
                    ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_body,
                 (SELECT m.sender_id FROM messages m WHERE m.conversation_id = c.id AND (m.status = 'delivered' OR (m.sender_id = $1 AND m.status = 'held'))
-                   ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_sender
+                   ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_sender,
+                EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = p.id AND b.blocked_id = $1) AS ended
            FROM conversations c
            JOIN users p ON p.id = CASE WHEN c.user_a = $1 THEN c.user_b ELSE c.user_a END
           WHERE (c.user_a = $1 OR c.user_b = $1)
-            AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = $1 AND b.blocked_id = p.id) OR (b.blocker_id = p.id AND b.blocked_id = $1))
+            AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $1 AND b.blocked_id = p.id)
+            -- Ended by the other person: still listed (read-only) for a week, so it can be reported.
+            AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = p.id AND b.blocked_id = $1 AND b.created_at < $2)
             ${visible}
           ORDER BY c.last_message_at DESC
-          ${limit ? 'LIMIT $2' : ''}`,
-        limit ? [userId, limit] : [userId],
+          ${limit ? 'LIMIT $3' : ''}`,
+        limit ? [userId, now() - ENDED_VISIBLE_MS, limit] : [userId, now() - ENDED_VISIBLE_MS],
       );
       return rows.map((r) => ({
         id: r.id,
@@ -308,7 +312,15 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         lastMessage: r.last_body === null || r.last_body === undefined ? null : { body: r.last_body, fromMe: r.last_sender === userId },
         lastMessageAt: num(r.last_message_at),
         createdAt: num(r.created_at),
+        ended: r.ended === true || Number(r.ended) === 1,
       }));
+    },
+
+    // When the other person ended (blocked) the conversation, and it's still recent enough to
+    // read and report; null otherwise.
+    async endedByPartnerRecently(userId, partnerId) {
+      const { rows } = await db.query('SELECT created_at FROM blocks WHERE blocker_id = $1 AND blocked_id = $2', [partnerId, userId]);
+      return rows[0] && num(rows[0].created_at) >= now() - ENDED_VISIBLE_MS ? num(rows[0].created_at) : null;
     },
 
     // Messages visible to this user: everything delivered, plus their own held messages.
@@ -929,10 +941,17 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
 
     async listAppeals() {
       const { rows } = await db.query(
-        `SELECT a.*, u.handle, u.status AS user_status FROM appeals a JOIN users u ON u.id = a.user_id
+        `SELECT a.*, u.handle, u.status AS user_status,
+                (SELECT m.action || COALESCE(': ' || m.detail, '') FROM mod_actions m WHERE m.target_id = a.user_id
+                  ORDER BY m.created_at DESC LIMIT 1) AS last_action
+           FROM appeals a JOIN users u ON u.id = a.user_id
           WHERE a.status = 'open' ORDER BY a.created_at ASC`,
       );
-      return rows.map((r) => ({ id: r.id, message: r.message, createdAt: num(r.created_at), user: { id: r.user_id, handle: r.handle, status: r.user_status } }));
+      return rows.map((r) => ({
+        id: r.id, message: r.message, createdAt: num(r.created_at),
+        user: { id: r.user_id, handle: r.handle, status: r.user_status },
+        reason: r.last_action ? r.last_action.replace(/_/g, ' ') : null, // why they were paused, from the audit log
+      }));
     },
 
     // Closes an open appeal exactly once (two moderators clicking at once can't both decide).

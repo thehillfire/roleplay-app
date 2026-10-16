@@ -83,6 +83,8 @@ const LOCATION_PATTERNS = [
   /\bwhat'?s\s+(your|ur)\s+(address|zip(\s*code)?|city|town)\b/,
   /\b(donde|en\s+que\s+(ciudad|pueblo|colonia|estado))\s+vives\b/,
   /\b(cual|que)\s+es\s+tu\s+(direccion|ciudad|colonia|codigo\s+postal)\b/,
+  // A street address someone shares about themselves.
+  /\b(i\s+live|i'?m|im|my\s+(house|apartment|place)\s+is)\s+(at|on)\s+\d{1,5}\s+[a-z]+(\s+[a-z]+)?\s+(street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd|court|ct|way|place|pl)\b/,
 ];
 
 // Strangers arranging to meet, or asking for photos (no photos in Kindred: it means elsewhere).
@@ -202,7 +204,10 @@ const CRISIS_PATTERNS = [
   /\bsuicid(e|al)\b/,
   /\b(want|wanna|going)\s+to\s+die\b/,
   /\bwanna\s+die\b/,
-  /\bend\s+(it\s+all|my\s+life|things)\b/,
+  /\b(end|ending)\s+(it\s+all|my\s+life|things|myself)\b/,
+  /\b(don'?t|do\s+not|can'?t)\s+see\s+(the|a|any)\s+point\s*(any\s*more|anymore|in\s+(living|life|anything|going\s+on|trying|being\s+here)|$|[.!?,])/,
+  /\bno\s+point\s+(any\s*more|anymore|in\s+(anything|trying|being\s+here))\b/,
+  /\bwhat'?s\s+the\s+point\s+any\s*more\b/,
   /\bno\s+(reason|point)\s+(to|in)\s+(live|living|going\s+on)\b/,
   /\b(cut|cutting)\s+(my\s*self|myself)\b/,
   /\bself[\s-]?harm\b/,
@@ -237,6 +242,10 @@ const ABUSE_PATTERNS = [
   new RegExp(`${QUOTED}\\b(go|just|you\\s+should|u\\s+should)\\s+(kill|unalive)\\s+(your\\s*self|yourself|urself|ur\\s*self)\\b`),
   new RegExp(`${QUOTED}\\b(matate|suicidate)\\b`),
   new RegExp(`${QUOTED}\\b(you|u)\\s+should\\s+(just\\s+)?die\\b`),
+  // Insults aimed at the other person ("you're pathetic"); "you're not worthless" is fine.
+  new RegExp(`${QUOTED}\\b(you|u)\\s*('?re|are|r|sound|look|seem)?\\s+(such\\s+a\\s+|a\\s+|so\\s+|like\\s+a\\s+)?(pathetic|worthless|loser|idiot|moron|stupid|ugly|disgusting|useless|retard(ed)?|freak|waste\\s+of\\s+space)\\b`),
+  new RegExp(`${QUOTED}\\b(nobody|no\\s+one)\\s+(cares|likes|loves|would\\s+miss)\\s+(about\\s+)?(you|u)\\b`),
+  /[,!]\s*(loser|idiot|moron|freak)\s*[.!]*$/, // "…, loser" aimed at them
 ];
 
 const any = (patterns, t) => patterns.some((re) => re.test(t));

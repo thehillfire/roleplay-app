@@ -39,6 +39,10 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
   const [topic, setTopic] = useState('');
   const [onboarding, setOnboarding] = useState(shouldOnboard);
 
+  // Your own message for the next listener counts in the presence numbers; don't show it back to you.
+  const [mineWaiting, setMineWaiting] = useState(false);
+  const waitingForOthers = Math.max(0, (presence?.waitingToTalk || 0) - (mineWaiting ? 1 : 0));
+
   return (
     <main className="screen">
       <nav className="topbar">
@@ -62,15 +66,15 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
         </div>
       )}
 
-      <WaitingMessage refreshKey={notice} />
+      <WaitingMessage refreshKey={notice} onChange={setMineWaiting} />
 
       <section className="card find">
         <h1 className="find-title">Talk to someone</h1>
         <p className="hint">A random, anonymous match. Stay as long as you like.</p>
         {presence?.online > 1 && <p className="presence"><span className="dot" aria-hidden="true" /> {presence.online} people here now</p>}
-        {presence?.waitingToTalk > 0 && (
+        {waitingForOthers > 0 && (
           <div className="need-listener">
-            <p>💙 {presence.waitingToTalk === 1 ? 'Someone is' : `${presence.waitingToTalk} people are`} waiting for someone to listen.</p>
+            <p>💙 {waitingForOthers === 1 ? 'Someone is' : `${waitingForOthers} people are`} waiting for someone to listen.</p>
             <button className="btn" onClick={() => { setRole('listen'); onFind({ role: 'listen', topic: '' }); }}>Be a listener</button>
           </div>
         )}
@@ -134,9 +138,10 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
                       </span>
                       <span className="convo-time">{timeAgo(c.lastMessageAt)}</span>
                     </span>
-                    <span className={c.unread ? 'convo-preview unread' : 'convo-preview'}>
+                    {c.ended && <span className="convo-preview">Ended by them · open to report</span>}
+                    {!c.ended && <span className={c.unread ? 'convo-preview unread' : 'convo-preview'}>
                       {c.lastMessage ? `${c.lastMessage.fromMe ? 'You: ' : ''}${c.lastMessage.body}` : 'Say hello'}
-                    </span>
+                    </span>}
                   </span>
                   {c.unread > 0 && <span className="count" aria-label={`${c.unread} unread`}>{c.unread}</span>}
                 </button>
