@@ -245,15 +245,20 @@ module.exports = function register(app, { store, hub, payments, classifier, push
       if (recentAsks(askKey).length >= CONNECT_ASKS_PER_DAY) {
         throw httpError(429, "You've asked a few times today. Give them some room and try again tomorrow.");
       }
+      // Counted before any await, so a burst of parallel asks can't all pass the check.
+      const askedAt = Date.now();
+      connectAsks.set(askKey, [...recentAsks(askKey), askedAt]);
+      const unask = () => connectAsks.set(askKey, recentAsks(askKey).filter((t) => t !== askedAt));
       const paid = payments.enabled;
       if (paid && !(await store.spendCredit(req.user.id))) {
+        unask();
         return res.status(402).json({ error: 'Connecting needs a credit.', needsCredit: true });
       }
       if (!(await store.createConnectRequest({ conversationId: id, requesterId: req.user.id, ...reveal, paid }))) {
+        unask();
         if (paid) await store.addCredits(req.user.id, 1); // lost a race with their request; refund
         throw httpError(409, 'They just sent you a request. Open it to accept.');
       }
-      connectAsks.set(askKey, [...recentAsks(askKey), Date.now()]);
     }
     await pushConnection(id, [partnerId]);
     res.json({ connection: connectionView(await store.getConnection(id), req.user.id) });

@@ -61,7 +61,8 @@ function Paused({ onSignOut, onCheck }) {
           {Date.now() < appeal.nextAppealAt && <p className="hint">If something has changed, you can send another note after {new Date(appeal.nextAppealAt).toLocaleDateString()}.</p>}
         </div>
       )}
-      {(appeal === null || appeal?.decision === 'granted' || (appeal?.decision === 'denied' && Date.now() >= appeal.nextAppealAt)) && (
+      {/* A note can be sent unless one is waiting, or a "no" is still inside its week. */}
+      {appeal !== undefined && appeal?.status !== 'open' && !(appeal?.decision === 'denied' && Date.now() < appeal.nextAppealAt) && (
         <form className="card form" onSubmit={send}>
           <label>
             <span>Think this was a mistake? Tell the moderators what happened.</span>
@@ -165,9 +166,10 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
   }, []);
 
   // The chat needs the list too: its back arrow counts what's unread elsewhere (also after a reload).
+  const listKey = view.name === 'chat' ? `chat:${view.id}` : view.name; // chat to chat refetches too
   useEffect(() => {
     if (view.name === 'home' || view.name === 'chat') refresh();
-  }, [view.name, refresh]);
+  }, [listKey, refresh]);
 
   useEffect(() => {
     const offs = [

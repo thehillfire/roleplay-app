@@ -180,3 +180,15 @@ test('asking to connect, cancelling and asking again stops after three asks a da
   assert.equal((await p.bob('POST', `/api/conversations/${p.id}/connect`, { name: 'Robert' })).status, 200);
   assert.equal((await p.alice('POST', `/api/conversations/${p.id}/connect`, { name: 'Jav' })).body.connection.status, 'accepted');
 });
+
+test('a burst of parallel connect asks still counts each one', async (t) => {
+  const s = await start({ payments: createPayments({ secretKey: '', webhookSecret: '' }) });
+  t.after(s.stop);
+  const p = await pair(s);
+  t.after(p.close);
+  for (let i = 0; i < 3; i++) {
+    const results = await Promise.all([1, 2, 3].map(() => p.alice('POST', `/api/conversations/${p.id}/connect`, { name: 'Jav' })));
+    if (results.some((r) => r.status === 200)) await p.alice('POST', `/api/conversations/${p.id}/connect/cancel`, {});
+  }
+  assert.equal((await p.alice('POST', `/api/conversations/${p.id}/connect`, { name: 'Jav' })).status, 429);
+});

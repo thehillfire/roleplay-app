@@ -12,8 +12,8 @@ async function request(method, path, body) {
   }
   const data = await res.json().catch(() => ({}));
   // The session ended elsewhere (signed out everywhere, expired, account removed): let the app go to sign-in.
-  // Auth endpoints answer 401 as part of their normal flow, so they don't count.
-  if (res.status === 401 && !path.startsWith('/api/auth/')) window.dispatchEvent(new Event('kindred:signed-out'));
+  // Only a missing session counts; a wrong password (e.g. confirming a deletion) is a normal error.
+  if (res.status === 401 && data.code === 'signed_out') window.dispatchEvent(new Event('kindred:signed-out'));
   if (!res.ok) throw Object.assign(new Error(data.error || `Request failed (${res.status})`), { status: res.status });
   return data;
 }

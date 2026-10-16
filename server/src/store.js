@@ -4,6 +4,8 @@ const { ageOn } = require('./validate');
 
 const newId = () => crypto.randomUUID();
 const UNDERAGE_SIGNUP = 'underage-signup';
+// Log actions that pause an account (what an appeal is about), for the moderator's appeal card.
+const PAUSE_ACTIONS = "('suspend', 'auto_pause', 'report_suspended')";
 const ENDED_VISIBLE_MS = 7 * 24 * 60 * 60 * 1000; // a conversation the other person ended stays readable this long // banned_devices marker: refused at signup as under 18
 const num = (v) => (v === null || v === undefined ? v : Number(v));
 const pairKey = (a, b) => (a < b ? `${a}:${b}` : `${b}:${a}`);
@@ -964,8 +966,10 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     async listAppeals() {
       const { rows } = await db.query(
         `SELECT a.*, u.handle, u.status AS user_status,
-                (SELECT m.action FROM mod_actions m WHERE m.target_id = a.user_id ORDER BY m.created_at DESC LIMIT 1) AS last_action,
-                (SELECT m.detail FROM mod_actions m WHERE m.target_id = a.user_id ORDER BY m.created_at DESC LIMIT 1) AS last_detail
+                (SELECT m.action FROM mod_actions m WHERE m.target_id = a.user_id AND m.action IN ${PAUSE_ACTIONS}
+                  ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_action,
+                (SELECT m.detail FROM mod_actions m WHERE m.target_id = a.user_id AND m.action IN ${PAUSE_ACTIONS}
+                  ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_detail
            FROM appeals a JOIN users u ON u.id = a.user_id
           WHERE a.status = 'open' ORDER BY a.created_at ASC`,
       );

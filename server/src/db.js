@@ -301,6 +301,11 @@ const MIGRATIONS = [
     'ALTER TABLE appeals ADD COLUMN decision TEXT',
     'ALTER TABLE appeals ADD COLUMN decision_note TEXT',
   ],
+  // 27: appeals answered before decisions were recorded belong to an earlier pause; retire them
+  // so the paused screen offers a fresh note instead of an outcome it can't describe.
+  [
+    "UPDATE appeals SET status = 'past' WHERE status = 'resolved' AND decision IS NULL",
+  ],
 ];
 
 async function migrate(db) {

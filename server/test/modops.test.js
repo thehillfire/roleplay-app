@@ -338,6 +338,21 @@ test('after a restore, a later pause starts with a fresh appeal', async (t) => {
   await s.store.setUserStatus(personId, 'suspended'); // and paused again for something new
   assert.equal((await person('GET', '/api/appeal')).body.appeal, null, 'the old decision belonged to the old pause');
   assert.equal((await person('POST', '/api/appeal', { message: 'this time is different' })).status, 201);
+  const [second] = (await mod('GET', '/api/admin/appeals')).body.appeals;
+  assert.equal(second.pausedBy.action, 'suspend', 'the cause, not the earlier "keep paused"');
+});
+
+test('a wrong password is not mistaken for a lost session', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const person = await signedUp(s.base);
+  const wrong = await person('POST', '/api/account/delete', { password: 'not-my-password' });
+  assert.equal(wrong.status, 401);
+  assert.notEqual(wrong.body.code, 'signed_out');
+  await person('POST', '/api/auth/logout', {});
+  const gone = await person('GET', '/api/conversations');
+  assert.equal(gone.status, 401);
+  assert.equal(gone.body.code, 'signed_out');
 });
 
 test('held messages come with the few messages just before them', async (t) => {
