@@ -997,6 +997,13 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return rowCount === 1;
     },
 
+    // All of them older than `before`: answered ones already live on as the first chat message
+    // (under the normal message retention), so the copy here shouldn't outlast that.
+    async purgeOldBottles(before) {
+      const { rowCount } = await db.query('DELETE FROM bottles WHERE created_at < $1', [before]);
+      return rowCount;
+    },
+
     async releaseBottle(id) {
       await db.query("UPDATE bottles SET status = 'open', claimed_by = NULL, claimed_at = NULL WHERE id = $1 AND status = 'claimed' AND conversation_id IS NULL", [id]);
     },

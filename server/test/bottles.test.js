@@ -155,3 +155,13 @@ test('waiting messages respect the daily new-people cap', async (t) => {
   await wait(50);
   assert.equal(w2.events.filter((e) => e.type === 'match.found').length, 0);
 });
+
+test('old unanswered messages for the next listener are purged', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const talker = await signedUp(s.base);
+  await talker('POST', '/api/bottle', { body: 'Anyone? Long night.' });
+  assert.equal(await s.store.purgeOldBottles(Date.now() - 1000), 0, 'recent ones stay');
+  assert.equal(await s.store.purgeOldBottles(Date.now() + 1000), 1);
+  assert.equal((await talker('GET', '/api/bottle')).body.bottle, null);
+});

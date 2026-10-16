@@ -26,6 +26,9 @@ boot({ staticDir }).then(({ listen, db, store }) => {
       if (accounts) console.log(`Purged ${accounts} deleted account(s)`);
       const scrubbed = await store.scrubResolvedReports(Date.now() - RETENTION_DAYS * DAY_MS);
       if (scrubbed) console.log(`Erased transcripts on ${scrubbed} long-resolved report(s)`);
+      // Messages left for the next listener: they expire after a day; the rows go after a week.
+      const bottles = await store.purgeOldBottles(Date.now() - 7 * DAY_MS);
+      if (bottles) console.log(`Deleted ${bottles} old message(s) for the next listener`);
       if (MESSAGE_RETENTION_DAYS > 0) {
         const messages = await store.purgeOldMessages(Date.now() - MESSAGE_RETENTION_DAYS * DAY_MS);
         if (messages) console.log(`Deleted ${messages} message(s) older than ${MESSAGE_RETENTION_DAYS} days`);
