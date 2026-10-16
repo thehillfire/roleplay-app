@@ -66,6 +66,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Mute notifications per conversation (messages still arrive; 🔕 in the chat header)
 - [x] Spanish in the screener (contact details, age questions, minors, sexual content, crisis) and Spanish 988 info on the crisis card
 - [x] Held queue: moderators can Deliver anyway (false positive) or Keep held; reviewed messages leave the queue
+- [x] Leave a message for the next listener: async matching for quiet hours (screened, one per person, 24h, withdrawable; counts toward the waiting banner; push when picked up)
 - [ ] Scale past one server: Redis pub/sub for realtime + shared queue (only needed beyond several thousand concurrent chatters)
 
 ## Known limits

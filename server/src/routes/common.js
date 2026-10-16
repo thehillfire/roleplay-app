@@ -5,6 +5,8 @@ const VERIFY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const UNSEND_WINDOW_MS = 5 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const PLUS_MONTHLY_CREDITS = 3;
+// A message left for the next listener waits this long, then quietly expires.
+const BOTTLE_TTL_MS = 24 * 60 * 60 * 1000;
 // Gentle on purpose: support, a hug, thanks. Nothing that could read as mocking.
 const REACTIONS = ['💙', '🫂', '🙏'];
 
@@ -52,6 +54,6 @@ function connectionView(c, userId) {
 }
 
 module.exports = {
-  RESET_TTL_MS, VERIFY_TTL_MS, UNSEND_WINDOW_MS, DAY_MS, PLUS_MONTHLY_CREDITS, REACTIONS, REPORT_REASONS, AUTO_PAUSE,
+  RESET_TTL_MS, VERIFY_TTL_MS, UNSEND_WINDOW_MS, DAY_MS, PLUS_MONTHLY_CREDITS, BOTTLE_TTL_MS, REACTIONS, REPORT_REASONS, AUTO_PAUSE,
   createRateLimiter, httpError, asyncRoute, publicUser, connectionView,
 };

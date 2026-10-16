@@ -760,6 +760,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       await db.query('DELETE FROM email_verifications WHERE user_id = $1', [userId]);
       await db.query('DELETE FROM checkins WHERE user_id = $1', [userId]); // private, no safety value
       await db.query('UPDATE feedback SET note = NULL WHERE rater_id = $1', [userId]); // words they wrote
+      await db.query("UPDATE bottles SET status = 'withdrawn' WHERE user_id = $1 AND status = 'open'", [userId]);
       await db.query("UPDATE connections SET requester_name = '(deleted)', requester_contact = NULL WHERE requester_id = $1", [userId]);
       await db.query(
         `UPDATE connections SET accepter_name = '(deleted)', accepter_contact = NULL
@@ -950,6 +951,58 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         [limit],
       );
       return rows.map((r) => ({ ...messageFromRow(r), sender: { id: r.sender_id, handle: r.sender_handle, status: r.sender_status } }));
+    },
+
+    // --- messages for the next listener ("bottles") ---
+
+    // One open message per person; a new one replaces the old.
+    async createBottle(userId, body, crisis) {
+      await db.query("UPDATE bottles SET status = 'withdrawn' WHERE user_id = $1 AND status = 'open'", [userId]);
+      const id = newId();
+      await db.query('INSERT INTO bottles (id, user_id, body, crisis, created_at) VALUES ($1, $2, $3, $4, $5)', [id, userId, body, crisis ? 1 : 0, now()]);
+      return id;
+    },
+
+    async myOpenBottle(userId, since) {
+      const { rows } = await db.query("SELECT id, body, created_at FROM bottles WHERE user_id = $1 AND status = 'open' AND created_at > $2", [userId, since]);
+      return rows[0] ? { id: rows[0].id, body: rows[0].body, createdAt: num(rows[0].created_at) } : null;
+    },
+
+    async withdrawBottle(userId) {
+      const { rowCount } = await db.query("UPDATE bottles SET status = 'withdrawn' WHERE user_id = $1 AND status = 'open'", [userId]);
+      return rowCount > 0;
+    },
+
+    // Oldest first, from people still in good standing.
+    async openBottleCandidates(listenerId, since, limit = 20) {
+      const { rows } = await db.query(
+        `SELECT b.id, b.user_id, b.body, b.crisis, u.handle FROM bottles b JOIN users u ON u.id = b.user_id
+          WHERE b.status = 'open' AND b.created_at > $1 AND b.user_id <> $2 AND u.status = 'active'
+          ORDER BY b.created_at ASC LIMIT $3`,
+        [since, listenerId, limit],
+      );
+      return rows.map((r) => ({ id: r.id, userId: r.user_id, body: r.body, crisis: Number(r.crisis) === 1, handle: r.handle }));
+    },
+
+    async claimBottle(id, listenerId) {
+      const { rowCount } = await db.query("UPDATE bottles SET status = 'claimed', claimed_by = $1, claimed_at = $2 WHERE id = $3 AND status = 'open'", [listenerId, now(), id]);
+      return rowCount === 1;
+    },
+
+    async releaseBottle(id) {
+      await db.query("UPDATE bottles SET status = 'open', claimed_by = NULL, claimed_at = NULL WHERE id = $1 AND status = 'claimed' AND conversation_id IS NULL", [id]);
+    },
+
+    async setBottleConversation(id, conversationId) {
+      await db.query('UPDATE bottles SET conversation_id = $1 WHERE id = $2', [conversationId, id]);
+    },
+
+    async openBottleCount(since) {
+      const { rows } = await db.query(
+        "SELECT COUNT(*) AS n FROM bottles b JOIN users u ON u.id = b.user_id WHERE b.status = 'open' AND b.created_at > $1 AND u.status = 'active'",
+        [since],
+      );
+      return Number(rows[0].n);
     },
 
     async pendingHeldMessage(messageId) {

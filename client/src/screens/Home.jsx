@@ -3,6 +3,7 @@ import HomeAd from '../components/HomeAd.jsx';
 import Onboarding, { shouldOnboard } from '../components/Onboarding.jsx';
 import CheckIn from '../components/CheckIn.jsx';
 import KindWords from '../components/KindWords.jsx';
+import WaitingMessage from '../components/WaitingMessage.jsx';
 import { api } from '../api.js';
 
 function VerifyNudge() {
@@ -60,6 +61,8 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
           <button className="icon-btn" aria-label="Dismiss" onClick={onDismissNotice}>×</button>
         </div>
       )}
+
+      <WaitingMessage refreshKey={notice} />
 
       <section className="card find">
         <h1 className="find-title">Talk to someone</h1>

@@ -253,6 +253,21 @@ const MIGRATIONS = [
   [
     'ALTER TABLE messages ADD COLUMN reviewed_at BIGINT',
   ],
+  // 22: "leave a message for the next listener" when nobody is around
+  [
+    `CREATE TABLE IF NOT EXISTS bottles (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      body TEXT NOT NULL,
+      crisis INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at BIGINT NOT NULL,
+      claimed_by TEXT,
+      claimed_at BIGINT,
+      conversation_id TEXT
+    )`,
+    'CREATE INDEX IF NOT EXISTS bottles_open_idx ON bottles(status, created_at)',
+  ],
 ];
 
 async function migrate(db) {

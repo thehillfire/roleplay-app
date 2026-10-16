@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { api } from '../api.js';
 
 const LINES = [
   'Finding someone kind…',
@@ -18,16 +19,35 @@ function readBreathe() {
   }
 }
 
-export default function Waiting({ onCancel, error, presence }) {
+export default function Waiting({ onCancel, error, presence, canLeaveMessage, onLeftMessage }) {
   const [i, setI] = useState(0);
   const [slow, setSlow] = useState(false);
+  const [offer, setOffer] = useState(false); // "leave a message" after 20s
   const [breathe, setBreathe] = useState(readBreathe);
   const [phase, setPhase] = useState(0);
+  const [writing, setWriting] = useState(false);
+  const [note, setNote] = useState('');
+  const [noteError, setNoteError] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const leaveMessage = async (e) => {
+    e.preventDefault();
+    setSending(true);
+    setNoteError('');
+    try {
+      const { crisis } = await api.leaveBottle(note);
+      onLeftMessage({ crisis });
+    } catch (err) {
+      setNoteError(err.message);
+      setSending(false);
+    }
+  };
 
   useEffect(() => {
     const t = setInterval(() => setI((n) => (n + 1) % LINES.length), 4000);
     const s = setTimeout(() => setSlow(true), 45000);
-    return () => { clearInterval(t); clearTimeout(s); };
+    const o = setTimeout(() => setOffer(true), 20000);
+    return () => { clearInterval(t); clearTimeout(s); clearTimeout(o); };
   }, []);
 
   useEffect(() => {
@@ -59,6 +79,22 @@ export default function Waiting({ onCancel, error, presence }) {
       {breathe && !error && <p className="hint">Still looking for someone. You'll see them the moment they're here.</p>}
       {presence?.online > 1 && <p className="presence"><span className="dot" aria-hidden="true" /> {presence.online} people here now</p>}
       {slow && !error && <p className="hint">It's quiet right now. Choosing <strong>Either</strong> or no topic widens the search.</p>}
+      {offer && !error && canLeaveMessage && !writing && (
+        <button className="btn" onClick={() => setWriting(true)}>Leave a message for the next listener</button>
+      )}
+      {writing && (
+        <form className="card form leave-message" onSubmit={leaveMessage}>
+          <label>
+            <span>What's on your mind? The next person who comes to listen will start here, and we'll let you know.</span>
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} rows={4} autoFocus />
+          </label>
+          {noteError && <p className="form-error" role="alert">{noteError}</p>}
+          <div className="sheet-actions">
+            <button type="button" className="btn" onClick={() => setWriting(false)}>Keep waiting</button>
+            <button type="submit" className="btn primary" disabled={sending || !note.trim()}>{sending ? 'Leaving it…' : 'Leave it'}</button>
+          </div>
+        </form>
+      )}
       <div className="waiting-actions">
         <button className="link" onClick={toggle} aria-pressed={breathe}>{breathe ? 'Stop breathing exercise' : 'Breathe with me'}</button>
         <button className="btn" onClick={onCancel}>Cancel</button>

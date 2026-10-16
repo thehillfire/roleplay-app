@@ -18,6 +18,7 @@ const routes = {
   billing: require('./routes/billing'),
   conversations: require('./routes/conversations'),
   admin: require('./routes/admin'),
+  bottles: require('./routes/bottles'),
 };
 
 function createApp({
@@ -134,6 +135,7 @@ function createApp({
   routes.account(app, ctx);
   routes.billing(app, ctx);
   routes.conversations(app, ctx);
+  routes.bottles(app, ctx);
   routes.admin(app, ctx);
 
   app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));

@@ -9,11 +9,21 @@ const TOPIC_MAX = 30;
 function createHub() {
   const sockets = new Map(); // userId -> Set<WebSocket>
   let waiting = () => ({ talk: 0, listen: 0, either: 0 });
+  let bottles = 0; // messages left for the next listener
+  let onBottles = () => {};
   return {
     // People with the app open, and how many are waiting for a match right now (by role).
     stats: () => {
       const byRole = waiting();
-      return { online: sockets.size, waiting: byRole.talk + byRole.listen + byRole.either, waitingToTalk: byRole.talk };
+      return { online: sockets.size, waiting: byRole.talk + byRole.listen + byRole.either, waitingToTalk: byRole.talk + bottles };
+    },
+    setBottleCount(n) {
+      bottles = n;
+    },
+    // The HTTP side calls this when a message for the next listener is left or withdrawn.
+    bottlesChanged: () => onBottles(),
+    onBottlesChanged(fn) {
+      onBottles = fn;
     },
     setWaitingCounter(fn) {
       waiting = fn;
@@ -56,6 +66,7 @@ function originAllowed(req, allowedOrigins) {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const { BOTTLE_TTL_MS } = require('./routes/common');
 
 function attachRealtime({
   server, hub, store, allowedOrigins = [], sameRoleAfterMs, sweepMs = 5000, log = console,
@@ -99,6 +110,40 @@ function attachRealtime({
   };
   const sweep = setInterval(() => matchmaker.sweep(), sweepMs);
   sweep.unref();
+
+  // Messages left for the next listener count as people waiting to talk (the home banner).
+  const refreshBottles = () => store.openBottleCount(Date.now() - BOTTLE_TTL_MS).then((n) => {
+    hub.setBottleCount(n);
+    presenceChanged();
+  }, (err) => log.error('bottle count failed', err));
+  hub.onBottlesChanged(refreshBottles);
+  refreshBottles();
+  const bottleTimer = setInterval(refreshBottles, 60000);
+  bottleTimer.unref();
+
+  // A listener nobody is waiting for live picks up the oldest message left for the next listener.
+  const answerBottle = async (listener, blocked) => {
+    const candidates = await store.openBottleCandidates(listener.id, Date.now() - BOTTLE_TTL_MS);
+    for (const b of candidates) {
+      if (blocked.has(b.userId)) continue;
+      if (!(await store.claimBottle(b.id, listener.id))) continue; // another listener got it
+      if (!matchmaker.leave(listener.id)) { // matched live meanwhile (or left): put it back
+        await store.releaseBottle(b.id);
+        return;
+      }
+      const convo = await store.openConversation(b.userId, listener.id);
+      await store.addMessage({ conversationId: convo.id, senderId: b.userId, body: b.body, flags: b.crisis ? ['crisis'] : undefined });
+      await store.setBottleConversation(b.id, convo.id);
+      hub.push(listener.id, { type: 'match.found', conversationId: convo.id, partner: { handle: b.handle }, isNew: convo.isNew, fromMessage: true });
+      hub.push(b.userId, { type: 'bottle.answered', conversationId: convo.id, partner: { handle: listener.handle } });
+      if (!hub.isOnline(b.userId) && push?.enabled) {
+        push.notify(store, b.userId, { title: 'Kindred', body: 'Someone is here to listen to your message', conversationId: convo.id, tag: convo.id })
+          .catch((err) => log.error('push failed', err));
+      }
+      refreshBottles();
+      return;
+    }
+  };
 
   const alertTimers = new Map(); // talker -> pending timer
   const lastAlertFor = new Map(); // talker -> when their wait last alerted listeners
@@ -185,6 +230,7 @@ function attachRealtime({
       const matched = matchmaker.join({ userId: user.id, role, topic, ageBand, blocked, known });
       presenceChanged();
       if (!matched && role === 'talk') scheduleListenerAlert(user.id, blocked);
+      if (!matched && (role === 'listen' || role === 'either')) await answerBottle(user, blocked);
     };
 
     ws.on('message', async (raw) => {
@@ -239,6 +285,7 @@ function attachRealtime({
     close() {
       clearTimeout(presenceTimer);
       for (const timer of alertTimers.values()) clearTimeout(timer);
+      clearInterval(bottleTimer);
       clearInterval(sweep);
       clearInterval(heartbeat);
       for (const ws of wss.clients) ws.terminate();

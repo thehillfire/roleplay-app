@@ -126,6 +126,10 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
       socket.on('close', () => { if (viewRef.current.name === 'waiting') setMatchError('Connection lost. Reconnecting…'); }),
       socket.on('credits.updated', onRefreshMe),
       socket.on('presence', ({ online, waiting, waitingToTalk }) => setPresence({ online, waiting, waitingToTalk })),
+      socket.on('bottle.answered', ({ partner }) => {
+        setNotice(`💙 ${partner.handle} picked up your message.`);
+        refresh();
+      }),
       socket.on('kind_words', () => setNotice('💙 Someone left you a few kind words.')),
       socket.on('thanks', () => {
         setNotice('💙 Someone you talked with said it helped.');
@@ -151,8 +155,10 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
     return () => { document.title = 'Kindred'; };
   }, [conversations, view.name]);
 
+  const [findRole, setFindRole] = useState('talk');
   const find = ({ role, topic }) => {
     setMatchError('');
+    setFindRole(role);
     navigate({ name: 'waiting' });
     socket.send({ type: 'match.join', role, topic });
   };
@@ -183,7 +189,16 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
       )}
       {view.name === 'moderate' && <Moderate onBack={goHome} />}
       {view.name === 'account' && <Account user={user} billing={billing} pushKey={pushKey} onUserChanged={onRefreshMe} onBack={goHome} onSignOut={onSignOut} onSignOutEverywhere={onSignOutEverywhere} onDeleted={onDeleted} onOpenLegal={onOpenLegal} />}
-      {view.name === 'waiting' && <Waiting onCancel={cancel} error={matchError} presence={presence} />}
+      {view.name === 'waiting' && <Waiting
+          onCancel={cancel}
+          error={matchError}
+          presence={presence}
+          canLeaveMessage={findRole !== 'listen'}
+          onLeftMessage={({ crisis }) => {
+            setNotice(`Your message is waiting for the next listener. It shows up in your conversations when someone picks it up${pushKey ? ", and you'll get a notification" : ''}.${crisis ? ' If you are in danger right now, call or text 988.' : ''}`);
+            goHome();
+          }}
+        />}
       {view.name === 'chat' && (
         <Chat
           key={view.id}

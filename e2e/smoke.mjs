@@ -350,6 +350,25 @@ if (process.env.MAIL_LOG) {
   step('forgot password and reset');
 }
 
+// Nobody around: Carol leaves a message for the next listener; Dave picks it up later
+const carol = await person('carol');
+await signUp(carol);
+await carol.getByRole('button', { name: 'Find someone' }).click();
+await carol.getByRole('button', { name: 'Leave a message for the next listener' }).click({ timeout: 25000 });
+await carol.getByLabel(/What's on your mind/).fill('Long week. Could use someone to talk to when you get a minute.');
+await carol.getByRole('button', { name: 'Leave it' }).click();
+await carol.getByText(/Your message is waiting for the next listener/).waitFor();
+await carol.locator('.waiting-message', { hasText: 'Long week.' }).waitFor();
+const dave = await person('dave');
+await signUp(dave);
+await dave.getByText('Someone is waiting for someone to listen.').waitFor();
+await dave.getByRole('button', { name: 'Be a listener' }).click();
+await dave.locator('.bubble.them', { hasText: 'Long week. Could use someone to talk to' }).waitFor();
+await carol.getByText(/picked up your message/).waitFor();
+await carol.locator('.waiting-message').waitFor({ state: 'detached' });
+pages.push(carol, dave);
+step('message left for the next listener is picked up later');
+
 // Account: download data, then delete the account
 await bob.goto(BASE);
 await bob.getByRole('button', { name: 'Account' }).click();
