@@ -11,6 +11,7 @@ function createHub() {
   let waiting = () => ({ talk: 0, listen: 0, either: 0 });
   let bottles = 0; // messages left for the next listener
   let onBottles = () => {};
+  let onDisconnect = () => {};
   return {
     // People with the app open, and how many are waiting for a match right now (by role).
     stats: () => {
@@ -47,8 +48,14 @@ function createHub() {
       const data = JSON.stringify(event);
       for (const ws of sockets.get(userId) || []) if (ws.readyState === ws.OPEN) ws.send(data);
     },
+    // Suspended, paused or deleted: out of the queue right away (a sleeping phone may take
+    // ~30s to answer a close), and the sockets closed.
     disconnect(userId) {
+      onDisconnect(userId);
       for (const ws of sockets.get(userId) || []) ws.close(4003, 'Account unavailable');
+    },
+    onDisconnect(fn) {
+      onDisconnect = fn;
     },
     isOnline: (userId) => sockets.has(userId),
   };
@@ -86,11 +93,20 @@ function attachRealtime({
     onMatch: (a, b) => {
       presenceChanged(); // defined below; runs later, once matching is live
       (async () => {
-        // Matched live: any message either left for the next listener is no longer needed.
+        const [ua, ub] = await Promise.all([store.getUser(a.userId), store.getUser(b.userId)]);
+        // Someone paused or suspended while queued never gets matched; the other person searches on.
+        const inactive = [ua, ub].filter((u) => u?.status !== 'active');
+        if (inactive.length) {
+          for (const [entry, u] of [[a, ua], [b, ub]]) {
+            if (u?.status === 'active') hub.push(entry.userId, { type: 'match.error', error: 'They left before you met. Tap Find someone to try again.' });
+          }
+          return;
+        }
+        const convo = await store.openConversation(a.userId, b.userId);
+        // Matched live: any message either left for the next listener is no longer needed
+        // (only now, so a failed match doesn't throw their message away).
         const withdrawn = await Promise.all([store.withdrawBottle(a.userId), store.withdrawBottle(b.userId)]);
         if (withdrawn.some(Boolean)) refreshBottles();
-        const [ua, ub] = await Promise.all([store.getUser(a.userId), store.getUser(b.userId)]);
-        const convo = await store.openConversation(a.userId, b.userId);
         hub.push(a.userId, { type: 'match.found', conversationId: convo.id, partner: { handle: ub.handle }, isNew: convo.isNew });
         hub.push(b.userId, { type: 'match.found', conversationId: convo.id, partner: { handle: ua.handle }, isNew: convo.isNew });
       })().catch((err) => {
@@ -100,6 +116,10 @@ function attachRealtime({
     },
   });
   hub.setWaitingCounter(() => matchmaker.waitingByRole());
+  hub.onDisconnect((userId) => { if (matchmaker.leave(userId)) presenceChanged(); });
+  // match.leave can arrive while a join is still looking things up: count leaves per user so the
+  // join notices and doesn't queue someone who already said stop.
+  const leaves = new Map(); // userId -> number of leaves seen
 
   // Tell everyone when the queue changes (at most every 2s), so "someone is waiting for a
   // listener" shows up right away instead of on the next poll.
@@ -136,7 +156,7 @@ function attachRealtime({
       if (matchmaker.isQueued(b.userId)) continue; // they're searching live right now; live matching handles them
       if (!(await underDailyCap(b.userId))) continue; // the daily new-people cap applies to messages too
       if (!(await store.claimBottle(b.id, listener.id))) continue; // another listener got it
-      if (!matchmaker.leave(listener.id)) { // matched live meanwhile (or left): put it back
+      if (matchmaker.isQueued(b.userId) || !matchmaker.leave(listener.id)) { // either side matched/joined live meanwhile: put it back
         await store.releaseBottle(b.id);
         return;
       }
@@ -226,6 +246,7 @@ function attachRealtime({
 
     // Joins the match queue unless today's cap is reached or the socket went away meanwhile.
     const handleJoin = async (msg) => {
+      const leavesAtStart = leaves.get(user.id) || 0;
       const role = typeof msg.role === 'string' ? msg.role : 'either';
       const topic = typeof msg.topic === 'string' ? msg.topic.trim().toLowerCase().slice(0, TOPIC_MAX) : '';
       const [blocked, known, today, ageBand] = await Promise.all([
@@ -243,6 +264,7 @@ function attachRealtime({
       }
       // The socket may have closed while we looked those up; never queue someone who's gone.
       if (ws.readyState !== ws.OPEN) return;
+      if ((leaves.get(user.id) || 0) !== leavesAtStart) return; // they pressed Cancel meanwhile
       ws.send(JSON.stringify({ type: 'match.waiting' }));
       const matched = matchmaker.join({ userId: user.id, role, topic, ageBand, blocked, known });
       presenceChanged();
@@ -267,6 +289,8 @@ function attachRealtime({
             joining.delete(user.id);
           }
         } else if (msg.type === 'match.leave') {
+          if (leaves.size > 50000) leaves.clear();
+          leaves.set(user.id, (leaves.get(user.id) || 0) + 1);
           if (matchmaker.leave(user.id)) presenceChanged();
           ws.send(JSON.stringify({ type: 'match.left' }));
         } else if (msg.type === 'typing' && typeof msg.conversationId === 'string') {
