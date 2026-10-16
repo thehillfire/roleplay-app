@@ -652,6 +652,12 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       );
     },
 
+    // Deletes messages older than `before` (report snapshots keep their own copy for moderators).
+    async purgeOldMessages(before) {
+      const { rowCount } = await db.query('DELETE FROM messages WHERE created_at < $1', [before]);
+      return rowCount;
+    },
+
     // Fully removes accounts deleted before `before` (cascades to their messages, chats and reports).
     async purgeDeleted(before) {
       const { rowCount } = await db.query("DELETE FROM users WHERE status = 'deleted' AND deleted_at < $1", [before]);

@@ -77,3 +77,16 @@ test('deleted accounts keep safety data until the retention period, then are pur
   assert.equal((await s.store.listReports()).length, 0);
   assert.equal(Number((await s.db.query('SELECT COUNT(*) AS n FROM messages')).rows[0].n), 0);
 });
+
+test('old messages are purged; report snapshots keep their copy', async (t) => {
+  const s = await start({ autoPauseMinReporterAgeMs: 0 });
+  t.after(s.stop);
+  const c = await chatting(s);
+  t.after(c.close);
+  await c.bob('POST', `/api/conversations/${c.id}/report`, { reason: 'harassment', block: false });
+  await s.db.query('UPDATE messages SET created_at = $1', [Date.now() - 400 * 24 * 60 * 60 * 1000]);
+  assert.equal(await s.store.purgeOldMessages(Date.now() - 365 * 24 * 60 * 60 * 1000), 3);
+  assert.deepEqual((await c.alice('GET', `/api/conversations/${c.id}`)).body.messages, []);
+  const [report] = await s.store.listReports();
+  assert.ok(report.snapshot.length > 0, 'the report still shows what was said');
+});

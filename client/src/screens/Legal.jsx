@@ -16,6 +16,8 @@ function Privacy() {
         <li><strong>Daily check-ins:</strong> the mood you log each day. Only you can see it; it's deleted immediately if you delete your account.</li>
         <li><strong>Notifications:</strong> if you turn them on, a push address for your device. Notifications never include message text.</li>
       </ul>
+      <h2>How long we keep things</h2>
+      <p>Messages are deleted automatically after one year [adjust if you change MESSAGE_RETENTION_DAYS]. Copies attached to safety reports are kept until the report is resolved and the retention period ends. Deleted accounts are erased as described below.</p>
       <h2>How messages are checked</h2>
       <p>Every message is automatically screened before delivery to keep the community safe. The screening holds back contact details (until you both connect), questions about age, sexual content and messages suggesting a user is under 18. It also shows crisis resources when someone may be at risk. Trained moderators can read a conversation when it's reported or when a message is held.</p>
       <h2>Who sees what</h2>

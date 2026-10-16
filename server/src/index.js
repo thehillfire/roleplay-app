@@ -2,6 +2,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { boot } = require('./boot');
+const { envInt } = require('./env');
 
 const port = Number(process.env.PORT) || 3000;
 const distDir = path.join(__dirname, '..', '..', 'dist');
@@ -12,12 +13,25 @@ if (process.env.NODE_ENV === 'production' && !process.env.PUBLIC_URL) {
 }
 
 // Deleted accounts keep messages/reports this long for safety review, then are purged.
-const RETENTION_DAYS = Number(process.env.DELETED_RETENTION_DAYS) || 90;
+const RETENTION_DAYS = envInt('DELETED_RETENTION_DAYS', 90);
+
+// Messages older than this are deleted (0 keeps them forever).
+const MESSAGE_RETENTION_DAYS = envInt('MESSAGE_RETENTION_DAYS', 365);
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 boot({ staticDir }).then(({ listen, db, store }) => {
-  const purge = () => store.purgeDeleted(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000)
-    .then((n) => n && console.log(`Purged ${n} deleted account(s)`))
-    .catch((err) => console.error('purge failed', err));
+  const purge = async () => {
+    try {
+      const accounts = await store.purgeDeleted(Date.now() - RETENTION_DAYS * DAY_MS);
+      if (accounts) console.log(`Purged ${accounts} deleted account(s)`);
+      if (MESSAGE_RETENTION_DAYS > 0) {
+        const messages = await store.purgeOldMessages(Date.now() - MESSAGE_RETENTION_DAYS * DAY_MS);
+        if (messages) console.log(`Deleted ${messages} message(s) older than ${MESSAGE_RETENTION_DAYS} days`);
+      }
+    } catch (err) {
+      console.error('purge failed', err);
+    }
+  };
   purge();
   setInterval(purge, 24 * 60 * 60 * 1000).unref();
 
