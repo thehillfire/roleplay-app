@@ -1,0 +1,53 @@
+# Render Blueprint: one web service (Docker) + one Postgres database.
+# New → Blueprint → pick this repo. Fill in the "sync: false" values when prompted.
+services:
+  - type: web
+    name: kindred
+    runtime: docker
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kindred-db
+          property: connectionString
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: PUBLIC_URL
+        sync: false
+      - key: ADSENSE_CLIENT
+        sync: false
+      - key: ADSENSE_SLOT
+        sync: false
+      - key: ERROR_WEBHOOK_URL
+        sync: false
+      - key: TRUST_PROXY
+        value: "1"
+      - key: TURNSTILE_SITE_KEY
+        sync: false
+      - key: TURNSTILE_SECRET_KEY
+        sync: false
+      - key: ANDROID_PACKAGE_NAME
+        sync: false
+      - key: ANDROID_CERT_SHA256
+        sync: false
+
+databases:
+  - name: kindred-db
+    plan: basic-256mb
