@@ -223,6 +223,23 @@ const MIGRATIONS = [
     )`,
     'CREATE INDEX IF NOT EXISTS support_status_idx ON support_requests(status, created_at)',
   ],
+  // 18: devices (hashed browser ids) so a suspended person can't just sign up again
+  [
+    `CREATE TABLE IF NOT EXISTS user_devices (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      device_hash TEXT NOT NULL,
+      last_seen BIGINT NOT NULL,
+      PRIMARY KEY (user_id, device_hash)
+    )`,
+    'CREATE INDEX IF NOT EXISTS user_devices_hash_idx ON user_devices(device_hash)',
+    // Outlives the account (a suspended person deleting it shouldn't clear the ban).
+    `CREATE TABLE IF NOT EXISTS banned_devices (
+      device_hash TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      created_at BIGINT NOT NULL,
+      PRIMARY KEY (device_hash, user_id)
+    )`,
+  ],
 ];
 
 async function migrate(db) {

@@ -15,6 +15,7 @@ function Privacy() {
         <li><strong>Payments:</strong> handled by Stripe. We store that a payment happened and its amount, never your card.</li>
         <li><strong>Daily check-ins:</strong> the mood you log each day. Only you can see it; it's deleted immediately if you delete your account.</li>
         <li><strong>Support messages:</strong> what you write to us from the app and our replies. Moderators see your anonymous name, never your email; replies are sent to your email. Deleted with your account after the retention period.</li>
+        <li><strong>Device cookie:</strong> a random id for your browser, stored only as a one-way hash, so that someone suspended for breaking the rules can't simply sign up again. It's never used for ads or tracking.</li>
         <li><strong>Kind words:</strong> short notes people leave for you after a conversation. Shown only to you, without who wrote them.</li>
         <li><strong>Notifications:</strong> if you turn them on, a push address for your device. Notifications never include message text.</li>
       </ul>

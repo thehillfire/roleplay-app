@@ -373,7 +373,39 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     // Deleted accounts stay deleted (so retention purge still removes them).
     async setUserStatus(userId, status) {
       const { rowCount } = await db.query("UPDATE users SET status = $1 WHERE id = $2 AND status <> 'deleted'", [status, userId]);
+      // A moderator's suspension covers the devices they used; restoring lifts it.
+      if (rowCount > 0 && status === 'suspended') {
+        await db.query(
+          `INSERT INTO banned_devices (device_hash, user_id, created_at)
+           SELECT device_hash, user_id, $2 FROM user_devices WHERE user_id = $1
+           ON CONFLICT (device_hash, user_id) DO NOTHING`,
+          [userId, now()],
+        );
+      } else if (rowCount > 0 && status === 'active') {
+        await db.query('DELETE FROM banned_devices WHERE user_id = $1', [userId]);
+      }
       return rowCount > 0;
+    },
+
+    // Remembers a browser this account used. A suspended account's new devices are banned too.
+    async noteDevice(userId, deviceHash) {
+      const t = now();
+      await db.query(
+        `INSERT INTO user_devices (user_id, device_hash, last_seen) VALUES ($1, $2, $3)
+         ON CONFLICT (user_id, device_hash) DO UPDATE SET last_seen = $3`,
+        [userId, deviceHash, t],
+      );
+      await db.query(
+        `INSERT INTO banned_devices (device_hash, user_id, created_at)
+         SELECT $2, id, $3 FROM users WHERE id = $1 AND status = 'suspended'
+         ON CONFLICT (device_hash, user_id) DO NOTHING`,
+        [userId, deviceHash, t],
+      );
+    },
+
+    async deviceBanned(deviceHash) {
+      const { rows } = await db.query('SELECT 1 FROM banned_devices WHERE device_hash = $1 LIMIT 1', [deviceHash]);
+      return rows.length > 0;
     },
 
     async setUserRole(email, role) {

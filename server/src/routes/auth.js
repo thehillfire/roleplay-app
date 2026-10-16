@@ -1,6 +1,6 @@
 // Sign up, sign in, email confirmation and password resets.
 const crypto = require('crypto');
-const { hashPassword, verifyPassword, hashToken } = require('../auth');
+const { hashPassword, verifyPassword, hashToken, deviceHash } = require('../auth');
 const { parseCredentials, badRequest } = require('../validate');
 const { httpError, asyncRoute, publicUser, RESET_TTL_MS, VERIFY_TTL_MS, PLUS_MONTHLY_CREDITS } = require('./common');
 
@@ -57,9 +57,24 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
     const { email, password, birthdate } = parseCredentials(req.body, { signup: true });
     const user = await store.createUser({ email, birthdate, passwordHash: await hashPassword(password) });
     if (!user) throw httpError(409, 'An account with that email already exists.');
+    const device = deviceHash(req, res);
+    const evading = await store.deviceBanned(device);
+    await store.noteDevice(user.id, device);
+    let created = user;
+    if (evading) {
+      // Same browser as a suspended account: a moderator takes a look first (they can appeal).
+      await store.setUserStatus(user.id, 'review');
+      await store.logModAction({ targetId: user.id, action: 'auto_pause', detail: 'Signed up on the device of a suspended account' });
+      created = { ...user, status: 'review' };
+      store.moderatorEmails().then((emails) => Promise.all(emails.map((to) => mailer.send({
+        to,
+        subject: '[Kindred] Possible ban evasion paused',
+        text: `A new account (${user.handle}) signed up on a device used by a suspended account and was paused for review. Look it up under Moderate → Look up.`,
+      })))).catch((err) => console.error('evasion alert failed', err.message));
+    }
     await sendVerification(req, user);
     await auth.startSession(req, res, user.id);
-    res.status(201).json({ user: publicUser(user) });
+    res.status(201).json({ user: publicUser(created) });
   }));
 
   app.post('/api/auth/login', authLimiter, asyncRoute(async (req, res) => {
@@ -73,6 +88,7 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
     }
     failedLogins.delete(email);
     const user = await promoteIfAdmin(found);
+    await store.noteDevice(user.id, deviceHash(req, res));
     await auth.startSession(req, res, user.id);
     res.json({ user: publicUser(user) });
   }));
@@ -141,6 +157,8 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
   }));
 
   app.get('/api/auth/me', asyncRoute(async (req, res) => {
+    // Sessions from before device tracking pick it up here (and it keeps last_seen fresh).
+    if (req.user) await store.noteDevice(req.user.id, deviceHash(req, res));
     res.json({
       user: req.user ? { ...publicUser(req.user), helped: await store.helpedCount(req.user.id) } : null,
       billing: { enabled: payments.enabled, priceCents: payments.priceCents, plusPriceCents: payments.plusPriceCents, plusCredits: PLUS_MONTHLY_CREDITS, currency: payments.currency },

@@ -177,3 +177,30 @@ test('support: members write in, moderators reply by email without seeing the ad
   for (let i = 0; i < 3; i += 1) assert.equal((await member('POST', '/api/support', { topic: 'other', message: `question ${i}` })).status, 201);
   assert.equal((await member('POST', '/api/support', { topic: 'other', message: 'one more' })).status, 429);
 });
+
+test('ban evasion: a new account on a suspended account\'s device waits for review', async (t) => {
+  const sent = [];
+  const s = await start({ mailer: { enabled: true, send: async (m) => { sent.push(m); } } });
+  t.after(s.stop);
+  const mod = await moderator(s, 'mod-evasion@example.com');
+  const troll = await signedUp(s.base);
+  const device = troll.device();
+  assert.ok(device, 'a device cookie is set at signup');
+  const trollId = (await s.db.query('SELECT id FROM users WHERE handle = $1', [troll.user.handle])).rows[0].id;
+  await mod('POST', `/api/admin/users/${trollId}/status`, { status: 'suspended' });
+
+  // Same browser, new email: paused for review, logged, moderators told.
+  const again = await signedUp(s.base, undefined, { device });
+  assert.equal(again.user.status, 'review');
+  assert.equal((await again('GET', '/api/conversations')).status, 403);
+  assert.equal((await mod('GET', '/api/admin/log')).body.actions[0].detail, 'Signed up on the device of a suspended account');
+  await new Promise((r) => setTimeout(r, 20));
+  assert.ok(sent.some((m) => m.subject === '[Kindred] Possible ban evasion paused'));
+
+  // Another browser is unaffected.
+  assert.equal((await signedUp(s.base)).user.status, 'active');
+
+  // Deleting the suspended account doesn't lift the ban; a moderator restoring it does.
+  await mod('POST', `/api/admin/users/${trollId}/status`, { status: 'active' });
+  assert.equal((await signedUp(s.base, undefined, { device })).user.status, 'active');
+});

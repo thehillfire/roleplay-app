@@ -6,7 +6,7 @@ const { boot } = require('../src/boot');
 async function start(options = {}) {
   const url = process.env.TEST_DATABASE_URL || '';
   const built = await boot({ db: { url, sqliteFile: ':memory:' }, realtime: { sweepMs: 50, ...options.realtime }, ...options });
-  if (url) await built.db.query('TRUNCATE users, sessions, conversations, messages, blocks, reports, connections, payments, push_subscriptions, feedback, password_resets, email_verifications, checkins, mod_actions, appeals, support_requests CASCADE');
+  if (url) await built.db.query('TRUNCATE users, sessions, conversations, messages, blocks, reports, connections, payments, push_subscriptions, feedback, password_resets, email_verifications, checkins, mod_actions, appeals, support_requests, user_devices, banned_devices CASCADE');
   const server = built.listen(0);
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -19,20 +19,30 @@ async function start(options = {}) {
 }
 
 // A minimal browser-like client: keeps one session cookie, can open a socket.
-function client(base) {
-  let cookie = '';
+function client(base, device) {
+  const jar = new Map(); // name -> value, like a browser (session + device cookies)
+  if (device) jar.set('kd_dev', device);
+  const cookie = () => [...jar].map(([k, v]) => `${k}=${v}`).join('; ');
   const api = async (method, path, body) => {
     const res = await fetch(`${base}${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+      headers: { 'Content-Type': 'application/json', ...(jar.size ? { Cookie: cookie() } : {}) },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    for (const c of res.headers.getSetCookie()) {
+      const [pair] = c.split(';');
+      const [name, ...rest] = pair.split('=');
+      const value = rest.join('=');
+      if (value) jar.set(name, value);
+      else jar.delete(name);
+    }
     const set = res.headers.get('set-cookie');
-    if (set) cookie = set.split(';')[0].endsWith('=') ? '' : set.split(';')[0];
     return { status: res.status, body: await res.json(), setCookie: set };
   };
-  api.cookie = () => cookie;
-  api.socket = (headers = {}) => connect(base, { Cookie: cookie, ...headers });
+  // Same browser, new person: keeps the device cookie, drops the session.
+  api.device = () => jar.get('kd_dev');
+  api.cookie = () => (jar.has('lf_sid') ? `lf_sid=${jar.get('lf_sid')}` : '');
+  api.socket = (headers = {}) => connect(base, { Cookie: cookie(), ...headers });
   return api;
 }
 
@@ -84,8 +94,8 @@ const adult = (overrides = {}) => ({
   ...overrides,
 });
 
-async function signedUp(base, overrides) {
-  const api = client(base);
+async function signedUp(base, overrides, { device } = {}) {
+  const api = client(base, device);
   const res = await api('POST', '/api/auth/signup', adult(overrides));
   if (res.status !== 201) throw new Error(`signup failed: ${JSON.stringify(res.body)}`);
   api.user = res.body.user;

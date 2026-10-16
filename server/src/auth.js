@@ -40,6 +40,19 @@ function cookieOptions(req, maxAgeSeconds) {
   return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure ? '; Secure' : ''}`;
 }
 
+// A long-lived random id for this browser, kept apart from the session so it survives
+// signing out. Only its hash is stored. Clearing cookies resets it: this stops casual
+// ban evasion, not a determined person.
+const DEVICE_COOKIE = 'kd_dev';
+function deviceHash(req, res) {
+  let id = readCookie(req, DEVICE_COOKIE);
+  if (!id || !/^[A-Za-z0-9_-]{20,64}$/.test(id)) {
+    id = crypto.randomBytes(18).toString('base64url');
+    res.append('Set-Cookie', `${DEVICE_COOKIE}=${id}; ${cookieOptions(req, 2 * 365 * 24 * 60 * 60)}`);
+  }
+  return hashToken(`device:${id}`);
+}
+
 function createAuth(store) {
   return {
     async startSession(req, res, userId) {
@@ -74,4 +87,4 @@ function createAuth(store) {
   };
 }
 
-module.exports = { createAuth, hashPassword, verifyPassword, readCookie, hashToken, COOKIE };
+module.exports = { createAuth, hashPassword, verifyPassword, readCookie, hashToken, deviceHash, COOKIE };
