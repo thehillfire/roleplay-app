@@ -16,6 +16,8 @@ function userFromRow(row) {
     status: row.status,
     connectCredits: num(row.connect_credits) || 0,
     emailVerified: Boolean(row.email_verified_at),
+    plusUntil: num(row.plus_until) || 0,
+    stripeCustomerId: row.stripe_customer_id || null,
     createdAt: num(row.created_at),
   };
 }
@@ -741,6 +743,29 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     async moderatorEmails() {
       const { rows } = await db.query("SELECT email FROM users WHERE role = 'admin' AND status = 'active' AND email_verified_at IS NOT NULL");
       return rows.map((r) => r.email);
+    },
+
+    // --- Kindred Plus ---
+
+    async linkSubscription(userId, { customerId, subscriptionId }) {
+      await db.query(
+        'UPDATE users SET stripe_customer_id = COALESCE($1, stripe_customer_id), plus_subscription_id = $2 WHERE id = $3',
+        [customerId || null, subscriptionId, userId],
+      );
+    },
+
+    async userBySubscription(subscriptionId) {
+      const { rows } = await db.query('SELECT * FROM users WHERE plus_subscription_id = $1', [subscriptionId]);
+      return userFromRow(rows[0]);
+    },
+
+    // Extends Plus to `until` (never shortens it, so out-of-order webhooks are harmless).
+    async extendPlus(userId, until) {
+      await db.query('UPDATE users SET plus_until = $1 WHERE id = $2 AND (plus_until IS NULL OR plus_until < $1)', [until, userId]);
+    },
+
+    async endPlus(userId, until) {
+      await db.query('UPDATE users SET plus_until = $1, plus_subscription_id = NULL WHERE id = $2', [until, userId]);
     },
 
     async listHeldMessages({ limit = 50 } = {}) {

@@ -135,7 +135,10 @@ function attachRealtime({
         store.conversationsStartedSince(user.id, Date.now() - DAY_MS),
         store.ageBand(user.id),
       ]);
-      if (today >= dailyMatchLimit) {
+      // Kindred Plus members can meet more new people a day.
+      const fresh = await store.getUser(user.id);
+      const limit = fresh?.plusUntil > Date.now() ? dailyMatchLimit * 3 : dailyMatchLimit;
+      if (today >= limit) {
         ws.send(JSON.stringify({ type: 'match.error', error: "You've met a lot of new people today. You can keep talking with anyone in your list, and matching opens again tomorrow." }));
         return;
       }

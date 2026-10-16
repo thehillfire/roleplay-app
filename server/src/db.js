@@ -187,6 +187,12 @@ const MIGRATIONS = [
     'ALTER TABLE mod_actions_v2 RENAME TO mod_actions',
     'CREATE INDEX IF NOT EXISTS mod_actions_created_idx2 ON mod_actions(created_at)',
   ],
+  // 13: Kindred Plus subscriptions
+  [
+    'ALTER TABLE users ADD COLUMN stripe_customer_id TEXT',
+    'ALTER TABLE users ADD COLUMN plus_subscription_id TEXT',
+    'ALTER TABLE users ADD COLUMN plus_until BIGINT',
+  ],
 ];
 
 async function migrate(db) {

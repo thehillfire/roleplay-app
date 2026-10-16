@@ -24,7 +24,7 @@ What's left between this repo and real users, in order. The code side is done an
 - **Keep talking free, forever.** The free chat is the product and the growth engine.
 - **Connect at $4.99 to start, not $10.** [Guessing] At $10, few people will pay to learn the name of someone they met an hour ago. At $4.99 it's an impulse buy, and the credit comes back if they decline, which makes the "yes" feel safe. Raise it once you see demand. `CONNECT_PRICE_CENTS=499`.
 - **Ads: wait.** Turn on AdSense only after you have steady traffic (AdSense often rejects new sites with little traffic), and keep it non-personalized (the default here).
-- **Later: "Kindred Plus" subscription** ($3–5/month): extra connect credits, priority matching, unlimited daily matches. It's more predictable than one-off purchases. Not built yet; Stripe Checkout supports subscriptions with a small change.
+- **Kindred Plus subscription: built.** $4.99/month (`PLUS_PRICE_CENTS`) for 3 connect credits a month and 3× the daily new-match limit. Subscriptions are more predictable than one-off purchases. Next idea: an annual plan at about two months free.
 
 ## Where the first users come from
 

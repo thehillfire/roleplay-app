@@ -18,6 +18,18 @@ export default function Account({ user, billing, onBack, onSignOut, onSignOutEve
     }
   };
 
+  const goTo = async (call) => {
+    setBusy(true);
+    setError('');
+    try {
+      window.location.assign((await call()).url);
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  };
+  const money = (cents) => new Intl.NumberFormat(undefined, { style: 'currency', currency: billing?.currency || 'usd' }).format(cents / 100);
+
   const remove = async (e) => {
     e.preventDefault();
     setBusy(true);
@@ -46,6 +58,24 @@ export default function Account({ user, billing, onBack, onSignOut, onSignOutEve
         )}
         <div className="row"><span>Member since</span><span>{new Date(user.createdAt).toLocaleDateString()}</span></div>
       </section>
+
+      {billing?.enabled && (
+        <section className="card plus">
+          {user.plus ? (
+            <>
+              <h2>Kindred Plus 💙</h2>
+              <p className="hint">Active until {new Date(user.plusUntil).toLocaleDateString()} (renews automatically). Thank you for keeping Kindred free for everyone.</p>
+              <button className="btn" onClick={() => goTo(api.billingPortal)} disabled={busy}>Manage subscription</button>
+            </>
+          ) : (
+            <>
+              <h2>Kindred Plus</h2>
+              <p className="hint">{money(billing.plusPriceCents)}/month: {billing.plusCredits} connect credits every month and more new people a day. Talking stays free for everyone.</p>
+              <button className="btn primary" onClick={() => goTo(api.subscribePlus)} disabled={busy}>Get Plus</button>
+            </>
+          )}
+        </section>
+      )}
 
       <section className="card rows">
         <a className="row link-row" href="/api/account/export" download>Download my data</a>

@@ -13,6 +13,45 @@ function createPayments({
   now = () => Math.floor(Date.now() / 1000),
 } = {}) {
   const enabled = Boolean(secretKey && webhookSecret);
+  const plusPriceCents = Number(process.env.PLUS_PRICE_CENTS) || 499;
+
+  async function stripe(path, form) {
+    const res = await fetchImpl(`https://api.stripe.com/v1/${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${secretKey}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form,
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.url) throw Object.assign(new Error(`Stripe ${path} failed (${res.status})`), { status: 502 });
+    return { url: data.url };
+  }
+
+  // Monthly Kindred Plus. The user id rides along on the subscription so renewals can be
+  // matched to the account even if Stripe delivers events out of order.
+  function createSubscriptionCheckout({ userId, returnUrl, customerId }) {
+    const form = new URLSearchParams({
+      mode: 'subscription',
+      success_url: `${returnUrl}?checkout=plus`,
+      cancel_url: `${returnUrl}?checkout=cancelled`,
+      client_reference_id: userId,
+      'line_items[0][quantity]': '1',
+      'line_items[0][price_data][currency]': currency,
+      'line_items[0][price_data][unit_amount]': String(plusPriceCents),
+      'line_items[0][price_data][recurring][interval]': 'month',
+      'line_items[0][price_data][product_data][name]': 'Kindred Plus',
+      'metadata[user_id]': userId,
+      'metadata[kind]': 'plus',
+      'subscription_data[metadata][user_id]': userId,
+    });
+    if (customerId) form.set('customer', customerId);
+    return stripe('checkout/sessions', form);
+  }
+
+  // Stripe-hosted page to update the card or cancel.
+  function createPortal({ customerId, returnUrl }) {
+    return stripe('billing_portal/sessions', new URLSearchParams({ customer: customerId, return_url: returnUrl }));
+  }
 
   async function createCheckout({ userId, returnUrl }) {
     const form = new URLSearchParams({
@@ -63,7 +102,7 @@ function createPayments({
     return `t=${t},v1=${v1}`;
   }
 
-  return { enabled, priceCents, currency, createCheckout, verifyWebhook, sign };
+  return { enabled, priceCents, plusPriceCents, currency, createCheckout, createSubscriptionCheckout, createPortal, verifyWebhook, sign };
 }
 
 module.exports = { createPayments };

@@ -210,6 +210,7 @@ function takeCheckoutNotice() {
   const result = new URLSearchParams(window.location.search).get('checkout');
   if (!result) return '';
   window.history.replaceState(null, '', window.location.pathname);
+  if (result === 'plus') return 'Welcome to Kindred Plus! Your monthly credits will appear in a moment.';
   return result === 'success'
     ? 'Payment received. Your connect credit will be ready in a moment.'
     : 'Checkout cancelled. Nothing was charged.';

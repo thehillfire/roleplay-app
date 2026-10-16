@@ -15,6 +15,8 @@ const crypto = require('crypto');
 const RESET_TTL_MS = 60 * 60 * 1000;
 const VERIFY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const UNSEND_WINDOW_MS = 5 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const PLUS_MONTHLY_CREDITS = 3;
 // Gentle on purpose: support, a hug, thanks. Nothing that could read as mocking.
 const REACTIONS = ['💙', '🫂', '🙏'];
 
@@ -45,7 +47,9 @@ function createRateLimiter({ max, windowMs, now = Date.now, key = (req) => req.i
 
 const httpError = (status, message) => Object.assign(new Error(message), { status, expose: true });
 const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-const publicUser = ({ id, handle, role, status, connectCredits, emailVerified, createdAt }) => ({ id, handle, role, status, connectCredits, emailVerified, createdAt });
+const publicUser = ({ id, handle, role, status, connectCredits, emailVerified, plusUntil, createdAt }) => ({
+  id, handle, role, status, connectCredits, emailVerified, plusUntil: plusUntil || 0, plus: (plusUntil || 0) > Date.now(), createdAt,
+});
 
 // What one side of a conversation may see about its connect state.
 function connectionView(c, userId) {
@@ -101,12 +105,48 @@ function createApp({
       },
     },
   }));
+  // A paid Plus invoice (first month or renewal): extend Plus to the end of the period and
+  // grant the month's connect credits once (keyed by invoice id, so retries are harmless).
+  // Reads both pre- and post-2025 Stripe invoice shapes.
+  async function handlePlusInvoice(inv) {
+    const details = inv.parent?.subscription_details || inv.subscription_details || {};
+    const subscriptionId = inv.subscription || details.subscription;
+    if (!subscriptionId) return;
+    let user = await store.userBySubscription(subscriptionId);
+    const metaUserId = details.metadata?.user_id;
+    if (!user && metaUserId && (user = await store.getUser(metaUserId))) {
+      await store.linkSubscription(user.id, { customerId: inv.customer, subscriptionId }); // invoice beat checkout
+    }
+    if (!user) return;
+    const periodEnd = Math.max(0, ...((inv.lines?.data || []).map((l) => Number(l.period?.end) || 0)));
+    await store.extendPlus(user.id, (periodEnd || Math.floor(Date.now() / 1000) + 31 * 86400) * 1000);
+    await store.recordPayment({ id: inv.id, userId: user.id, amountCents: inv.amount_paid || 0, credits: PLUS_MONTHLY_CREDITS });
+    await store.flush();
+    hub.push(user.id, { type: 'credits.updated' });
+  }
+
   // Stripe webhook needs the raw body for signature checks, so it's mounted before the JSON parser.
   app.post('/api/billing/webhook', express.raw({ type: '*/*', limit: '256kb' }), asyncRoute(async (req, res) => {
     if (!payments.enabled) throw httpError(404, 'Not found');
     const event = payments.verifyWebhook(req.body.toString('utf8'), req.get('stripe-signature'));
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object;
+    const obj = event.data?.object || {};
+    if (event.type === 'checkout.session.completed' && obj.mode === 'subscription') {
+      // Plus started: remember the subscription; the first invoice.paid grants the month.
+      const userId = obj.client_reference_id || obj.metadata?.user_id;
+      if (userId && obj.subscription && (await store.getUser(userId))) {
+        await store.linkSubscription(userId, { customerId: obj.customer, subscriptionId: obj.subscription });
+      }
+    } else if (event.type === 'invoice.paid') {
+      await handlePlusInvoice(obj);
+    } else if (event.type === 'customer.subscription.deleted') {
+      const user = await store.userBySubscription(obj.id);
+      const end = Number(obj.current_period_end ?? obj.items?.data?.[0]?.current_period_end) || 0;
+      if (user) {
+        await store.endPlus(user.id, Math.min(end * 1000 || Date.now(), Date.now() + 31 * DAY_MS));
+        hub.push(user.id, { type: 'credits.updated' });
+      }
+    } else if (event.type === 'checkout.session.completed') {
+      const session = obj;
       const userId = session.client_reference_id || session.metadata?.user_id;
       if (session.payment_status === 'paid' && userId && (await store.getUser(userId))) {
         const credits = Math.max(1, Math.min(10, Number(session.metadata?.credits) || 1));
@@ -361,7 +401,7 @@ function createApp({
   app.get('/api/auth/me', asyncRoute(async (req, res) => {
     res.json({
       user: req.user ? { ...publicUser(req.user), helped: await store.helpedCount(req.user.id) } : null,
-      billing: { enabled: payments.enabled, priceCents: payments.priceCents, currency: payments.currency },
+      billing: { enabled: payments.enabled, priceCents: payments.priceCents, plusPriceCents: payments.plusPriceCents, plusCredits: PLUS_MONTHLY_CREDITS, currency: payments.currency },
       push: { publicKey: push.publicKey },
       ads,
     });
@@ -439,6 +479,21 @@ function createApp({
   }));
 
   // --- Billing ---
+
+  app.post('/api/billing/plus', member, asyncRoute(async (req, res) => {
+    if (!payments.enabled) throw httpError(503, "Payments aren't set up yet.");
+    const base = siteUrl(req);
+    if (!base) throw httpError(503, 'Payments need PUBLIC_URL to be configured.');
+    if (req.user.plusUntil > Date.now() && req.user.stripeCustomerId) throw httpError(409, 'You already have Kindred Plus.');
+    res.json(await payments.createSubscriptionCheckout({ userId: req.user.id, returnUrl: `${base}/`, customerId: req.user.stripeCustomerId }));
+  }));
+
+  app.post('/api/billing/portal', member, asyncRoute(async (req, res) => {
+    if (!payments.enabled || !req.user.stripeCustomerId) throw httpError(404, 'No subscription to manage.');
+    const base = siteUrl(req);
+    if (!base) throw httpError(503, 'Payments need PUBLIC_URL to be configured.');
+    res.json(await payments.createPortal({ customerId: req.user.stripeCustomerId, returnUrl: `${base}/` }));
+  }));
 
   app.post('/api/billing/checkout', member, asyncRoute(async (req, res) => {
     if (!payments.enabled) throw httpError(503, "Payments aren't set up yet. Connecting is free for now.");

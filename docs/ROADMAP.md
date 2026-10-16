@@ -32,6 +32,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Deployment: Dockerfile (tested: production mode, non-root, clean SIGTERM), Render Blueprint, docs/DEPLOY.md
 
 ## 5. Community & launch readiness
+- [x] Kindred Plus subscription (monthly credits, more daily matches, Stripe customer portal); copy-paste spam detection
 - [x] Optional ML screening (OpenAI moderation endpoint, free): threats, hate, sexual+minors; fails open
 - [x] Link previews (Open Graph + share image); launch playbook (docs/LAUNCH.md)
 - [x] "N people are waiting for someone to listen" banner with one-tap Be a listener (balances the two sides)

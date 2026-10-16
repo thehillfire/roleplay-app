@@ -306,3 +306,6 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); box-sh
 .bubble { cursor: default; }
 .need-listener { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(129, 199, 132, 0.4); background: rgba(129, 199, 132, 0.08); }
 .need-listener p { margin: 0; font-size: 14px; flex: 1 1 200px; }
+.plus { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; border-color: rgba(186, 104, 200, 0.4); }
+.plus h2 { margin: 0; font-size: 18px; }
+.plus .hint { line-height: 1.55; }

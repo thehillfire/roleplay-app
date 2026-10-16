@@ -45,7 +45,8 @@ Create a [Resend](https://resend.com) account, verify your sending domain, and s
 ## Payments (Connect)
 
 1. Create a Stripe account and copy the **secret key** into `STRIPE_SECRET_KEY`.
-2. Stripe Dashboard → Developers → Webhooks → **Add endpoint**: `https://<your-domain>/api/billing/webhook`, event `checkout.session.completed`. Copy its **signing secret** into `STRIPE_WEBHOOK_SECRET`.
+2. Stripe Dashboard → Developers → Webhooks → **Add endpoint**: `https://<your-domain>/api/billing/webhook`, events `checkout.session.completed`, `invoice.paid` and `customer.subscription.deleted`. Copy its **signing secret** into `STRIPE_WEBHOOK_SECRET`.
+   - For **Kindred Plus** (the monthly subscription), also turn on the **Customer portal** in Stripe (Settings → Billing → Customer portal) so subscribers can update their card or cancel. Price: `PLUS_PRICE_CENTS` (default `499`).
 3. Optional: `CONNECT_PRICE_CENTS` (default `999`) and `CONNECT_CURRENCY` (default `usd`).
 4. Test with Stripe's test keys and card `4242 4242 4242 4242` before switching to live keys.
 
