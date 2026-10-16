@@ -296,6 +296,11 @@ const MIGRATIONS = [
     'CREATE INDEX IF NOT EXISTS reports_reporter_idx ON reports(reporter_id, created_at)',
     'CREATE INDEX IF NOT EXISTS bottles_user_idx ON bottles(user_id, status)',
   ],
+  // 26: appeals record the decision (and an optional note to the person)
+  [
+    'ALTER TABLE appeals ADD COLUMN decision TEXT',
+    'ALTER TABLE appeals ADD COLUMN decision_note TEXT',
+  ],
 ];
 
 async function migrate(db) {

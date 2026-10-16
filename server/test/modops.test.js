@@ -301,3 +301,24 @@ test('a moderator restoring an account clears an under-18 refusal flag on its br
   const next = await browser('POST', '/api/auth/signup', adult({ birthdate: '1985-05-05' }));
   assert.equal(next.body.user.status, 'active', 'the next adult on that browser is not paused');
 });
+
+test('a denied appeal shows its outcome and note, and a new note can follow a week later', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const mod = await moderator(s, 'mod-appeal-note@example.com');
+  const person = await signedUp(s.base);
+  const personId = (await s.db.query('SELECT id FROM users WHERE handle = $1', [person.user.handle])).rows[0].id;
+  await s.store.setUserStatus(personId, 'review');
+  await person('POST', '/api/appeal', { message: 'This is the only place I can talk.' });
+  assert.equal((await person('GET', '/api/appeal')).body.appeal.status, 'open');
+  const [appeal] = (await mod('GET', '/api/admin/appeals')).body.appeals;
+  await mod('POST', `/api/admin/appeals/${appeal.id}/resolve`, { restore: false, note: 'Several people reported threats. We will look again next week.' });
+
+  const seen = (await person('GET', '/api/appeal')).body.appeal;
+  assert.equal(seen.decision, 'denied');
+  assert.equal(seen.note, 'Several people reported threats. We will look again next week.');
+  assert.ok(seen.nextAppealAt > Date.now());
+  assert.equal((await person('POST', '/api/appeal', { message: 'please' })).status, 429, 'one note a week after a no');
+  await s.db.query('UPDATE appeals SET resolved_at = $1', [Date.now() - 8 * 24 * 60 * 60 * 1000]);
+  assert.equal((await person('POST', '/api/appeal', { message: 'I have thought about it.' })).status, 201);
+});

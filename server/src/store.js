@@ -912,6 +912,18 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return rows[0] ? { message: rows[0].message, createdAt: num(rows[0].created_at) } : null;
     },
 
+    // The open appeal, or else the latest decided one (so a paused person sees the outcome).
+    async latestAppeal(userId) {
+      const open = await store.openAppeal(userId);
+      if (open) return { ...open, status: 'open' };
+      const { rows } = await db.query(
+        "SELECT message, created_at, decision, decision_note, resolved_at FROM appeals WHERE user_id = $1 AND status = 'resolved' ORDER BY resolved_at DESC LIMIT 1",
+        [userId],
+      );
+      const r = rows[0];
+      return r ? { message: r.message, createdAt: num(r.created_at), status: 'resolved', decision: r.decision, note: r.decision_note, decidedAt: num(r.resolved_at) } : null;
+    },
+
     // --- support requests ---
 
     async createSupportRequest(userId, topic, message) {
@@ -962,10 +974,13 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     },
 
     // Closes an open appeal exactly once (two moderators clicking at once can't both decide).
-    async resolveAppeal(id) {
+    async resolveAppeal(id, { decision = null, note = null } = {}) {
       const { rows } = await db.query('SELECT user_id FROM appeals WHERE id = $1', [id]);
       if (!rows[0]) return null;
-      const { rowCount } = await db.query("UPDATE appeals SET status = 'resolved', resolved_at = $1 WHERE id = $2 AND status = 'open'", [now(), id]);
+      const { rowCount } = await db.query(
+        "UPDATE appeals SET status = 'resolved', resolved_at = $1, decision = $2, decision_note = $3 WHERE id = $4 AND status = 'open'",
+        [now(), decision, note, id],
+      );
       return rowCount === 1 ? rows[0].user_id : null;
     },
 

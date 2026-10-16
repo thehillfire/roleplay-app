@@ -19,9 +19,11 @@ module.exports = function register(app, { store, hub, mailer, push, member }) {
   }));
 
   app.post('/api/admin/appeals/:id/resolve', admin, asyncRoute(async (req, res) => {
-    const userId = await store.resolveAppeal(req.params.id);
-    if (!userId) throw httpError(404, 'Open appeal not found (it may have just been answered).');
     const restore = req.body.restore === true;
+    // An optional line for the person (shown on their paused screen), e.g. why the pause stays.
+    const note = typeof req.body.note === 'string' ? req.body.note.trim().slice(0, 500) || null : null;
+    const userId = await store.resolveAppeal(req.params.id, { decision: restore ? 'granted' : 'denied', note });
+    if (!userId) throw httpError(404, 'Open appeal not found (it may have just been answered).');
     const restored = restore ? await store.setUserStatus(userId, 'active') : false;
     const action = !restore ? 'appeal_denied' : restored ? 'appeal_granted' : 'appeal_closed_account_deleted';
     await store.logModAction({ moderatorId: req.user.id, targetId: userId, action });

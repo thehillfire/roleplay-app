@@ -3,6 +3,7 @@ const { verifyPassword } = require('../auth');
 const { str, badRequest } = require('../validate');
 const { httpError, asyncRoute } = require('./common');
 
+const APPEAL_WAIT_MS = 7 * 24 * 60 * 60 * 1000;
 const SUPPORT_TOPICS = ['account', 'billing', 'safety', 'feedback', 'other'];
 
 module.exports = function register(app, { store, hub, auth, payments, push, mailer, siteUrl, authLimiter, member }) {
@@ -50,13 +51,19 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
   });
 
   app.get('/api/appeal', paused, asyncRoute(async (req, res) => {
-    res.json({ appeal: await store.openAppeal(req.user.id) });
+    const appeal = await store.latestAppeal(req.user.id);
+    res.json({ appeal: appeal && appeal.decision === 'denied' ? { ...appeal, nextAppealAt: appeal.decidedAt + APPEAL_WAIT_MS } : appeal });
   }));
 
   app.post('/api/appeal', paused, authLimiter, asyncRoute(async (req, res) => {
     const message = str(req.body.message, 'message', 1000);
+    // After a "no", one new note a week: enough to add context, not to wear moderators down.
+    const last = await store.latestAppeal(req.user.id);
+    if (last?.decision === 'denied' && last.decidedAt + APPEAL_WAIT_MS > Date.now()) {
+      throw httpError(429, `You can send another note after ${new Date(last.decidedAt + APPEAL_WAIT_MS).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}.`);
+    }
     await store.createAppeal(req.user.id, message);
-    res.status(201).json({ appeal: await store.openAppeal(req.user.id) });
+    res.status(201).json({ appeal: await store.latestAppeal(req.user.id) });
   }));
 
   // --- Account ---

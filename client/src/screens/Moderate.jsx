@@ -29,6 +29,7 @@ export default function Moderate({ onBack }) {
   const [query, setQuery] = useState('');
   const [inbox, setInbox] = useState(null);
   const [replies, setReplies] = useState({});
+  const [appealNotes, setAppealNotes] = useState({});
   const [found, setFound] = useState(null);
 
   const lookup = async (e) => {
@@ -180,8 +181,16 @@ export default function Moderate({ onBack }) {
           {a.reason && <p className="meta"><span>Paused for: {a.reason}</span></p>}
           <p className="details">“{a.message}”</p>
           <div className="actions">
-            <button className="btn primary" disabled={!!busy} onClick={() => act(a.id, () => api.admin.resolveAppeal(a.id, true))}>Restore account</button>
-            <button className="btn" disabled={!!busy} onClick={() => act(a.id, () => api.admin.resolveAppeal(a.id, false))}>Keep paused</button>
+            <textarea
+              className="reply-box"
+              aria-label={`Note to ${a.user.handle} (optional)`}
+              value={appealNotes[a.id] || ''}
+              onChange={(e) => setAppealNotes((m) => ({ ...m, [a.id]: e.target.value }))}
+              placeholder="Optional note they'll see, e.g. why the pause stays"
+              maxLength={500}
+            />
+            <button className="btn primary" disabled={!!busy} onClick={() => act(a.id, () => api.admin.resolveAppeal(a.id, true, appealNotes[a.id]))}>Restore account</button>
+            <button className="btn" disabled={!!busy} onClick={() => act(a.id, () => api.admin.resolveAppeal(a.id, false, appealNotes[a.id]))}>Keep paused</button>
           </div>
         </article>
       ))}

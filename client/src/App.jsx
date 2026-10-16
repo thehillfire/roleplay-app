@@ -34,12 +34,19 @@ function Paused({ onSignOut }) {
         <p>A moderator is taking a look at your account. This can follow a report, a message our safety check flagged, or something about the sign-up, such as an age that didn't add up. It isn't a final decision.</p>
         <p className="hint">If you need support right now, call or text <a href="tel:988">988</a> (US) or visit <a href="https://findahelpline.com" target="_blank" rel="noreferrer">findahelpline.com</a>.</p>
       </div>
-      {appeal && (
+      {appeal?.status === 'open' && (
         <div className="card">
           <p role="status">Your note was sent {new Date(appeal.createdAt).toLocaleDateString()}. A moderator will read it.</p>
         </div>
       )}
-      {appeal === null && (
+      {appeal?.decision === 'denied' && (
+        <div className="card">
+          <p role="status">A moderator read your note on {new Date(appeal.decidedAt).toLocaleDateString()} and decided to keep the pause in place for now.</p>
+          {appeal.note && <p className="details">“{appeal.note}”</p>}
+          {Date.now() < appeal.nextAppealAt && <p className="hint">If something has changed, you can send another note after {new Date(appeal.nextAppealAt).toLocaleDateString()}.</p>}
+        </div>
+      )}
+      {(appeal === null || appeal?.decision === 'granted' || (appeal?.decision === 'denied' && Date.now() >= appeal.nextAppealAt)) && (
         <form className="card form" onSubmit={send}>
           <label>
             <span>Think this was a mistake? Tell the moderators what happened.</span>

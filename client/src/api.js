@@ -59,7 +59,7 @@ export const api = {
     stats: () => request('GET', '/api/admin/stats'),
     log: () => request('GET', '/api/admin/log').then((d) => d.actions),
     appeals: () => request('GET', '/api/admin/appeals').then((d) => d.appeals),
-    resolveAppeal: (id, restore) => request('POST', `/api/admin/appeals/${enc(id)}/resolve`, { restore }),
+    resolveAppeal: (id, restore, note) => request('POST', `/api/admin/appeals/${enc(id)}/resolve`, { restore, note: note || undefined }),
     reports: (status = 'open') => request('GET', `/api/admin/reports?status=${status}`).then((d) => d.reports),
     resolve: (id, resolution) => request('POST', `/api/admin/reports/${enc(id)}/resolve`, { resolution }),
     support: () => request('GET', '/api/admin/support').then((d) => d.requests),
