@@ -62,6 +62,10 @@ function createApp({
   push = createPush(),
   mailer = createMailer(),
   publicUrl = process.env.PUBLIC_URL,
+  // Google AdSense on the home screen only. Off unless both IDs are set.
+  ads = process.env.ADSENSE_CLIENT && process.env.ADSENSE_SLOT
+    ? { client: process.env.ADSENSE_CLIENT, slot: process.env.ADSENSE_SLOT }
+    : null,
   adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
 } = {}) {
   if (!store || !hub) throw new Error('createApp requires a store and a hub');
@@ -70,12 +74,17 @@ function createApp({
 
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
+  // Ad scripts only get through the CSP when ads are configured.
+  const adHosts = ads ? ['https://pagead2.googlesyndication.com', 'https://*.googlesyndication.com', 'https://*.doubleclick.net', 'https://*.google.com', 'https://*.adtrafficquality.google'] : [];
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
         'font-src': ["'self'", 'https://fonts.gstatic.com'],
         'style-src': ["'self'", 'https://fonts.googleapis.com', "'unsafe-inline'"],
-        'connect-src': ["'self'"],
+        'connect-src': ["'self'", ...adHosts],
+        'script-src': ["'self'", ...adHosts],
+        'frame-src': ["'self'", ...adHosts],
+        'img-src': ["'self'", 'data:', ...adHosts],
       },
     },
   }));
@@ -197,6 +206,7 @@ function createApp({
       user: req.user ? { ...publicUser(req.user), helped: await store.helpedCount(req.user.id) } : null,
       billing: { enabled: payments.enabled, priceCents: payments.priceCents, currency: payments.currency },
       push: { publicKey: push.publicKey },
+      ads,
     });
   }));
 

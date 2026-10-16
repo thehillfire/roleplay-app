@@ -37,7 +37,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Live "people here now" count on home and in the waiting room
 - [x] Privacy policy and terms pages at /privacy and /terms (DRAFTS: need legal review and the bracketed details filled in before launch)
 - [x] Accessibility pass: axe-core audit of 8 screens in CI (`npm run a11y`, zero violations), dialog semantics, Escape to close, reduced motion
-- [ ] Ad slot on the home screen only (never inside chats), off unless configured
+- [x] Ad slot on the home screen only (never inside chats), non-personalized, off unless `ADSENSE_CLIENT`/`ADSENSE_SLOT` are set; CSP opens for Google ad hosts only then
 - [ ] Scale past one server: Redis pub/sub for realtime + shared queue
 
 ## Known limits

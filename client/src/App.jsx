@@ -24,7 +24,7 @@ function Paused({ onSignOut }) {
   );
 }
 
-function Signedin({ user, billing, pushKey, onSignOut, onDeleted, onPaused, onRefreshMe, onOpenLegal, initialNotice }) {
+function Signedin({ user, billing, ads, pushKey, onSignOut, onDeleted, onPaused, onRefreshMe, onOpenLegal, initialNotice }) {
   const [view, setView] = useState({ name: 'home' });
 
   // Browser history: home is the root entry; other screens are pushed on top so the
@@ -137,6 +137,7 @@ function Signedin({ user, billing, pushKey, onSignOut, onDeleted, onPaused, onRe
           onDismissNotice={() => setNotice('')}
           onModerate={user.role === 'admin' ? () => navigate({ name: 'moderate' }) : undefined}
           presence={presence}
+          ads={ads}
           askPush={askPush}
           onEnablePush={turnOnPush}
           onDismissPush={() => setAskPush(false)}
@@ -181,12 +182,14 @@ export default function App() {
   const [user, setUser] = useState(undefined); // undefined while checking the session
   const [billing, setBilling] = useState(null);
   const [pushKey, setPushKey] = useState(null);
+  const [ads, setAds] = useState(null);
   const [checkoutNotice] = useState(takeCheckoutNotice);
 
   const refreshMe = useCallback(() => api.me().then((d) => {
     setUser(d.user);
     setBilling(d.billing);
     setPushKey(d.push?.publicKey || null);
+    setAds(d.ads || null);
   }), []);
 
   const refreshMeQuietly = useCallback(() => { refreshMe().catch(() => {}); }, [refreshMe]);
@@ -252,6 +255,7 @@ export default function App() {
           key={user.id}
           user={user}
           billing={billing}
+          ads={ads}
           pushKey={pushKey}
           initialNotice={checkoutNotice}
           onSignOut={signOut}

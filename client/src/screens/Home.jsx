@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import HomeAd from '../components/HomeAd.jsx';
 
 const ROLES = [
   { id: 'talk', label: 'I need to talk' },
@@ -16,7 +17,7 @@ export function timeAgo(ts) {
   return `${Math.round(hours / 24)}d`;
 }
 
-export default function Home({ user, conversations, listError, onRetry, onFind, onOpen, onAccount, connection, notice, onDismissNotice, onModerate, askPush, onEnablePush, onDismissPush, presence }) {
+export default function Home({ user, conversations, listError, onRetry, onFind, onOpen, onAccount, connection, notice, onDismissNotice, onModerate, askPush, onEnablePush, onDismissPush, presence, ads }) {
   const [role, setRole] = useState('talk');
   const [topic, setTopic] = useState('');
 
@@ -103,6 +104,8 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
           </ul>
         </section>
       )}
+
+      <HomeAd ads={ads} />
 
       {conversations?.length === 0 && <p className="empty">Your conversations will appear here. Past matches stay anonymous, and you can pick up where you left off.</p>}
     </main>
