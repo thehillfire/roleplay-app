@@ -67,7 +67,13 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     setError('');
     api.conversation(id).then((d) => {
       setConvo(d.conversation);
-      setMessages(d.messages);
+      // Merge rather than replace: a message pushed live while this request was in flight
+      // (e.g. their first line, sent the moment you matched) isn't in this response yet.
+      setMessages((prev) => {
+        const ids = new Set(d.messages.map((m) => m.id));
+        const newest = d.messages.length ? d.messages[d.messages.length - 1].createdAt : 0;
+        return [...d.messages, ...prev.filter((m) => !ids.has(m.id) && m.createdAt >= newest)];
+      });
       // Opening a chat whose recent messages from them mention crisis: show listener guidance once.
       if (!crisisChecked.current) {
         crisisChecked.current = true;
