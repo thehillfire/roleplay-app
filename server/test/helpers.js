@@ -6,7 +6,7 @@ const { boot } = require('../src/boot');
 async function start(options = {}) {
   const url = process.env.TEST_DATABASE_URL || '';
   const built = await boot({ db: { url, sqliteFile: ':memory:' }, realtime: { sweepMs: 50, ...options.realtime }, ...options });
-  if (url) await built.db.query('TRUNCATE users, sessions, conversations, messages, blocks CASCADE');
+  if (url) await built.db.query('TRUNCATE users, sessions, conversations, messages, blocks, reports CASCADE');
   const server = built.listen(0);
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -64,7 +64,11 @@ function connect(base, headers) {
           waiters.push({ match: (e) => e.type === type, resolve: (e) => { clearTimeout(timer); e.seen = true; res(e); } });
         });
       },
-      close: () => new Promise((r) => { ws.once('close', r); ws.close(); }),
+      close: () => new Promise((r) => {
+        if (ws.readyState === WebSocket.CLOSED) return r(); // the server may have closed it already
+        ws.once('close', r);
+        ws.close();
+      }),
     }));
     ws.once('unexpected-response', (req, res) => reject(Object.assign(new Error(`HTTP ${res.statusCode}`), { status: res.statusCode })));
     ws.once('error', reject);

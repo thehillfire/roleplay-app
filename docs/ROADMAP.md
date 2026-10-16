@@ -12,11 +12,12 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Client: home, waiting room, chat, past conversations with unread counts
 
 ## 2. Safety
-- [ ] Block (ends chat, never matched again) and report (reason + conversation snapshot)
-- [ ] Message screening before delivery: contact info (phones, emails, @handles, links) held back until connected; age probing flagged; self-disclosed under-18 suspends the account for review
-- [ ] Crisis language shows the sender crisis resources (988 / findahelpline.com) without blocking them
-- [ ] Auto-suspend after reports from several different people; rate limits on matching and messaging
-- [ ] Moderator review queue (admin role): reports, flagged messages, suspend/restore
+- [x] Block (ends chat, never matched again) and report (reason + conversation snapshot)
+- [x] Message screening before delivery: contact info (phones, emails, @handles, links) held back until connected; age probing flagged; self-disclosed under-18 suspends the account for review
+- [x] Crisis language shows the sender crisis resources (988 / findahelpline.com) without blocking them
+- [x] Auto-suspend after reports from several different people; rate limits on matching and messaging
+- [x] Moderator API (admin role): reports, held messages, suspend/restore; `npm run make-admin -- email`
+- [ ] Moderator screen in the app
 
 ## 3. Connect (the paid feature)
 - [ ] Either person can request to connect; reveal only when both have

@@ -30,6 +30,7 @@ test('signup gives an anonymous handle and a session', async (t) => {
   assert.equal(res.status, 201);
   assert.match(res.body.user.handle, /^[A-Z][a-z]+[A-Z][a-z]+\d{2}$/);
   assert.ok(!('email' in res.body.user), 'email is never sent back to the client');
+  assert.equal(res.body.user.status, 'active');
   assert.match(res.setCookie, /HttpOnly/);
   assert.match(res.setCookie, /SameSite=Lax/);
   const me = await api('GET', '/api/auth/me');

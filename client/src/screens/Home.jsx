@@ -16,7 +16,7 @@ export function timeAgo(ts) {
   return `${Math.round(hours / 24)}d`;
 }
 
-export default function Home({ user, conversations, listError, onRetry, onFind, onOpen, onSignOut, connection }) {
+export default function Home({ user, conversations, listError, onRetry, onFind, onOpen, onSignOut, connection, notice, onDismissNotice }) {
   const [role, setRole] = useState('talk');
   const [topic, setTopic] = useState('');
 
@@ -28,6 +28,13 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
       </nav>
 
       {connection === 'offline' && <p className="banner" role="status">Reconnecting…</p>}
+
+      {notice && (
+        <div className="notice" role="status">
+          <p>{notice}</p>
+          <button className="icon-btn" aria-label="Dismiss" onClick={onDismissNotice}>×</button>
+        </div>
+      )}
 
       <section className="card find">
         <h1 className="find-title">Talk to someone</h1>

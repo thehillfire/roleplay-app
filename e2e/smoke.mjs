@@ -88,6 +88,34 @@ await bob.locator('.bubble', { hasText: 'Thank you. Really.' }).waitFor();
 assert.equal(await bob.locator('.bubble').count(), 3);
 step('session and history survive reload');
 
+// Safety: phone numbers are held back with an explanation
+await alice.getByLabel('Message').fill('text me 555 123 4567');
+await alice.getByLabel('Message').press('Enter');
+await alice.locator('.bubble.held .held-note', { hasText: "Contact details" }).waitFor();
+await bob.waitForTimeout(500);
+assert.equal(await bob.locator('.bubble', { hasText: '555' }).count(), 0, 'partner never sees held messages');
+step('contact info held with an explanation');
+
+// Crisis language: sender sees resources, listener sees guidance
+await alice.getByLabel('Message').fill('some days I just want to die');
+await alice.getByLabel('Message').press('Enter');
+await alice.locator('.crisis', { hasText: 'You matter' }).waitFor();
+await bob.locator('.crisis', { hasText: 'going through something heavy' }).waitFor();
+await bob.shot('5-crisis-listener');
+await alice.shot('5b-held-and-crisis');
+step('crisis resources shown to both sides');
+
+// Report and block
+await bob.getByRole('button', { name: 'Conversation options' }).click();
+await bob.getByRole('menuitem', { name: 'Report' }).click();
+await bob.getByText('Harassment or bullying').click();
+await bob.shot('6-report');
+await bob.getByRole('button', { name: 'Report and block' }).click();
+await bob.locator('.notice', { hasText: 'was reported and blocked' }).waitFor();
+assert.equal(await bob.locator('.convo').count(), 0);
+await alice.getByText('This conversation has ended.').waitFor();
+step('report blocks and ends the chat for both');
+
 for (const page of [alice, bob]) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   assert.equal(overflow, false, 'page scrolls horizontally on a phone');

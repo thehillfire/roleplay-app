@@ -51,6 +51,25 @@ const MIGRATIONS = [
       PRIMARY KEY (blocker_id, blocked_id)
     )`,
   ],
+  // 2: reports for moderators
+  [
+    `CREATE TABLE IF NOT EXISTS reports (
+      id TEXT PRIMARY KEY,
+      reporter_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      reported_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      conversation_id TEXT REFERENCES conversations(id) ON DELETE SET NULL,
+      reason TEXT NOT NULL,
+      details TEXT,
+      snapshot TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at BIGINT NOT NULL,
+      resolved_at BIGINT,
+      resolution TEXT
+    )`,
+    'CREATE INDEX IF NOT EXISTS reports_reported_idx ON reports(reported_id, created_at)',
+    'CREATE INDEX IF NOT EXISTS reports_status_idx ON reports(status, created_at)',
+    'CREATE INDEX IF NOT EXISTS messages_status_idx ON messages(status, created_at)',
+  ],
 ];
 
 async function migrate(db) {

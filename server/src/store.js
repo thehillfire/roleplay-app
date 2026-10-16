@@ -17,7 +17,24 @@ function messageFromRow(row) {
     senderId: row.sender_id,
     body: row.body,
     status: row.status,
+    flags: row.flags ? JSON.parse(row.flags) : [],
     createdAt: num(row.created_at),
+  };
+}
+
+function reportFromRow(row) {
+  return {
+    id: row.id,
+    reason: row.reason,
+    details: row.details,
+    status: row.status,
+    createdAt: num(row.created_at),
+    resolvedAt: num(row.resolved_at),
+    resolution: row.resolution,
+    conversationId: row.conversation_id,
+    reporter: { id: row.reporter_id, handle: row.reporter_handle },
+    reported: { id: row.reported_id, handle: row.reported_handle, status: row.reported_status },
+    snapshot: JSON.parse(row.snapshot),
   };
 }
 
@@ -182,7 +199,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
 
     async addMessage({ conversationId, senderId, body, status = 'delivered', flags }) {
       const t = now();
-      const message = { id: newId(), conversationId, senderId, body, status, createdAt: t };
+      const message = { id: newId(), conversationId, senderId, body, status, flags: flags || [], createdAt: t };
       await db.query(
         'INSERT INTO messages (id, conversation_id, sender_id, body, status, flags, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',
         [message.id, conversationId, senderId, body, status, flags ? JSON.stringify(flags) : null, t],
@@ -201,6 +218,90 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
          WHERE id = $2`,
         [userId, conversationId, at],
       );
+    },
+
+    // --- safety ---
+
+    async setUserStatus(userId, status) {
+      await db.query('UPDATE users SET status = $1 WHERE id = $2', [status, userId]);
+    },
+
+    async setUserRole(email, role) {
+      const { rowCount } = await db.query('UPDATE users SET role = $1 WHERE email = $2', [role, email]);
+      return rowCount > 0;
+    },
+
+    async createReport({ reporterId, reportedId, conversationId, reason, details }) {
+      // Moderators see the recent conversation as it was when reported.
+      const { rows } = await db.query(
+        `SELECT m.sender_id, m.body, m.status, m.created_at FROM messages m
+          WHERE m.conversation_id = $1 ORDER BY m.created_at DESC, m.id DESC LIMIT 30`,
+        [conversationId],
+      );
+      const snapshot = rows.reverse().map((r) => ({
+        from: r.sender_id === reportedId ? 'reported' : 'reporter',
+        body: r.body,
+        held: r.status !== 'delivered',
+        at: num(r.created_at),
+      }));
+      const report = { id: newId(), createdAt: now() };
+      await db.query(
+        `INSERT INTO reports (id, reporter_id, reported_id, conversation_id, reason, details, snapshot, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [report.id, reporterId, reportedId, conversationId, reason, details || null, JSON.stringify(snapshot), report.createdAt],
+      );
+      return report;
+    },
+
+    // Distinct people who reported this user since `since`, optionally for one reason.
+    async distinctReporters(reportedId, since, reason) {
+      const params = [reportedId, since];
+      let extra = '';
+      if (reason) {
+        params.push(reason);
+        extra = 'AND reason = $3';
+      }
+      const { rows } = await db.query(
+        `SELECT COUNT(DISTINCT reporter_id) AS n FROM reports WHERE reported_id = $1 AND created_at >= $2 ${extra}`,
+        params,
+      );
+      return Number(rows[0].n);
+    },
+
+    async listReports({ status = 'open', limit = 50 } = {}) {
+      const { rows } = await db.query(
+        `SELECT r.*, a.handle AS reporter_handle, b.handle AS reported_handle, b.status AS reported_status
+           FROM reports r JOIN users a ON a.id = r.reporter_id JOIN users b ON b.id = r.reported_id
+          WHERE r.status = $1 ORDER BY r.created_at ASC LIMIT $2`,
+        [status, limit],
+      );
+      return rows.map(reportFromRow);
+    },
+
+    async getReport(id) {
+      const { rows } = await db.query(
+        `SELECT r.*, a.handle AS reporter_handle, b.handle AS reported_handle, b.status AS reported_status
+           FROM reports r JOIN users a ON a.id = r.reporter_id JOIN users b ON b.id = r.reported_id WHERE r.id = $1`,
+        [id],
+      );
+      return rows[0] ? reportFromRow(rows[0]) : null;
+    },
+
+    async resolveReport(id, resolution) {
+      const { rowCount } = await db.query(
+        "UPDATE reports SET status = 'resolved', resolution = $1, resolved_at = $2 WHERE id = $3 AND status = 'open'",
+        [resolution, now(), id],
+      );
+      return rowCount > 0;
+    },
+
+    async listHeldMessages({ limit = 50 } = {}) {
+      const { rows } = await db.query(
+        `SELECT m.*, u.handle AS sender_handle, u.status AS sender_status FROM messages m JOIN users u ON u.id = m.sender_id
+          WHERE m.status = 'held' ORDER BY m.created_at DESC LIMIT $1`,
+        [limit],
+      );
+      return rows.map((r) => ({ ...messageFromRow(r), sender: { id: r.sender_id, handle: r.sender_handle, status: r.sender_status } }));
     },
   };
   return store;

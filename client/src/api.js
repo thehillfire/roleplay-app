@@ -25,6 +25,8 @@ export const api = {
 
   conversations: () => request('GET', '/api/conversations').then((d) => d.conversations),
   conversation: (id, before) => request('GET', `/api/conversations/${enc(id)}${before ? `?before=${before}` : ''}`),
-  send: (id, body) => request('POST', `/api/conversations/${enc(id)}/messages`, { body }).then((d) => d.message),
+  send: (id, body) => request('POST', `/api/conversations/${enc(id)}/messages`, { body }),
+  block: (id) => request('POST', `/api/conversations/${enc(id)}/block`, {}),
+  report: (id, reason, details) => request('POST', `/api/conversations/${enc(id)}/report`, { reason, details }),
   markRead: (id) => request('POST', `/api/conversations/${enc(id)}/read`, {}),
 };

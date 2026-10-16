@@ -33,6 +33,8 @@ e2e/      Playwright test: two strangers sign up, match and chat
 - **Accounts:** email + password (scrypt), 18+ birthdate check and guidelines agreement at signup. Each user gets a random anonymous handle. Email is never sent to other users or back to the client. Sessions are random tokens in an httpOnly cookie, stored hashed.
 - **Matching:** `I need to talk` pairs with `I can listen`; `Either` pairs with anyone. Two talkers (or two listeners) pair up after 30 seconds so nobody waits forever. Shared topics are preferred, new people are preferred over past partners, and blocked pairs never match.
 - **Conversations:** one thread per pair, so matching someone again (or opening them from your list) continues where you left off. Messages are sent over REST and pushed live over the WebSocket, along with typing and match events.
+- **Safety:** every message is screened before delivery (`server/src/moderation.js`). Contact details are held back until both people connect. Asking someone's age and sexual solicitation are held. A message saying the sender is under 18 is held and pauses their account for review. Crisis language is still delivered, but the sender gets 988 / findahelpline resources and the listener gets guidance. Held messages are shown to the sender with the reason, and to moderators. Block ends a chat for good. Report snapshots the last 30 messages, blocks, and auto-pauses anyone reported by 3 different people in a week (2 for "under 18").
+- **Moderation:** make someone a moderator with `npm run make-admin -- you@example.com`. Moderators get `GET /api/admin/reports`, `POST /api/admin/reports/:id/resolve { resolution: dismissed|warned|suspended }`, `GET /api/admin/held` and `POST /api/admin/users/:id/status`.
 - **Security:** JSON-only mutating requests (CSRF guard), origin check on the WebSocket handshake, rate limits on auth and messages, per-socket flood guard, and conversation membership checked on every read and write.
 
 ## API
@@ -41,7 +43,8 @@ e2e/      Playwright test: two strangers sign up, match and chat
 - `GET /api/conversations`: your threads, with partner handle, online flag, last message and unread count
 - `GET /api/conversations/:id?before=<ms>`: messages, newest 50
 - `POST /api/conversations/:id/messages { body }`, `POST /api/conversations/:id/read`
-- WebSocket `/ws`. Send `match.join { role, topic }`, `match.leave`, `typing { conversationId }`. Receive `match.waiting`, `match.found`, `message`, `typing`.
+- `POST /api/conversations/:id/block`, `POST /api/conversations/:id/report { reason, details? }`
+- WebSocket `/ws`. Send `match.join { role, topic }`, `match.leave`, `typing { conversationId }`. Receive `match.waiting`, `match.found`, `message`, `typing`, `conversation.ended`.
 
 ## Deploying
 

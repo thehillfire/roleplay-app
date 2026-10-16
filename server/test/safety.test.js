@@ -1,0 +1,140 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { start, signedUp } = require('./helpers');
+
+async function matched(s, a, b) {
+  const aws = await a.socket();
+  const bws = await b.socket();
+  aws.send({ type: 'match.join', role: 'talk' });
+  await aws.next('match.waiting');
+  bws.send({ type: 'match.join', role: 'listen' });
+  const { conversationId } = await aws.next('match.found');
+  await bws.next('match.found');
+  return { id: conversationId, aws, bws, close: () => Promise.all([aws.close().catch(() => {}), bws.close().catch(() => {})]) };
+}
+
+const idOf = async (s, api) => (await s.db.query('SELECT id FROM users WHERE handle = $1', [api.user.handle])).rows[0].id;
+
+test('contact info is held: sender sees why, partner never receives it', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const alice = await signedUp(s.base);
+  const bob = await signedUp(s.base);
+  const c = await matched(s, alice, bob);
+  t.after(c.close);
+
+  const res = await alice('POST', `/api/conversations/${c.id}/messages`, { body: 'text me 555 123 4567' });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.message.status, 'held');
+  assert.deepEqual(res.body.message.flags, ['contact']);
+
+  await alice('POST', `/api/conversations/${c.id}/messages`, { body: 'ok never mind, how was your day?' });
+  const pushed = await c.bws.next('message');
+  assert.equal(pushed.message.body, 'ok never mind, how was your day?', 'only the clean message was pushed');
+
+  const bobView = (await bob('GET', `/api/conversations/${c.id}`)).body.messages;
+  assert.deepEqual(bobView.map((m) => m.body), ['ok never mind, how was your day?']);
+  const aliceView = (await alice('GET', `/api/conversations/${c.id}`)).body.messages;
+  assert.equal(aliceView.length, 2);
+  assert.deepEqual(aliceView[0].flags, ['contact']);
+  assert.equal((await bob('GET', '/api/conversations')).body.conversations[0].lastMessage.body, 'ok never mind, how was your day?');
+});
+
+test('crisis messages are delivered, flagged for both sides', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const alice = await signedUp(s.base);
+  const bob = await signedUp(s.base);
+  const c = await matched(s, alice, bob);
+  t.after(c.close);
+  const res = await alice('POST', `/api/conversations/${c.id}/messages`, { body: 'honestly I just want to die' });
+  assert.equal(res.body.crisis, true);
+  assert.equal(res.body.message.status, 'delivered');
+  const pushed = await c.bws.next('message');
+  assert.equal(pushed.message.crisis, true);
+});
+
+test('saying you are a minor pauses the account and ends the chat', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const alice = await signedUp(s.base);
+  const bob = await signedUp(s.base);
+  const c = await matched(s, alice, bob);
+  t.after(c.close);
+  const res = await alice('POST', `/api/conversations/${c.id}/messages`, { body: "lol I'm 15 btw" });
+  assert.equal(res.body.paused, true);
+  assert.equal(res.body.message.status, 'held');
+  assert.equal((await c.bws.next('conversation.ended')).conversationId, c.id);
+  assert.equal((await alice('GET', '/api/auth/me')).body.user.status, 'review');
+  const blocked = await alice('POST', `/api/conversations/${c.id}/messages`, { body: 'hello?' });
+  assert.equal(blocked.status, 403);
+  assert.equal(blocked.body.paused, true);
+  await assert.rejects(alice.socket(), { status: 403 });
+});
+
+test('block ends the conversation for both and hides it', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const alice = await signedUp(s.base);
+  const bob = await signedUp(s.base);
+  const c = await matched(s, alice, bob);
+  t.after(c.close);
+  assert.equal((await bob('POST', `/api/conversations/${c.id}/block`, {})).status, 200);
+  assert.equal((await c.aws.next('conversation.ended')).conversationId, c.id);
+  assert.equal((await alice('POST', `/api/conversations/${c.id}/messages`, { body: 'hey' })).status, 403);
+  assert.equal((await alice('GET', '/api/conversations')).body.conversations.length, 0);
+  assert.equal((await bob('GET', '/api/conversations')).body.conversations.length, 0);
+});
+
+test('reports snapshot the chat, block by default, and auto-pause repeat offenders', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const troll = await signedUp(s.base);
+  const trollId = await idOf(s, troll);
+  for (let i = 0; i < 3; i += 1) {
+    const victim = await signedUp(s.base);
+    const c = await matched(s, troll, victim);
+    await troll('POST', `/api/conversations/${c.id}/messages`, { body: `you are pathetic ${i}` });
+    assert.equal((await victim('POST', `/api/conversations/${c.id}/report`, { reason: 'nonsense' })).status, 400);
+    const res = await victim('POST', `/api/conversations/${c.id}/report`, { reason: 'harassment', details: 'Insults' });
+    assert.equal(res.status, 201);
+    await c.close();
+    const status = (await s.store.getUser(trollId)).status;
+    assert.equal(status, i < 2 ? 'active' : 'review', `after ${i + 1} reports`);
+  }
+  const reports = await s.store.listReports();
+  assert.equal(reports.length, 3);
+  assert.equal(reports[0].snapshot[0].from, 'reported');
+  assert.match(reports[0].snapshot[0].body, /pathetic/);
+});
+
+test('moderators review reports and held messages; members cannot', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const alice = await signedUp(s.base);
+  const bob = await signedUp(s.base);
+  const mod = await signedUp(s.base, { email: 'mod@example.com' });
+  await s.store.setUserRole('mod@example.com', 'admin');
+  const c = await matched(s, alice, bob);
+  t.after(c.close);
+  await alice('POST', `/api/conversations/${c.id}/messages`, { body: 'send nudes' });
+  await bob('POST', `/api/conversations/${c.id}/report`, { reason: 'sexual' });
+
+  assert.equal((await alice('GET', '/api/admin/reports')).status, 403);
+
+  const held = (await mod('GET', '/api/admin/held')).body.messages;
+  assert.equal(held[0].body, 'send nudes');
+  assert.deepEqual(held[0].flags, ['sexual']);
+
+  const [report] = (await mod('GET', '/api/admin/reports')).body.reports;
+  assert.equal(report.reason, 'sexual');
+  assert.equal(report.reported.handle, alice.user.handle);
+  assert.equal((await mod('POST', `/api/admin/reports/${report.id}/resolve`, { resolution: 'suspended' })).status, 200);
+  assert.equal((await mod('POST', `/api/admin/reports/${report.id}/resolve`, { resolution: 'suspended' })).status, 404, 'already resolved');
+  assert.equal((await alice('GET', '/api/auth/me')).body.user.status, 'suspended');
+  assert.equal((await mod('GET', '/api/admin/reports')).body.reports.length, 0);
+
+  const aliceId = await idOf(s, alice);
+  await mod('POST', `/api/admin/users/${aliceId}/status`, { status: 'active' });
+  assert.equal((await alice('GET', '/api/auth/me')).body.user.status, 'active');
+});

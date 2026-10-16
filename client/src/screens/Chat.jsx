@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
+import { CrisisCard, ReportSheet, heldNote } from '../components/Safety.jsx';
 
 function formatTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-export default function Chat({ id, socket, onBack }) {
+export default function Chat({ id, socket, onBack, onLeft, onPaused }) {
   const [convo, setConvo] = useState(null);
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState('');
@@ -13,6 +14,10 @@ export default function Chat({ id, socket, onBack }) {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
   const [partnerTyping, setPartnerTyping] = useState(false);
+  const [ended, setEnded] = useState(false);
+  const [crisis, setCrisis] = useState(null); // 'sender' | 'listener' | null
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const endRef = useRef(null);
   const typingTimer = useRef(null);
   const lastTypingSent = useRef(0);
@@ -34,6 +39,7 @@ export default function Chat({ id, socket, onBack }) {
       if (message.conversationId !== id) return;
       setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
       setPartnerTyping(false);
+      if (message.crisis) setCrisis('listener');
       api.markRead(id).catch(() => {});
     });
     const offTyping = socket.on('typing', ({ conversationId }) => {
@@ -42,9 +48,12 @@ export default function Chat({ id, socket, onBack }) {
       clearTimeout(typingTimer.current);
       typingTimer.current = setTimeout(() => setPartnerTyping(false), 4000);
     });
+    const offEnded = socket.on('conversation.ended', ({ conversationId }) => {
+      if (conversationId === id) setEnded(true);
+    });
     // After a reconnect, refetch in case messages arrived while offline.
     const offOpen = socket.on('open', load);
-    return () => { offMessage(); offTyping(); offOpen(); clearTimeout(typingTimer.current); };
+    return () => { offMessage(); offTyping(); offEnded(); offOpen(); clearTimeout(typingTimer.current); };
   }, [socket, id, load]);
 
   useEffect(() => {
@@ -57,11 +66,15 @@ export default function Chat({ id, socket, onBack }) {
     setSending(true);
     setSendError('');
     try {
-      const message = await api.send(id, body);
-      setMessages((prev) => [...prev, message]);
+      const res = await api.send(id, body);
+      setMessages((prev) => [...prev, res.message]);
       setDraft('');
+      if (res.crisis) setCrisis('sender');
+      if (res.paused) onPaused();
     } catch (err) {
-      setSendError(err.message);
+      if (err.status === 403 && /paused/.test(err.message)) onPaused();
+      else if (err.status === 403) setEnded(true);
+      else setSendError(err.message);
     } finally {
       setSending(false);
     }
@@ -81,6 +94,22 @@ export default function Chat({ id, socket, onBack }) {
       e.preventDefault();
       send();
     }
+  };
+
+  const block = async () => {
+    setMenuOpen(false);
+    if (!window.confirm(`Block ${convo.partner.handle}? You won't see each other again.`)) return;
+    try {
+      await api.block(id);
+      onLeft(`You blocked ${convo.partner.handle}.`);
+    } catch (err) {
+      setSendError(err.message);
+    }
+  };
+
+  const report = async (reason, details) => {
+    await api.report(id, reason, details);
+    onLeft(`Thanks. ${convo.partner.handle} was reported and blocked. A moderator will review it.`);
   };
 
   if (error) {
@@ -105,15 +134,28 @@ export default function Chat({ id, socket, onBack }) {
             </span>
           </div>
         )}
+        {convo && (
+          <div className="menu-wrap">
+            <button className="icon-btn" aria-label="Conversation options" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>⋯</button>
+            {menuOpen && (
+              <div className="menu" role="menu">
+                <button role="menuitem" onClick={() => { setMenuOpen(false); setReporting(true); }}>Report</button>
+                <button role="menuitem" onClick={block}>Block</button>
+              </div>
+            )}
+          </div>
+        )}
       </header>
+      {crisis && <CrisisCard role={crisis === 'sender' ? 'sender' : 'listener'} onDismiss={() => setCrisis(null)} />}
 
       <div className="messages" aria-live="polite">
         {convo && messages.length === 0 && (
           <p className="empty">You're connected with {convo.partner.handle}. Say hi, share what's on your mind, or ask how their day is going.</p>
         )}
         {messages.map((m) => (
-          <div key={m.id} className={m.fromMe ? 'bubble me' : 'bubble them'}>
+          <div key={m.id} className={`bubble ${m.fromMe ? 'me' : 'them'}${m.status === 'held' ? ' held' : ''}`}>
             <p>{m.body}</p>
+            {m.status === 'held' && <p className="held-note">{heldNote(m.flags)}</p>}
             <time dateTime={new Date(m.createdAt).toISOString()}>{formatTime(m.createdAt)}</time>
           </div>
         ))}
@@ -121,6 +163,12 @@ export default function Chat({ id, socket, onBack }) {
         <div ref={endRef} />
       </div>
 
+      {ended ? (
+        <div className="composer ended">
+          <p>This conversation has ended.</p>
+          <button className="btn" onClick={onBack}>Back to conversations</button>
+        </div>
+      ) : (
       <form className="composer" onSubmit={(e) => { e.preventDefault(); send(); }}>
         {sendError && <p className="form-error" role="alert">{sendError}</p>}
         <div className="composer-row">
@@ -136,6 +184,9 @@ export default function Chat({ id, socket, onBack }) {
           <button className="btn primary" type="submit" disabled={sending || !draft.trim()}>Send</button>
         </div>
       </form>
+      )}
+
+      {reporting && convo && <ReportSheet handle={convo.partner.handle} onSubmit={report} onClose={() => setReporting(false)} />}
     </main>
   );
 }
