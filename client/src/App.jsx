@@ -19,9 +19,9 @@ function Paused({ onSignOut }) {
   );
 }
 
-function Signedin({ user, onSignOut, onPaused }) {
+function Signedin({ user, billing, onSignOut, onPaused, onRefreshMe, initialNotice }) {
   const [view, setView] = useState({ name: 'home' });
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(initialNotice || '');
   const [conversations, setConversations] = useState(null);
   const [listError, setListError] = useState('');
   const [connection, setConnection] = useState('connecting');
@@ -49,9 +49,10 @@ function Signedin({ user, onSignOut, onPaused }) {
       socket.on('message', () => { if (viewRef.current.name === 'home') refresh(); }),
       socket.on('open', () => { if (viewRef.current.name === 'home') refresh(); }),
       socket.on('close', () => { if (viewRef.current.name === 'waiting') setMatchError('Connection lost. Reconnecting…'); }),
+      socket.on('credits.updated', onRefreshMe),
     ];
     return () => offs.forEach((off) => off());
-  }, [socket, refresh]);
+  }, [socket, refresh, onRefreshMe]);
 
   useEffect(() => window.scrollTo(0, 0), [view.name]);
 
@@ -96,18 +97,40 @@ function Signedin({ user, onSignOut, onPaused }) {
             setView({ name: 'home' });
           }}
           onPaused={onPaused}
+          billing={billing}
+          credits={user.connectCredits}
+          onCreditsChanged={onRefreshMe}
         />
       )}
     </>
   );
 }
 
+// Returning from Stripe Checkout lands on /?checkout=success|cancelled.
+function takeCheckoutNotice() {
+  const result = new URLSearchParams(window.location.search).get('checkout');
+  if (!result) return '';
+  window.history.replaceState(null, '', window.location.pathname);
+  return result === 'success'
+    ? 'Payment received. Your connect credit will be ready in a moment.'
+    : 'Checkout cancelled. Nothing was charged.';
+}
+
 export default function App() {
   const [user, setUser] = useState(undefined); // undefined while checking the session
+  const [billing, setBilling] = useState(null);
+  const [checkoutNotice] = useState(takeCheckoutNotice);
+
+  const refreshMe = useCallback(() => api.me().then((d) => {
+    setUser(d.user);
+    setBilling(d.billing);
+  }), []);
+
+  const refreshMeQuietly = useCallback(() => { refreshMe().catch(() => {}); }, [refreshMe]);
 
   useEffect(() => {
-    api.me().then(setUser, () => setUser(null));
-  }, []);
+    refreshMe().catch(() => setUser(null));
+  }, [refreshMe]);
 
   const signOut = async () => {
     await api.logout().catch(() => {});
@@ -121,7 +144,15 @@ export default function App() {
       {user === null && <Welcome onSignedIn={setUser} />}
       {user && user.status !== 'active' && <Paused onSignOut={signOut} />}
       {user && user.status === 'active' && (
-        <Signedin key={user.id} user={user} onSignOut={signOut} onPaused={() => setUser({ ...user, status: 'review' })} />
+        <Signedin
+          key={user.id}
+          user={user}
+          billing={billing}
+          initialNotice={checkoutNotice}
+          onSignOut={signOut}
+          onPaused={() => setUser({ ...user, status: 'review' })}
+          onRefreshMe={refreshMeQuietly}
+        />
       )}
     </div>
   );

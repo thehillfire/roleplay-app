@@ -70,6 +70,29 @@ const MIGRATIONS = [
     'CREATE INDEX IF NOT EXISTS reports_status_idx ON reports(status, created_at)',
     'CREATE INDEX IF NOT EXISTS messages_status_idx ON messages(status, created_at)',
   ],
+  // 3: mutual connect (reveal) and paid connect credits
+  [
+    'ALTER TABLE users ADD COLUMN connect_credits INTEGER NOT NULL DEFAULT 0',
+    `CREATE TABLE IF NOT EXISTS connections (
+      conversation_id TEXT PRIMARY KEY REFERENCES conversations(id) ON DELETE CASCADE,
+      requester_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      requester_name TEXT NOT NULL,
+      requester_contact TEXT,
+      paid INTEGER NOT NULL DEFAULT 0,
+      accepter_name TEXT,
+      accepter_contact TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at BIGINT NOT NULL,
+      responded_at BIGINT
+    )`,
+    `CREATE TABLE IF NOT EXISTS payments (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      amount_cents INTEGER NOT NULL,
+      credits INTEGER NOT NULL,
+      created_at BIGINT NOT NULL
+    )`,
+  ],
 ];
 
 async function migrate(db) {

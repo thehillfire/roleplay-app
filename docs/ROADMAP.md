@@ -20,9 +20,9 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [ ] Moderator screen in the app
 
 ## 3. Connect (the paid feature)
-- [ ] Either person can request to connect; reveal only when both have
-- [ ] Reveal shows a profile each person chose to share (name + optional contact), never email
-- [ ] Payment behind an interface; Stripe Checkout when keys exist, free in development
+- [x] Either person can request to connect; reveal only when both have
+- [x] Reveal shows a profile each person chose to share (name + optional contact), never email
+- [x] Payment behind an interface; Stripe Checkout when keys exist, free in development
 
 ## 4. Polish
 - [ ] PWA: installable, notification permission for new messages

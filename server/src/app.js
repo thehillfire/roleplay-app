@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const { createAuth, hashPassword, verifyPassword } = require('./auth');
 const { parseCredentials, parseMessageBody, str, badRequest } = require('./validate');
 const { screenMessage } = require('./moderation');
+const { createPayments } = require('./payments');
 
 const REPORT_REASONS = ['harassment', 'sexual', 'minor', 'hate', 'spam', 'self_harm', 'other'];
 // Auto-pause (pending human review) when this many different people report someone within a week.
@@ -32,7 +33,19 @@ function createRateLimiter({ max, windowMs, now = Date.now, key = (req) => req.i
 
 const httpError = (status, message) => Object.assign(new Error(message), { status, expose: true });
 const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-const publicUser = ({ id, handle, role, status, createdAt }) => ({ id, handle, role, status, createdAt });
+const publicUser = ({ id, handle, role, status, connectCredits, createdAt }) => ({ id, handle, role, status, connectCredits, createdAt });
+
+// What one side of a conversation may see about its connect state.
+function connectionView(c, userId) {
+  if (!c) return { status: 'none' };
+  const mine = c.requesterId === userId;
+  if (c.status === 'accepted') {
+    const me = mine ? c.requester : c.accepter;
+    const them = mine ? c.accepter : c.requester;
+    return { status: 'accepted', me, partner: them };
+  }
+  return { status: c.status, mine };
+}
 
 function createApp({
   store,
@@ -40,6 +53,7 @@ function createApp({
   authRateLimit = { max: 10, windowMs: 60000 },
   messageRateLimit = { max: 30, windowMs: 60000 },
   staticDir,
+  payments = createPayments(),
 } = {}) {
   if (!store || !hub) throw new Error('createApp requires a store and a hub');
   const app = express();
@@ -56,6 +70,22 @@ function createApp({
       },
     },
   }));
+  // Stripe webhook needs the raw body for signature checks, so it's mounted before the JSON parser.
+  app.post('/api/billing/webhook', express.raw({ type: '*/*', limit: '256kb' }), asyncRoute(async (req, res) => {
+    if (!payments.enabled) throw httpError(404, 'Not found');
+    const event = payments.verifyWebhook(req.body.toString('utf8'), req.get('stripe-signature'));
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const userId = session.client_reference_id || session.metadata?.user_id;
+      if (session.payment_status === 'paid' && userId && (await store.getUser(userId))) {
+        const credits = Math.max(1, Math.min(10, Number(session.metadata?.credits) || 1));
+        const granted = await store.recordPayment({ id: session.id, userId, amountCents: session.amount_total || 0, credits });
+        if (granted) hub.push(userId, { type: 'credits.updated' });
+      }
+    }
+    res.json({ received: true });
+  }));
+
   app.use('/api', express.json({ limit: '32kb' }));
 
   // State-changing API calls must be JSON. Cross-site forms can't send that without
@@ -115,8 +145,19 @@ function createApp({
   }));
 
   app.get('/api/auth/me', (req, res) => {
-    res.json({ user: req.user ? publicUser(req.user) : null });
+    res.json({
+      user: req.user ? publicUser(req.user) : null,
+      billing: { enabled: payments.enabled, priceCents: payments.priceCents, currency: payments.currency },
+    });
   });
+
+  // --- Billing ---
+
+  app.post('/api/billing/checkout', member, asyncRoute(async (req, res) => {
+    if (!payments.enabled) throw httpError(503, "Payments aren't set up yet. Connecting is free for now.");
+    const returnUrl = `${req.protocol}://${req.get('host')}/`;
+    res.json(await payments.createCheckout({ userId: req.user.id, returnUrl }));
+  }));
 
   // --- Conversations ---
 
@@ -136,8 +177,9 @@ function createApp({
     if (blocked) throw httpError(404, 'Conversation not found.');
     const before = Number(req.query.before) || undefined;
     const messages = await store.listMessages(req.user.id, req.conversation.id, { before });
+    const connection = connectionView(await store.getConnection(req.conversation.id), req.user.id);
     res.json({
-      conversation: { id: req.conversation.id, partner: { handle: partner.handle, online: hub.isOnline(partner.id) } },
+      conversation: { id: req.conversation.id, partner: { handle: partner.handle, online: hub.isOnline(partner.id) }, connection },
       // Flags are only shown to the sender, to explain why a message was held.
       messages: messages.map(({ senderId, flags, ...m }) => ({ ...m, fromMe: senderId === req.user.id, ...(senderId === req.user.id && m.status === 'held' ? { flags } : {}) })),
     });
@@ -148,7 +190,8 @@ function createApp({
     const { id, partnerId } = req.conversation;
     if (await store.isBlocked(req.user.id, partnerId)) throw httpError(403, "You can't message this person.");
 
-    const screen = screenMessage(body);
+    const connected = (await store.getConnection(id))?.status === 'accepted';
+    const screen = screenMessage(body, { connected });
     const message = await store.addMessage({
       conversationId: id,
       senderId: req.user.id,
@@ -168,6 +211,66 @@ function createApp({
       hub.push(partnerId, { type: 'message', message: { ...out, fromMe: false, ...(screen.crisis ? { crisis: true } : {}) } });
     }
     res.status(201).json({ message: { ...out, fromMe: true, flags }, crisis: screen.crisis, paused: screen.suspend || undefined });
+  }));
+
+  // --- Connect: mutual reveal. Requesting costs a credit (when payments are on); accepting is free. ---
+
+  const parseReveal = (body = {}) => ({
+    name: str(body.name, 'name', 40),
+    contact: str(body.contact, 'contact', 100, { required: false }),
+  });
+
+  const pushConnection = async (conversationId, userIds) => {
+    const c = await store.getConnection(conversationId);
+    for (const uid of userIds) hub.push(uid, { type: 'connect.updated', conversationId, connection: connectionView(c, uid) });
+  };
+
+  app.post('/api/conversations/:id/connect', member, conversation, asyncRoute(async (req, res) => {
+    const { id, partnerId } = req.conversation;
+    if (await store.isBlocked(req.user.id, partnerId)) throw httpError(403, "You can't connect with this person.");
+    const reveal = parseReveal(req.body);
+    const existing = await store.getConnection(id);
+
+    if (existing?.status === 'pending' && existing.requesterId === partnerId) {
+      // They asked first: accepting is free and reveals both sides.
+      await store.respondToConnect(id, { accept: true, ...reveal });
+    } else if (existing?.status === 'accepted') {
+      throw httpError(409, "You're already connected.");
+    } else if (existing?.status === 'pending') {
+      throw httpError(409, 'Your request is waiting for their answer.');
+    } else if (existing?.status === 'declined') {
+      throw httpError(409, "They chose to stay anonymous. Let's respect that.");
+    } else {
+      const paid = payments.enabled;
+      if (paid && !(await store.spendCredit(req.user.id))) {
+        return res.status(402).json({ error: 'Connecting needs a credit.', needsCredit: true });
+      }
+      if (!(await store.createConnectRequest({ conversationId: id, requesterId: req.user.id, ...reveal, paid }))) {
+        if (paid) await store.addCredits(req.user.id, 1); // lost a race with their request; refund
+        throw httpError(409, 'They just sent you a request. Open it to accept.');
+      }
+    }
+    await pushConnection(id, [partnerId]);
+    res.json({ connection: connectionView(await store.getConnection(id), req.user.id) });
+  }));
+
+  app.post('/api/conversations/:id/connect/decline', member, conversation, asyncRoute(async (req, res) => {
+    const { id, partnerId } = req.conversation;
+    const c = await store.getConnection(id);
+    if (!c || c.status !== 'pending' || c.requesterId !== partnerId) throw httpError(404, 'No request to decline.');
+    await store.respondToConnect(id, { accept: false });
+    if (c.paid) await store.addCredits(partnerId, 1); // their credit comes back
+    await pushConnection(id, [partnerId]);
+    res.json({ connection: connectionView(await store.getConnection(id), req.user.id) });
+  }));
+
+  app.post('/api/conversations/:id/connect/cancel', member, conversation, asyncRoute(async (req, res) => {
+    const { id, partnerId } = req.conversation;
+    const c = await store.getConnection(id);
+    if (!c || !(await store.cancelConnectRequest(id, req.user.id))) throw httpError(404, 'No request to cancel.');
+    if (c.paid) await store.addCredits(req.user.id, 1);
+    await pushConnection(id, [partnerId]);
+    res.json({ connection: { status: 'none' } });
   }));
 
   app.post('/api/conversations/:id/block', member, conversation, asyncRoute(async (req, res) => {
@@ -259,7 +362,7 @@ function createApp({
     let status = err.status || err.statusCode || 500;
     if (err.type === 'entity.parse.failed') status = 400;
     if (err.type === 'entity.too.large') status = 413;
-    if (status >= 500) console.error(err);
+    if (status >= 500 && !err.expose) console.error(err);
     let message = 'Something went wrong.';
     if (err.type === 'entity.parse.failed') message = 'Request body is not valid JSON.';
     else if (status === 413) message = 'Request is too large.';

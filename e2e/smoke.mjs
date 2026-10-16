@@ -105,6 +105,25 @@ await bob.shot('5-crisis-listener');
 await alice.shot('5b-held-and-crisis');
 step('crisis resources shown to both sides');
 
+// Connect: Alice asks, Bob accepts, both see what the other chose to share
+await alice.getByRole('button', { name: 'Conversation options' }).click();
+await alice.getByRole('menuitem', { name: 'Connect…' }).click();
+await alice.getByLabel('First name or nickname').fill('Jav');
+await alice.getByLabel(/A way to reach you/).fill('@jav.writes');
+await alice.shot('7-connect-request');
+await alice.getByRole('button', { name: 'Send request' }).click();
+await alice.getByText('Connect request sent.').waitFor();
+await bob.getByText(`${aliceHandle} would like to connect.`).waitFor();
+await bob.shot('7b-connect-incoming');
+await bob.getByRole('button', { name: 'Accept…' }).click();
+await bob.getByLabel('First name or nickname').fill('Rob');
+await bob.getByRole('button', { name: 'Accept and connect' }).click();
+await bob.locator('.connect-banner.accepted', { hasText: 'Jav' }).waitFor();
+assert.match(await bob.locator('.connect-banner.accepted').innerText(), /@jav\.writes/);
+await alice.locator('.connect-banner.accepted', { hasText: 'Rob' }).waitFor();
+await alice.shot('7c-connected');
+step('mutual connect reveals both names only after both agree');
+
 // Report and block
 await bob.getByRole('button', { name: 'Conversation options' }).click();
 await bob.getByRole('menuitem', { name: 'Report' }).click();

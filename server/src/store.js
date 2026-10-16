@@ -7,7 +7,15 @@ const pairKey = (a, b) => (a < b ? `${a}:${b}` : `${b}:${a}`);
 
 function userFromRow(row) {
   if (!row) return null;
-  return { id: row.id, email: row.email, handle: row.handle, role: row.role, status: row.status, createdAt: num(row.created_at) };
+  return {
+    id: row.id,
+    email: row.email,
+    handle: row.handle,
+    role: row.role,
+    status: row.status,
+    connectCredits: num(row.connect_credits) || 0,
+    createdAt: num(row.created_at),
+  };
 }
 
 function messageFromRow(row) {
@@ -46,7 +54,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       const exists = await db.query('SELECT 1 FROM users WHERE email = $1', [email]);
       if (exists.rows.length) return null;
       for (let attempt = 0; attempt < 8; attempt += 1) {
-        const user = { id: newId(), email, handle: randomHandle(rng), role: 'member', status: 'active', createdAt: now() };
+        const user = { id: newId(), email, handle: randomHandle(rng), role: 'member', status: 'active', connectCredits: 0, createdAt: now() };
         try {
           await db.query(
             'INSERT INTO users (id, email, handle, password_hash, birthdate, created_at) VALUES ($1, $2, $3, $4, $5, $6)',
@@ -293,6 +301,73 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         [resolution, now(), id],
       );
       return rowCount > 0;
+    },
+
+    // --- connect (mutual reveal) ---
+
+    async getConnection(conversationId) {
+      const { rows } = await db.query('SELECT * FROM connections WHERE conversation_id = $1', [conversationId]);
+      const r = rows[0];
+      if (!r) return null;
+      return {
+        conversationId: r.conversation_id,
+        requesterId: r.requester_id,
+        requester: { name: r.requester_name, contact: r.requester_contact },
+        accepter: { name: r.accepter_name, contact: r.accepter_contact },
+        status: r.status,
+        paid: Number(r.paid) === 1,
+        createdAt: num(r.created_at),
+        respondedAt: num(r.responded_at),
+      };
+    },
+
+    // Spends one credit if the user has one. Returns false otherwise (atomic).
+    async spendCredit(userId) {
+      const { rowCount } = await db.query(
+        'UPDATE users SET connect_credits = connect_credits - 1 WHERE id = $1 AND connect_credits > 0',
+        [userId],
+      );
+      return rowCount === 1;
+    },
+
+    async addCredits(userId, n) {
+      await db.query('UPDATE users SET connect_credits = connect_credits + $1 WHERE id = $2', [n, userId]);
+    },
+
+    async createConnectRequest({ conversationId, requesterId, name, contact, paid }) {
+      const { rowCount } = await db.query(
+        `INSERT INTO connections (conversation_id, requester_id, requester_name, requester_contact, paid, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (conversation_id) DO NOTHING`,
+        [conversationId, requesterId, name, contact || null, paid ? 1 : 0, now()],
+      );
+      return rowCount === 1;
+    },
+
+    async cancelConnectRequest(conversationId, requesterId) {
+      const { rowCount } = await db.query(
+        "DELETE FROM connections WHERE conversation_id = $1 AND requester_id = $2 AND status = 'pending'",
+        [conversationId, requesterId],
+      );
+      return rowCount === 1;
+    },
+
+    async respondToConnect(conversationId, { accept, name, contact }) {
+      const { rowCount } = await db.query(
+        `UPDATE connections SET status = $1, accepter_name = $2, accepter_contact = $3, responded_at = $4
+         WHERE conversation_id = $5 AND status = 'pending'`,
+        [accept ? 'accepted' : 'declined', accept ? name : null, accept ? contact || null : null, now(), conversationId],
+      );
+      return rowCount === 1;
+    },
+
+    // Records a completed payment once (webhooks can be retried) and grants its credits.
+    async recordPayment({ id, userId, amountCents, credits }) {
+      const { rowCount } = await db.query(
+        'INSERT INTO payments (id, user_id, amount_cents, credits, created_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING',
+        [id, userId, amountCents, credits, now()],
+      );
+      if (rowCount === 1) await store.addCredits(userId, credits);
+      return rowCount === 1;
     },
 
     async listHeldMessages({ limit = 50 } = {}) {

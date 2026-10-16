@@ -11,7 +11,7 @@ npm install
 npm run dev        # API + WebSocket on :3000, app on http://localhost:5173
 ```
 
-No keys needed. Data goes to SQLite at `data/kindred.db` unless `DATABASE_URL` points at Postgres.
+No keys needed (see `.env.example` for optional Postgres and Stripe settings). Data goes to SQLite at `data/kindred.db` unless `DATABASE_URL` points at Postgres.
 
 | Script | What it does |
 | --- | --- |
@@ -34,6 +34,7 @@ e2e/      Playwright test: two strangers sign up, match and chat
 - **Matching:** `I need to talk` pairs with `I can listen`; `Either` pairs with anyone. Two talkers (or two listeners) pair up after 30 seconds so nobody waits forever. Shared topics are preferred, new people are preferred over past partners, and blocked pairs never match.
 - **Conversations:** one thread per pair, so matching someone again (or opening them from your list) continues where you left off. Messages are sent over REST and pushed live over the WebSocket, along with typing and match events.
 - **Safety:** every message is screened before delivery (`server/src/moderation.js`). Contact details are held back until both people connect. Asking someone's age and sexual solicitation are held. A message saying the sender is under 18 is held and pauses their account for review. Crisis language is still delivered, but the sender gets 988 / findahelpline resources and the listener gets guidance. Held messages are shown to the sender with the reason, and to moderators. Block ends a chat for good. Report snapshots the last 30 messages, blocks, and auto-pauses anyone reported by 3 different people in a week (2 for "under 18").
+- **Connect (paid, mutual):** either person can ask to connect by entering what they'd share (first name, optional contact). Nothing is revealed unless the other person accepts with their own details. "Stay anonymous" is final. Once connected, contact details are no longer held back. With Stripe configured, sending a request uses one credit bought through Stripe Checkout (default $9.99). Accepting is free, and a declined or cancelled request returns the credit. Without Stripe keys, connecting is free.
 - **Moderation:** make someone a moderator with `npm run make-admin -- you@example.com`. Moderators get `GET /api/admin/reports`, `POST /api/admin/reports/:id/resolve { resolution: dismissed|warned|suspended }`, `GET /api/admin/held` and `POST /api/admin/users/:id/status`.
 - **Security:** JSON-only mutating requests (CSRF guard), origin check on the WebSocket handshake, rate limits on auth and messages, per-socket flood guard, and conversation membership checked on every read and write.
 
@@ -44,6 +45,8 @@ e2e/      Playwright test: two strangers sign up, match and chat
 - `GET /api/conversations/:id?before=<ms>`: messages, newest 50
 - `POST /api/conversations/:id/messages { body }`, `POST /api/conversations/:id/read`
 - `POST /api/conversations/:id/block`, `POST /api/conversations/:id/report { reason, details? }`
+- `POST /api/conversations/:id/connect { name, contact? }` (request or accept), `…/connect/decline`, `…/connect/cancel`
+- `POST /api/billing/checkout` → Stripe Checkout URL. `POST /api/billing/webhook` (Stripe, signature-verified, idempotent)
 - WebSocket `/ws`. Send `match.join { role, topic }`, `match.leave`, `typing { conversationId }`. Receive `match.waiting`, `match.found`, `message`, `typing`, `conversation.ended`.
 
 ## Deploying

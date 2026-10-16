@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { CrisisCard, ReportSheet, heldNote } from '../components/Safety.jsx';
+import { ConnectBanner, ConnectSheet } from '../components/Connect.jsx';
 
 function formatTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-export default function Chat({ id, socket, onBack, onLeft, onPaused }) {
+export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, credits, onCreditsChanged }) {
   const [convo, setConvo] = useState(null);
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState('');
@@ -18,6 +19,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused }) {
   const [crisis, setCrisis] = useState(null); // 'sender' | 'listener' | null
   const [menuOpen, setMenuOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [connectSheet, setConnectSheet] = useState(null); // null | 'request' | 'accept'
   const endRef = useRef(null);
   const typingTimer = useRef(null);
   const lastTypingSent = useRef(0);
@@ -51,10 +53,15 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused }) {
     const offEnded = socket.on('conversation.ended', ({ conversationId }) => {
       if (conversationId === id) setEnded(true);
     });
+    const offConnect = socket.on('connect.updated', ({ conversationId, connection }) => {
+      if (conversationId !== id) return;
+      setConvo((c) => (c ? { ...c, connection } : c));
+      onCreditsChanged(); // a declined request refunds the requester's credit
+    });
     // After a reconnect, refetch in case messages arrived while offline.
     const offOpen = socket.on('open', load);
-    return () => { offMessage(); offTyping(); offEnded(); offOpen(); clearTimeout(typingTimer.current); };
-  }, [socket, id, load]);
+    return () => { offMessage(); offTyping(); offEnded(); offConnect(); offOpen(); clearTimeout(typingTimer.current); };
+  }, [socket, id, load, onCreditsChanged]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
@@ -107,6 +114,32 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused }) {
     }
   };
 
+  const setConnection = (connection) => setConvo((c) => ({ ...c, connection }));
+
+  const connect = async (name, contact) => {
+    const { connection } = await api.connect(id, name, contact);
+    setConnection(connection);
+    setConnectSheet(null);
+    onCreditsChanged();
+  };
+
+  const declineConnect = async () => {
+    try {
+      setConnection((await api.declineConnect(id)).connection);
+    } catch (err) {
+      setSendError(err.message);
+    }
+  };
+
+  const cancelConnect = async () => {
+    try {
+      setConnection((await api.cancelConnect(id)).connection);
+      onCreditsChanged();
+    } catch (err) {
+      setSendError(err.message);
+    }
+  };
+
   const report = async (reason, details) => {
     await api.report(id, reason, details);
     onLeft(`Thanks. ${convo.partner.handle} was reported and blocked. A moderator will review it.`);
@@ -139,6 +172,9 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused }) {
             <button className="icon-btn" aria-label="Conversation options" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>⋯</button>
             {menuOpen && (
               <div className="menu" role="menu">
+                {convo.connection?.status === 'none' && (
+                  <button role="menuitem" onClick={() => { setMenuOpen(false); setConnectSheet('request'); }}>Connect…</button>
+                )}
                 <button role="menuitem" onClick={() => { setMenuOpen(false); setReporting(true); }}>Report</button>
                 <button role="menuitem" onClick={block}>Block</button>
               </div>
@@ -146,6 +182,15 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused }) {
           </div>
         )}
       </header>
+      {convo && (
+        <ConnectBanner
+          connection={convo.connection}
+          handle={convo.partner.handle}
+          onAccept={() => setConnectSheet('accept')}
+          onDecline={declineConnect}
+          onCancel={cancelConnect}
+        />
+      )}
       {crisis && <CrisisCard role={crisis === 'sender' ? 'sender' : 'listener'} onDismiss={() => setCrisis(null)} />}
 
       <div className="messages" aria-live="polite">
@@ -186,6 +231,16 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused }) {
       </form>
       )}
 
+      {connectSheet && convo && (
+        <ConnectSheet
+          handle={convo.partner.handle}
+          accepting={connectSheet === 'accept'}
+          billing={billing}
+          credits={credits}
+          onSubmit={connect}
+          onClose={() => setConnectSheet(null)}
+        />
+      )}
       {reporting && convo && <ReportSheet handle={convo.partner.handle} onSubmit={report} onClose={() => setReporting(false)} />}
     </main>
   );
