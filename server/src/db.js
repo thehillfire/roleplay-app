@@ -198,6 +198,11 @@ const MIGRATIONS = [
     'ALTER TABLE users ADD COLUMN listener_alerts INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE users ADD COLUMN listener_alerted_at BIGINT NOT NULL DEFAULT 0',
   ],
+  // 15: hide a conversation from your list until there's something new in it
+  [
+    'ALTER TABLE conversations ADD COLUMN hidden_a BIGINT NOT NULL DEFAULT 0',
+    'ALTER TABLE conversations ADD COLUMN hidden_b BIGINT NOT NULL DEFAULT 0',
+  ],
 ];
 
 async function migrate(db) {

@@ -312,3 +312,29 @@ test('held messages cannot be unsent (they stay for moderators)', async (t) => {
   assert.equal((await alice('POST', `/api/conversations/${id}/messages/${held.id}/unsend`, {})).status, 409);
   assert.equal((await s.store.listHeldMessages()).length, 1);
 });
+
+test('hiding a conversation tidies the list until there is something new', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const { alice, bob, aws, bws, am } = await matchPair(s);
+  t.after(() => Promise.all([aws.close(), bws.close()]));
+  const id = am.conversationId;
+  await bob('POST', `/api/conversations/${id}/messages`, { body: 'hi, I am here to listen' });
+  const ids = async (who) => (await who('GET', '/api/conversations')).body.conversations.map((c) => c.id);
+
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal((await alice('POST', `/api/conversations/${id}/hide`, {})).status, 200);
+  assert.deepEqual(await ids(alice), [], 'hidden for Alice');
+  assert.deepEqual(await ids(bob), [id], 'only for Alice');
+  assert.equal((await alice('GET', `/api/conversations/${id}`)).status, 200, 'still openable');
+
+  // A held message (contact info) doesn't bring it back; a real one does.
+  await new Promise((r) => setTimeout(r, 5));
+  await bob('POST', `/api/conversations/${id}/messages`, { body: 'call me at 555-123-4567' });
+  assert.deepEqual(await ids(alice), []);
+  await bob('POST', `/api/conversations/${id}/messages`, { body: 'thinking of you today' });
+  assert.deepEqual(await ids(alice), [id]);
+
+  const stranger = await signedUp(s.base);
+  assert.equal((await stranger('POST', `/api/conversations/${id}/hide`, {})).status, 404);
+});

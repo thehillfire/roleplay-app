@@ -60,6 +60,7 @@ export const api = {
     lookup: (handle) => request('GET', `/api/admin/users?handle=${enc(handle)}`).then((d) => d.user),
     setStatus: (userId, status) => request('POST', `/api/admin/users/${enc(userId)}/status`, { status }),
   },
+  hide: (id) => request('POST', `/api/conversations/${enc(id)}/hide`, {}),
   block: (id) => request('POST', `/api/conversations/${enc(id)}/block`, {}),
   report: (id, reason, details) => request('POST', `/api/conversations/${enc(id)}/report`, { reason, details }),
   markRead: (id) => request('POST', `/api/conversations/${enc(id)}/read`, {}),

@@ -57,6 +57,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Load test (`scripts/load-test.js`): ~700 msg/s on one server; hot send path cut from 7 queries to 3
 - [x] Listeners on call: opt-in push when someone has waited ~20s with nobody to listen (at most once per 3 hours per listener, never says who)
 - [x] Moderator lookup by handle: status, report counts, held messages, action history, suspend/restore (no email shown)
+- [x] Hide a conversation from your list (returns on a new message or a re-match)
 - [ ] Scale past one server: Redis pub/sub for realtime + shared queue (only needed beyond several thousand concurrent chatters)
 
 ## Known limits

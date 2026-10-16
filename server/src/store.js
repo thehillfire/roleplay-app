@@ -207,8 +207,16 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
          VALUES ($1, $2, $3, $4, $5, $5) ON CONFLICT (pair_key) DO NOTHING`,
         [newId(), key, a < b ? a : b, a < b ? b : a, t],
       );
+      // Matched again: the conversation comes back for anyone who had hidden it.
+      if (inserted.rowCount === 0) await db.query('UPDATE conversations SET hidden_a = 0, hidden_b = 0 WHERE pair_key = $1', [key]);
       const { rows } = await db.query('SELECT id FROM conversations WHERE pair_key = $1', [key]);
       return { id: rows[0].id, isNew: inserted.rowCount === 1 };
+    },
+
+    async hideConversation(userId, conversationId) {
+      const t = now();
+      await db.query('UPDATE conversations SET hidden_a = $1 WHERE id = $2 AND user_a = $3', [t, conversationId, userId]);
+      await db.query('UPDATE conversations SET hidden_b = $1 WHERE id = $2 AND user_b = $3', [t, conversationId, userId]);
     },
 
     // Returns { id, partnerId } if the user is in the conversation, else null.
@@ -256,7 +264,9 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       };
     },
 
-    async listConversations(userId) {
+    // `visibleOnly` leaves out conversations the user hid, unless something happened since.
+    async listConversations(userId, { visibleOnly = false } = {}) {
+      const visible = visibleOnly ? 'AND (CASE WHEN c.user_a = $1 THEN c.hidden_a ELSE c.hidden_b END) < c.last_message_at' : '';
       const { rows } = await db.query(
         `SELECT c.id, c.last_message_at, c.created_at,
                 CASE WHEN c.user_a = $1 THEN c.read_a ELSE c.read_b END AS my_read,
@@ -272,6 +282,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
            JOIN users p ON p.id = CASE WHEN c.user_a = $1 THEN c.user_b ELSE c.user_a END
           WHERE (c.user_a = $1 OR c.user_b = $1)
             AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = $1 AND b.blocked_id = p.id) OR (b.blocker_id = p.id AND b.blocked_id = $1))
+            ${visible}
           ORDER BY c.last_message_at DESC`,
         [userId],
       );

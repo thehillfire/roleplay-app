@@ -50,7 +50,7 @@ module.exports = function register(app, { store, hub, payments, classifier, push
   // --- Conversations ---
 
   app.get('/api/conversations', member, asyncRoute(async (req, res) => {
-    const conversations = await store.listConversations(req.user.id);
+    const conversations = await store.listConversations(req.user.id, { visibleOnly: true });
     res.json({
       conversations: conversations.map(({ partner, ...c }) => ({
         ...c,
@@ -219,6 +219,12 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     if (c.paid) await store.addCredits(req.user.id, 1);
     await pushConnection(id, [partnerId]);
     res.json({ connection: { status: 'none' } });
+  }));
+
+  // Tidies the list; the conversation returns when either person writes or they match again.
+  app.post('/api/conversations/:id/hide', member, conversation, asyncRoute(async (req, res) => {
+    await store.hideConversation(req.user.id, req.conversation.id);
+    res.json({ ok: true });
   }));
 
   app.post('/api/conversations/:id/block', member, conversation, asyncRoute(async (req, res) => {

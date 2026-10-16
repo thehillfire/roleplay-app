@@ -186,6 +186,16 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     }
   };
 
+  const hide = async () => {
+    setMenuOpen(false);
+    try {
+      await api.hide(id);
+      onLeft(`Hidden. ${convo.partner.handle} comes back to your list if either of you writes again.`);
+    } catch (err) {
+      setSendError(err.message);
+    }
+  };
+
   const setConnection = (connection) => setConvo((c) => ({ ...c, connection }));
 
   const connect = async (name, contact) => {
@@ -298,6 +308,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
                 {convo.connection?.status === 'none' && (
                   <button role="menuitem" onClick={() => { setMenuOpen(false); setConnectSheet('request'); }}>Connect…</button>
                 )}
+                <button role="menuitem" onClick={hide}>Hide from my list</button>
                 <button role="menuitem" onClick={() => close('end')}>End conversation</button>
                 <button role="menuitem" onClick={() => { setMenuOpen(false); setReporting(true); }}>Report</button>
                 <button role="menuitem" onClick={() => close('block')}>Block</button>
