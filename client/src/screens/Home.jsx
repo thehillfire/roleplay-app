@@ -16,7 +16,7 @@ export function timeAgo(ts) {
   return `${Math.round(hours / 24)}d`;
 }
 
-export default function Home({ user, conversations, listError, onRetry, onFind, onOpen, onSignOut, connection, notice, onDismissNotice, onModerate, askPush, onEnablePush, onDismissPush }) {
+export default function Home({ user, conversations, listError, onRetry, onFind, onOpen, onAccount, connection, notice, onDismissNotice, onModerate, askPush, onEnablePush, onDismissPush }) {
   const [role, setRole] = useState('talk');
   const [topic, setTopic] = useState('');
 
@@ -26,7 +26,7 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
         <span className="who">You are <strong>{user.handle}</strong></span>
         <span className="topbar-actions">
           {onModerate && <button className="link" onClick={onModerate}>Moderate</button>}
-          <button className="link" onClick={onSignOut}>Sign out</button>
+          <button className="link" onClick={onAccount}>Account</button>
         </span>
       </nav>
 

@@ -27,7 +27,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 ## 4. Polish
 - [x] PWA: installable (manifest, icons, service worker) and web push for new messages and connect requests (handle only, never message text)
 - [x] Back button / swipe-back navigation; load earlier messages
-- [ ] Account deletion and data export
+- [x] Account deletion (password-confirmed; personal data scrubbed now, safety data purged after 90 days) and JSON data export
 - [ ] Accessibility pass; reduced motion; text size
 - [ ] Deployment guide (needs a host with WebSockets: Render, Fly.io, Railway; Postgres via Supabase/Neon)
 

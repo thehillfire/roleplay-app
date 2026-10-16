@@ -6,6 +6,7 @@ import Home from './screens/Home.jsx';
 import Waiting from './screens/Waiting.jsx';
 import Chat from './screens/Chat.jsx';
 import Moderate from './screens/Moderate.jsx';
+import Account from './screens/Account.jsx';
 import { disablePushOnThisDevice, enablePush, pushSupported, syncPush } from './notifications.js';
 
 function Paused({ onSignOut }) {
@@ -21,7 +22,7 @@ function Paused({ onSignOut }) {
   );
 }
 
-function Signedin({ user, billing, pushKey, onSignOut, onPaused, onRefreshMe, initialNotice }) {
+function Signedin({ user, billing, pushKey, onSignOut, onDeleted, onPaused, onRefreshMe, initialNotice }) {
   const [view, setView] = useState({ name: 'home' });
 
   // Browser history: home is the root entry; other screens are pushed on top so the
@@ -114,7 +115,7 @@ function Signedin({ user, billing, pushKey, onSignOut, onPaused, onRefreshMe, in
           onRetry={refresh}
           onFind={find}
           onOpen={(id) => navigate({ name: 'chat', id })}
-          onSignOut={onSignOut}
+          onAccount={() => navigate({ name: 'account' })}
           connection={connection}
           notice={notice}
           onDismissNotice={() => setNotice('')}
@@ -125,6 +126,7 @@ function Signedin({ user, billing, pushKey, onSignOut, onPaused, onRefreshMe, in
         />
       )}
       {view.name === 'moderate' && <Moderate onBack={goHome} />}
+      {view.name === 'account' && <Account user={user} billing={billing} onBack={goHome} onSignOut={onSignOut} onDeleted={onDeleted} />}
       {view.name === 'waiting' && <Waiting onCancel={cancel} error={matchError} />}
       {view.name === 'chat' && (
         <Chat
@@ -179,6 +181,12 @@ export default function App() {
   const signOut = async () => {
     await disablePushOnThisDevice(api.pushUnsubscribe).catch(() => {});
     await api.logout().catch(() => {});
+    window.history.replaceState(null, '', '/');
+    setUser(null);
+  };
+
+  const deleted = () => {
+    window.history.replaceState(null, '', '/');
     setUser(null);
   };
 
@@ -196,6 +204,7 @@ export default function App() {
           pushKey={pushKey}
           initialNotice={checkoutNotice}
           onSignOut={signOut}
+          onDeleted={deleted}
           onPaused={() => setUser({ ...user, status: 'review' })}
           onRefreshMe={refreshMeQuietly}
         />

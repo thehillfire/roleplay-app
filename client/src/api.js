@@ -31,6 +31,7 @@ export const api = {
   cancelConnect: (id) => request('POST', `/api/conversations/${enc(id)}/connect/cancel`, {}),
   pushSubscribe: (subscription) => request('POST', '/api/push/subscribe', { subscription }),
   pushUnsubscribe: (endpoint) => request('POST', '/api/push/unsubscribe', { endpoint }),
+  deleteAccount: (password) => request('POST', '/api/account/delete', { password }),
   checkout: () => request('POST', '/api/billing/checkout', {}),
   admin: {
     reports: (status = 'open') => request('GET', `/api/admin/reports?status=${status}`).then((d) => d.reports),

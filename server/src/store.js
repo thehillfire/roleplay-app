@@ -396,6 +396,67 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return rows.map((r) => JSON.parse(r.subscription));
     },
 
+    // --- account lifecycle ---
+
+    // Everything we hold about the user that they can see, as plain data.
+    async exportAccount(userId) {
+      const user = await store.getUser(userId);
+      const { rows: [raw] } = await db.query('SELECT birthdate FROM users WHERE id = $1', [userId]);
+      const conversations = await store.listConversations(userId);
+      const threads = [];
+      for (const c of conversations) {
+        const { rows } = await db.query(
+          `SELECT body, status, sender_id, created_at FROM messages WHERE conversation_id = $1 AND (status = 'delivered' OR sender_id = $2)
+           ORDER BY created_at ASC, id ASC`,
+          [c.id, userId],
+        );
+        const connection = await store.getConnection(c.id);
+        threads.push({
+          with: c.partner.handle,
+          startedAt: new Date(c.createdAt).toISOString(),
+          connection: connection ? { status: connection.status, youRequested: connection.requesterId === userId } : null,
+          messages: rows.map((m) => ({
+            from: m.sender_id === userId ? 'you' : c.partner.handle,
+            body: m.body,
+            delivered: m.status === 'delivered',
+            at: new Date(num(m.created_at)).toISOString(),
+          })),
+        });
+      }
+      const { rows: reports } = await db.query('SELECT reason, details, created_at, status FROM reports WHERE reporter_id = $1', [userId]);
+      return {
+        exportedAt: new Date(now()).toISOString(),
+        account: { handle: user.handle, email: user.email, birthdate: raw.birthdate, createdAt: new Date(user.createdAt).toISOString(), connectCredits: user.connectCredits },
+        conversations: threads,
+        reportsYouFiled: reports.map((r) => ({ reason: r.reason, details: r.details, status: r.status, at: new Date(num(r.created_at)).toISOString() })),
+      };
+    },
+
+    // Scrubs personal data right away; messages and reports stay (for safety review)
+    // until purgeDeleted() runs after the retention period.
+    async deleteAccount(userId) {
+      const t = now();
+      await db.query(
+        `UPDATE users SET email = $1, password_hash = '!', birthdate = '0000-00-00', status = 'deleted', role = 'member', deleted_at = $2
+         WHERE id = $3`,
+        [`deleted+${userId}@deleted.invalid`, t, userId],
+      );
+      await db.query('DELETE FROM sessions WHERE user_id = $1', [userId]);
+      await db.query('DELETE FROM push_subscriptions WHERE user_id = $1', [userId]);
+      await db.query("UPDATE connections SET requester_name = '(deleted)', requester_contact = NULL WHERE requester_id = $1", [userId]);
+      await db.query(
+        `UPDATE connections SET accepter_name = '(deleted)', accepter_contact = NULL
+          WHERE requester_id <> $1 AND conversation_id IN (SELECT id FROM conversations WHERE user_a = $1 OR user_b = $1)`,
+        [userId],
+      );
+    },
+
+    // Fully removes accounts deleted before `before` (cascades to their messages, chats and reports).
+    async purgeDeleted(before) {
+      const { rowCount } = await db.query("DELETE FROM users WHERE status = 'deleted' AND deleted_at < $1", [before]);
+      return rowCount;
+    },
+
     async listHeldMessages({ limit = 50 } = {}) {
       const { rows } = await db.query(
         `SELECT m.*, u.handle AS sender_handle, u.status AS sender_status FROM messages m JOIN users u ON u.id = m.sender_id

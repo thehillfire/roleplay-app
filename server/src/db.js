@@ -103,6 +103,8 @@ const MIGRATIONS = [
     )`,
     'CREATE INDEX IF NOT EXISTS push_user_idx ON push_subscriptions(user_id)',
   ],
+  // 5: account deletion bookkeeping (safety data is purged after a retention period)
+  ['ALTER TABLE users ADD COLUMN deleted_at BIGINT'],
 ];
 
 async function migrate(db) {

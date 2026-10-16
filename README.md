@@ -37,6 +37,7 @@ e2e/      Playwright test: two strangers sign up, match and chat
 - **Connect (paid, mutual):** either person can ask to connect by entering what they'd share (first name, optional contact). Nothing is revealed unless the other person accepts with their own details. "Stay anonymous" is final. Once connected, contact details are no longer held back. With Stripe configured, sending a request uses one credit bought through Stripe Checkout (default $9.99). Accepting is free, and a declined or cancelled request returns the credit. Without Stripe keys, connecting is free.
 - **Moderation:** list moderator emails in `ADMIN_EMAILS` (or run `npm run make-admin -- you@example.com`). Moderators see a **Moderate** link with open reports (the full recent transcript), held messages, and suspend/restore buttons. They also get the API: `GET /api/admin/reports`, `POST /api/admin/reports/:id/resolve { resolution: dismissed|warned|suspended }`, `GET /api/admin/held` and `POST /api/admin/users/:id/status`.
 - **Phone app:** Kindred is a PWA. "Add to Home Screen" installs it with its own icon. With VAPID keys set (`npm run vapid`), people can turn on notifications. When someone isn't in the app, a new message or connect request triggers a push that shows only "New message from QuietHeron42", never the text, because lock screens are visible to anyone nearby. Signing out unsubscribes that device.
+- **Your data:** Account → *Download my data* exports everything you can see as JSON. *Delete account* (password-confirmed) immediately scrubs email, password, birthdate and anything revealed through Connect, signs out everywhere, and tells chat partners you left. Messages and reports are kept for `DELETED_RETENTION_DAYS` (default 90) so moderators can finish safety reviews, then a daily job purges them.
 - **Security:** JSON-only mutating requests (CSRF guard), origin check on the WebSocket handshake, rate limits on auth and messages, per-socket flood guard, and conversation membership checked on every read and write.
 
 ## API
@@ -47,6 +48,7 @@ e2e/      Playwright test: two strangers sign up, match and chat
 - `POST /api/conversations/:id/messages { body }`, `POST /api/conversations/:id/read`
 - `POST /api/conversations/:id/block`, `POST /api/conversations/:id/report { reason, details? }`
 - `POST /api/conversations/:id/connect { name, contact? }` (request or accept), `…/connect/decline`, `…/connect/cancel`
+- `GET /api/account/export`, `POST /api/account/delete { password }`
 - `POST /api/billing/checkout` → Stripe Checkout URL. `POST /api/billing/webhook` (Stripe, signature-verified, idempotent)
 - WebSocket `/ws`. Send `match.join { role, topic }`, `match.leave`, `typing { conversationId }`. Receive `match.waiting`, `match.found`, `message`, `typing`, `conversation.ended`.
 

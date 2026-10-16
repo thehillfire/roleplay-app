@@ -178,6 +178,18 @@ if (process.env.MOD_EMAIL) {
   pages.push(mod);
 }
 
+// Account: download data, then delete the account
+await bob.goto(BASE);
+await bob.getByRole('button', { name: 'Account' }).click();
+const exported = await bob.evaluate(async () => (await fetch('/api/account/export')).json());
+assert.equal(exported.account.handle, bobHandle);
+await bob.getByRole('button', { name: 'Delete account' }).click();
+await bob.getByLabel('Enter your password to confirm').fill('quiet-harbor-9');
+await bob.shot('9-delete');
+await bob.getByRole('button', { name: 'Delete forever' }).click();
+await bob.getByRole('button', { name: 'Get started' }).waitFor();
+step('data export and account deletion');
+
 for (const page of pages) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   assert.equal(overflow, false, 'page scrolls horizontally on a phone');

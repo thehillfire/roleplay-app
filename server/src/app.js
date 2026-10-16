@@ -163,6 +163,27 @@ function createApp({
     });
   });
 
+  // --- Account ---
+
+  app.get('/api/account/export', member, asyncRoute(async (req, res) => {
+    const data = await store.exportAccount(req.user.id);
+    res.set('Content-Disposition', `attachment; filename="kindred-${req.user.handle}.json"`);
+    res.json(data);
+  }));
+
+  app.post('/api/account/delete', auth.requireUser, authLimiter, asyncRoute(async (req, res) => {
+    const found = await store.findUserByEmail(req.user.email);
+    if (typeof req.body.password !== 'string' || !(await verifyPassword(req.body.password, found?.passwordHash))) {
+      throw httpError(401, 'Password is incorrect.');
+    }
+    const conversations = await store.listConversations(req.user.id);
+    await store.deleteAccount(req.user.id);
+    for (const c of conversations) hub.push(c.partner.id, { type: 'conversation.ended', conversationId: c.id });
+    hub.disconnect(req.user.id);
+    await auth.endSession(req, res);
+    res.json({ ok: true });
+  }));
+
   // --- Push notifications ---
 
   app.post('/api/push/subscribe', member, asyncRoute(async (req, res) => {
@@ -218,6 +239,7 @@ function createApp({
     const body = parseMessageBody(req.body.body);
     const { id, partnerId } = req.conversation;
     if (await store.isBlocked(req.user.id, partnerId)) throw httpError(403, "You can't message this person.");
+    if ((await store.getUser(partnerId))?.status === 'deleted') throw httpError(403, 'This person has left Kindred.');
 
     const connected = (await store.getConnection(id))?.status === 'accepted';
     const screen = screenMessage(body, { connected });
