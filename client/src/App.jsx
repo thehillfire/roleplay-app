@@ -444,7 +444,7 @@ export default function App() {
       )}
       <div hidden={Boolean(legal) || resetToken !== null}>
       {user === undefined && <main className="screen"><p className="loading">One moment…</p></main>}
-      {user === null && <Welcome key={welcomeMode || 'landing'} initialMode={welcomeMode === 'forgot' ? 'forgot' : welcomeMode === 'expired' ? 'login' : null} farewell={welcomeMode === 'deleted'} notice={welcomeMode === 'expired' ? 'You were signed out. Sign in again to pick up where you left off.' : ''} onSignedIn={(u) => refreshMe().catch(() => setUser(u))} onOpenLegal={openLegal} captchaSiteKey={captchaSiteKey} />}
+      {user === null && <Welcome key={welcomeMode || 'landing'} initialMode={welcomeMode === 'forgot' ? 'forgot' : welcomeMode === 'expired' ? 'login' : null} farewell={welcomeMode === 'deleted'} notice={welcomeMode === 'expired' ? 'You were signed out. Sign in again to carry on.' : ''} onSignedIn={(u) => refreshMe().catch(() => setUser(u))} onOpenLegal={openLegal} captchaSiteKey={captchaSiteKey} />}
       {user && user.status !== 'active' && <Paused onSignOut={signOut} onCheck={refreshMeQuietly} />}
       {user && user.status === 'active' && (
         <Signedin

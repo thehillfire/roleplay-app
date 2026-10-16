@@ -299,7 +299,8 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); box-sh
 .mood-strip { list-style: none; margin: 0; padding: 0; display: flex; align-items: flex-end; gap: 4px; height: 36px; }
 .mood-strip li { flex: 1; max-width: 18px; height: var(--h); min-height: 4px; border-radius: 4px; background: linear-gradient(to top, rgba(100, 181, 246, 0.35), rgba(129, 199, 132, 0.6)); }
 .checkin-nudge { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text); }
-.moderate .tabs { flex-wrap: wrap; }
+.moderate .tabs { overflow-x: auto; scrollbar-width: none; }
+.moderate .tabs .tab { flex: none; white-space: nowrap; }
 .moderate .tab { flex: 1 1 auto; padding: 9px 8px; font-size: 14px; }
 .modlog { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
 .modlog li { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; }
