@@ -45,6 +45,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
   const [feedbackDone, setFeedbackDone] = useState(false);
   const [partnerReadAt, setPartnerReadAt] = useState(0);
   const [reactingTo, setReactingTo] = useState(null); // message id with the picker open
+  const [selected, setSelected] = useState(null); // tapped message: shows its actions
   const [loadingMore, setLoadingMore] = useState(false);
   const endRef = useRef(null);
   const typingTimer = useRef(null);
@@ -330,7 +331,11 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
               <p>{m.fromMe ? 'You unsent a message' : 'Message unsent'}</p>
             </div>
           ) : (
-            <div key={m.id} className={`bubble ${m.fromMe ? 'me' : 'them'}${m.status === 'held' ? ' held' : ''}`}>
+            <div
+              key={m.id}
+              className={`bubble ${m.fromMe ? 'me' : 'them'}${m.status === 'held' ? ' held' : ''}${selected === m.id ? ' selected' : ''}`}
+              onClick={(e) => { if (!e.target.closest('button')) setSelected(selected === m.id ? null : m.id); }}
+            >
               <p>{m.body}</p>
               {m.status === 'held' && <p className="held-note">{heldNote(m.flags)}</p>}
               {m.reaction && <span className="reaction" aria-label={`Reaction ${m.reaction}`}>{m.reaction}</span>}
@@ -344,10 +349,10 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
               <time dateTime={new Date(m.createdAt).toISOString()}>
                 {formatTime(m.createdAt)}{m.id === seenId && ' · Seen'}
                 {!m.fromMe && m.status === 'delivered' && (
-                  <> · <button className="link unsend" aria-expanded={reactingTo === m.id} onClick={() => setReactingTo(reactingTo === m.id ? null : m.id)}>React</button></>
+                  <span className="msg-actions"> · <button className="link unsend" aria-expanded={reactingTo === m.id} onClick={() => setReactingTo(reactingTo === m.id ? null : m.id)}>React</button></span>
                 )}
                 {m.fromMe && Date.now() - m.createdAt < UNSEND_WINDOW_MS && (
-                  <> · <button className="link unsend" onClick={() => unsend(m.id)}>Unsend</button></>
+                  <span className="msg-actions"> · <button className="link unsend" onClick={() => unsend(m.id)}>Unsend</button></span>
                 )}
               </time>
             </div>

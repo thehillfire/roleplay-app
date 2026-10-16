@@ -1,6 +1,6 @@
 // Usage: node server/scripts/make-admin.js someone@example.com
 // Gives an existing account the moderator role (uses DATABASE_URL / SQLITE_FILE like the server).
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const { createDb } = require('../src/db');
 const { createStore } = require('../src/store');
 

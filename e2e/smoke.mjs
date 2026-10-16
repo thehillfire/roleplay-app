@@ -123,6 +123,7 @@ await alice.getByLabel('Message').press('Enter');
 await alice.locator('.bubble.me time', { hasText: 'Seen' }).waitFor();
 await alice.shot('3-chat');
 // Bob reacts to Alice's message; she sees it
+await bob.locator('.bubble.them', { hasText: 'Rent is due Friday' }).click(); // tap shows its actions
 await bob.locator('.bubble.them', { hasText: 'Rent is due Friday' }).getByRole('button', { name: 'React' }).click();
 await bob.getByRole('button', { name: 'Hug' }).click();
 await alice.locator('.bubble.me', { hasText: 'Rent is due Friday' }).locator('.reaction', { hasText: '🫂' }).waitFor();
@@ -165,6 +166,7 @@ step('contact info held with an explanation');
 await alice.getByLabel('Message').fill('ugh ignore that, I overshared');
 await alice.getByLabel('Message').press('Enter');
 await bob.locator('.bubble.them', { hasText: 'I overshared' }).waitFor();
+await alice.locator('.bubble.me', { hasText: 'I overshared' }).click();
 await alice.locator('.bubble.me', { hasText: 'I overshared' }).getByRole('button', { name: 'Unsend' }).click();
 await alice.getByText('You unsent a message').waitFor();
 await bob.getByText('Message unsent').waitFor();
