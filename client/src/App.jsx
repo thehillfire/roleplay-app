@@ -157,8 +157,12 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
       // Replace the waiting room in history, so back from the chat goes home.
       socket.on('match.found', ({ conversationId }) => navigate({ name: 'chat', id: conversationId }, { replace: viewRef.current.name === 'waiting' })),
       socket.on('match.error', ({ error }) => setMatchError(error)),
-      // New messages elsewhere update the list (unread counts, ordering).
-      socket.on('message', () => { if (viewRef.current.name === 'home') refresh(); }),
+      // New messages anywhere but the open chat update the list (unread counts, ordering), so the
+      // title and the chat's back arrow can say something arrived elsewhere.
+      socket.on('message', ({ message }) => {
+        const v = viewRef.current;
+        if (!(v.name === 'chat' && message?.conversationId === v.id)) refresh();
+      }),
       socket.on('open', () => {
         if (viewRef.current.name === 'home') refresh();
         // A dropped connection took us out of the queue: rejoin with the same choice.
@@ -198,12 +202,13 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
 
   useEffect(() => window.scrollTo(0, 0), [view.name]);
 
-  // Unread count in the tab title, e.g. "(2) Kindred".
+  // Unread count in the tab title, e.g. "(2) Kindred", leaving out the chat that's open.
+  const openChatId = view.name === 'chat' ? view.id : null;
+  const unreadElsewhere = (conversations || []).reduce((n, c) => (c.id === openChatId ? n : n + c.unread), 0);
   useEffect(() => {
-    const unread = (conversations || []).reduce((n, c) => n + c.unread, 0);
-    document.title = unread && view.name === 'home' ? `(${unread}) Kindred` : 'Kindred';
+    document.title = unreadElsewhere ? `(${unreadElsewhere}) Kindred` : 'Kindred';
     return () => { document.title = 'Kindred'; };
-  }, [conversations, view.name]);
+  }, [unreadElsewhere]);
 
   const [findRole, setFindRole] = useState('talk');
   const lastFind = useRef(null);
@@ -264,6 +269,7 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
           key={view.id}
           id={view.id}
           socket={socket}
+          unreadElsewhere={unreadElsewhere}
           onBack={goHome}
           onLeft={(text) => {
             // Drop the blocked conversation now rather than flashing it until the list refreshes.

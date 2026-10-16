@@ -31,7 +31,7 @@ function formatTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, credits, onCreditsChanged }) {
+export default function Chat({ id, socket, unreadElsewhere = 0, onBack, onLeft, onPaused, billing, credits, onCreditsChanged }) {
   const [convo, setConvo] = useState(null);
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState('');
@@ -377,7 +377,13 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
   return (
     <main className="chat">
       <header className="chat-head">
-        <button className="back" onClick={onBack} aria-label="Back to conversations">←</button>
+        <button
+          className="back"
+          onClick={onBack}
+          aria-label={unreadElsewhere ? `Back to conversations, ${unreadElsewhere} unread elsewhere` : 'Back to conversations'}
+        >
+          ←{unreadElsewhere > 0 && <span className="back-count" aria-hidden="true">{unreadElsewhere}</span>}
+        </button>
         {convo && (
           <div className="chat-who">
             <span className="avatar" aria-hidden="true">{convo.partner.handle.slice(0, 1)}</span>

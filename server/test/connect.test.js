@@ -163,3 +163,20 @@ test('declining twice at once refunds the credit only once', async (t) => {
   assert.equal(results.filter((r) => r.status === 200).length, 1, 'exactly one wins');
   assert.equal((await p.alice('GET', '/api/auth/me')).body.user.connectCredits, 1, 'refunded exactly once');
 });
+
+test('asking to connect, cancelling and asking again stops after three asks a day', async (t) => {
+  const s = await start({ payments: createPayments({ secretKey: '', webhookSecret: '' }) });
+  t.after(s.stop);
+  const p = await pair(s);
+  t.after(p.close);
+  for (let i = 0; i < 3; i++) {
+    assert.equal((await p.alice('POST', `/api/conversations/${p.id}/connect`, { name: 'Jav' })).status, 200);
+    assert.equal((await p.alice('POST', `/api/conversations/${p.id}/connect/cancel`, {})).status, 200);
+  }
+  const fourth = await p.alice('POST', `/api/conversations/${p.id}/connect`, { name: 'Jav' });
+  assert.equal(fourth.status, 429);
+  assert.match(fourth.body.error, /try again tomorrow/);
+  // The other person can still ask (and that accept path stays open).
+  assert.equal((await p.bob('POST', `/api/conversations/${p.id}/connect`, { name: 'Robert' })).status, 200);
+  assert.equal((await p.alice('POST', `/api/conversations/${p.id}/connect`, { name: 'Jav' })).body.connection.status, 'accepted');
+});
