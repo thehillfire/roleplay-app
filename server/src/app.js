@@ -59,6 +59,7 @@ function createApp({
   authRateLimit = { max: Number(process.env.AUTH_RATE_LIMIT) || 10, windowMs: 60000 },
   messageRateLimit = { max: 30, windowMs: 60000 },
   staticDir,
+  log = process.env.NODE_ENV === 'test' || process.env.REQUEST_LOG === 'off' ? null : console,
   payments = createPayments(),
   autoPauseMinReporterAgeMs = AUTO_PAUSE.minReporterAgeMs,
   push = createPush(),
@@ -108,6 +109,21 @@ function createApp({
     }
     res.json({ received: true });
   }));
+
+  // One line per API request. Never bodies or query strings: they can hold message text or tokens.
+  if (log) {
+    app.use('/api', (req, res, next) => {
+      if (req.path === '/health') return next();
+      const start = process.hrtime.bigint();
+      res.on('finish', () => {
+        const ms = Number(process.hrtime.bigint() - start) / 1e6;
+        // Collapse ids so logs group by route and never carry conversation ids.
+        const route = req.baseUrl + req.path.replace(/\/[0-9a-f-]{20,}/gi, '/:id');
+        log.log(JSON.stringify({ t: new Date().toISOString(), method: req.method, route, status: res.statusCode, ms: Math.round(ms) }));
+      });
+      next();
+    });
+  }
 
   app.use('/api', express.json({ limit: '32kb' }));
 

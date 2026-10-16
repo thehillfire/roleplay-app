@@ -51,6 +51,18 @@ Create a [Resend](https://resend.com) account, verify your sending domain, and s
 
 Both keys must be set for payments to turn on. Until then, connecting is free.
 
+## Logs
+
+Each API request logs one JSON line: time, method, route (ids collapsed to `:id`), status and duration. Bodies and query strings are never logged, because they can contain message text or reset tokens. Set `REQUEST_LOG=off` to silence it.
+
+## App stores
+
+Kindred is an installable web app (PWA), so people can already "Add to Home Screen". To list it in the stores without writing a native app:
+
+- **Google Play:** go to [PWABuilder](https://www.pwabuilder.com), enter your live URL, and download the Android package (a Trusted Web Activity). Upload it in the Play Console. PWABuilder also produces the `assetlinks.json` file. Serve it at `/.well-known/assetlinks.json` (put it in `client/public/.well-known/`).
+- **Apple App Store:** Apple rejects apps that are just a website in a wrapper, so a store listing there needs a native shell with real native features (push via APNs, etc.). Until then, iPhone users install from Safari (Share → Add to Home Screen), which supports web push on iOS 16.4+.
+- Both stores require in-app account deletion (done: Account → Delete account) and a privacy policy URL (`/privacy`, once it's been reviewed). Both rate dating and "chat with strangers" apps strictly. Expect questions about moderation, and point to the report flow, held-message filters and 18+ checks.
+
 ## How much one server handles
 
 `scripts/load-test.js` signs up N simulated people, matches them in pairs and has everyone send messages as fast as they can. On a small cloud container (one server process, local Postgres with a 10-connection pool), 200 people sending 2,000 messages flat out gave:
