@@ -16,8 +16,9 @@ async function person(i) {
       headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}), 'X-Forwarded-For': `10.0.${Math.floor(i / 250)}.${i % 250}` },
       body: body && JSON.stringify(body),
     });
-    const set = res.headers.get('set-cookie');
-    if (set) cookie = set.split(';')[0];
+    // Keep the session cookie (signup also sets a device cookie).
+    const session = res.headers.getSetCookie().find((c) => c.startsWith('lf_sid='));
+    if (session) cookie = session.split(';')[0];
     return { status: res.status, body: await res.json() };
   };
   const signup = await api('POST', '/api/auth/signup', { email: `load${Date.now()}-${i}@example.com`, password: 'load-test-pass', birthdate: '1990-01-01', agree: true });

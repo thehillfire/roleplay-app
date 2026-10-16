@@ -78,7 +78,7 @@ Kindred is an installable web app (PWA), so people can already "Add to Home Scre
 
 | Database | Messages/second | Median send | p95 | p99 |
 | --- | --- | --- | --- | --- |
-| Postgres | ~710 | 254 ms | 540 ms | 807 ms |
+| Postgres | ~714 | 262 ms | 400 ms | 598 ms |
 | SQLite (WAL) | ~780 | 165 ms | 334 ms | ~2 s (checkpoint stalls) |
 
 That's a worst case. Real people send about one message every 10 seconds, so one server comfortably covers **several thousand people chatting at the same time**. Use Postgres in production (no stalls, backups, managed). If median send time creeps up under load, raise `DATABASE_POOL_MAX` (default 5) to 10–20. Run it yourself:
