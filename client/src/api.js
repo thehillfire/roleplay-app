@@ -48,6 +48,7 @@ export const api = {
   setListenerAlerts: (on) => request('POST', '/api/account/listener-alerts', { on }),
   support: () => request('GET', '/api/support').then((d) => d.requests),
   sendSupport: (topic, message) => request('POST', '/api/support', { topic, message }),
+  dismissNotice: () => request('POST', '/api/account/notice/dismiss', {}),
   deleteAccount: (password) => request('POST', '/api/account/delete', { password }),
   checkout: () => request('POST', '/api/billing/checkout', {}),
   subscribePlus: () => request('POST', '/api/billing/plus', {}),

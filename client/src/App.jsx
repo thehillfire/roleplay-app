@@ -77,6 +77,12 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
   useEffect(() => {
     if (externalNotice) setNotice(externalNotice);
   }, [externalNotice]);
+  // A note from the moderators (a report was reviewed, or a reminder of the guidelines): show once.
+  useEffect(() => {
+    if (!user.notice) return;
+    setNotice(user.notice);
+    api.dismissNotice().catch(() => {});
+  }, [user.notice]);
   const [conversations, setConversations] = useState(null);
   const [listError, setListError] = useState('');
   const [connection, setConnection] = useState('connecting');
@@ -130,6 +136,7 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
         setNotice(`💙 ${partner.handle} picked up your message.`);
         refresh();
       }),
+      socket.on('notice.updated', onRefreshMe),
       socket.on('kind_words', () => setNotice('💙 Someone left you a few kind words.')),
       socket.on('thanks', () => {
         setNotice('💙 Someone you talked with said it helped.');

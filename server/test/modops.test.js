@@ -250,3 +250,25 @@ test('held messages: a moderator can deliver a false positive or keep it held, o
   assert.deepEqual(actions.slice(0, 2), ['held_kept', 'held_released']);
   assert.equal((await b('POST', `/api/admin/held/${real.id}/review`, { release: true })).status, 403);
 });
+
+test('reviewing a report tells the reporter it was read, and a warning reaches the person', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const mod = await moderator(s, 'mod-notice@example.com');
+  const a = await signedUp(s.base);
+  const b = await signedUp(s.base);
+  const c = await matched(a, b);
+  t.after(c.close);
+  await a('POST', `/api/conversations/${c.id}/messages`, { body: 'you are pathetic' });
+  await b('POST', `/api/conversations/${c.id}/report`, { reason: 'harassment', block: false });
+  const [report] = (await mod('GET', '/api/admin/reports')).body.reports;
+  await mod('POST', `/api/admin/reports/${report.id}/resolve`, { resolution: 'warned' });
+
+  const reporterNotice = (await b('GET', '/api/auth/me')).body.user.notice;
+  assert.match(reporterNotice, /A moderator has reviewed it/);
+  assert.ok(!/warn|suspend|dismiss/i.test(reporterNotice), 'never the outcome');
+  assert.match((await a('GET', '/api/auth/me')).body.user.notice, /keep to the guidelines/);
+
+  assert.equal((await b('POST', '/api/account/notice/dismiss', {})).status, 200);
+  assert.equal((await b('GET', '/api/auth/me')).body.user.notice, null, 'shown once');
+});

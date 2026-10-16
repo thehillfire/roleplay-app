@@ -20,6 +20,12 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
     }).catch((err) => console.error('support alert failed', err.message))));
   };
 
+  // The app shows a moderator notice once, then clears it.
+  app.post('/api/account/notice/dismiss', auth.requireUser, asyncRoute(async (req, res) => {
+    await store.setNotice(req.user.id, null);
+    res.json({ ok: true });
+  }));
+
   // --- Support: write to the team; replies arrive by email ---
 
   app.get('/api/support', member, asyncRoute(async (req, res) => {

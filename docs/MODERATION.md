@@ -33,8 +33,10 @@ Use **Deliver anyway** generously for real false positives. Every wrongly held m
 ## Reports
 
 - **Dismiss**: nothing wrong (disagreements, bad vibes, someone being blunt).
-- **Warn**: borderline; it's logged and counts as context next time.
+- **Warn**: borderline. It's logged, and the person sees a one-line reminder of the guidelines next time they open the app.
 - **Suspend**: clear abuse, sexual messages to a stranger, hate, repeated contact-fishing, minors. Their devices are banned too, so a new account from the same browser starts paused.
+
+Whatever you decide, the reporter sees "Thanks for your report. A moderator has reviewed it." (never the outcome).
 
 The transcript includes unsent messages ("unsent by sender") on purpose: abusers send and unsend.
 

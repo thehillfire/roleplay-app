@@ -268,6 +268,10 @@ const MIGRATIONS = [
     )`,
     'CREATE INDEX IF NOT EXISTS bottles_open_idx ON bottles(status, created_at)',
   ],
+  // 23: a one-line notice from the moderators, shown next time the person opens the app
+  [
+    'ALTER TABLE users ADD COLUMN notice TEXT',
+  ],
 ];
 
 async function migrate(db) {

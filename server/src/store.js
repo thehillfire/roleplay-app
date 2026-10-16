@@ -18,6 +18,7 @@ function userFromRow(row) {
     emailVerified: Boolean(row.email_verified_at),
     plusUntil: num(row.plus_until) || 0,
     listenerAlerts: Boolean(num(row.listener_alerts)),
+    notice: row.notice || null,
     stripeCustomerId: row.stripe_customer_id || null,
     plusSubscriptionId: row.plus_subscription_id || null,
     createdAt: num(row.created_at),
@@ -383,6 +384,10 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     // --- safety ---
 
     // Deleted accounts stay deleted (so retention purge still removes them).
+    async setNotice(userId, text) {
+      await db.query("UPDATE users SET notice = $1 WHERE id = $2 AND status <> 'deleted'", [text, userId]);
+    },
+
     async setUserStatus(userId, status) {
       const { rowCount } = await db.query("UPDATE users SET status = $1 WHERE id = $2 AND status <> 'deleted'", [status, userId]);
       // A moderator's suspension covers the devices they used; restoring lifts it.

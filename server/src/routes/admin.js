@@ -69,6 +69,13 @@ module.exports = function register(app, { store, hub, mailer, push, member }) {
       hub.disconnect(report.reported.id);
     }
     await store.logModAction({ moderatorId: req.user.id, targetId: report.reported.id, action: `report_${resolution}`, detail: report.reason });
+    // Close the loop: reporters learn it was read (never the outcome); a warning reaches the person.
+    await store.setNotice(report.reporter.id, '💙 Thanks for your report. A moderator has reviewed it.');
+    hub.push(report.reporter.id, { type: 'notice.updated' });
+    if (resolution === 'warned') {
+      await store.setNotice(report.reported.id, 'A moderator reviewed a report about one of your conversations. Please keep to the guidelines: be kind, stay anonymous, adults only.');
+      hub.push(report.reported.id, { type: 'notice.updated' });
+    }
     res.json({ ok: true });
   }));
 

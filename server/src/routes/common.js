@@ -37,8 +37,8 @@ function createRateLimiter({ max, windowMs, now = Date.now, key = (req) => req.i
 
 const httpError = (status, message) => Object.assign(new Error(message), { status, expose: true });
 const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-const publicUser = ({ id, handle, role, status, connectCredits, emailVerified, plusUntil, plusSubscriptionId, listenerAlerts, createdAt }) => ({
-  id, handle, role, status, connectCredits, emailVerified, listenerAlerts: Boolean(listenerAlerts), plusUntil: plusUntil || 0, plus: (plusUntil || 0) > Date.now(), hasSubscription: Boolean(plusSubscriptionId), createdAt,
+const publicUser = ({ id, handle, role, status, connectCredits, emailVerified, plusUntil, plusSubscriptionId, listenerAlerts, notice, createdAt }) => ({
+  id, handle, role, status, connectCredits, emailVerified, listenerAlerts: Boolean(listenerAlerts), plusUntil: plusUntil || 0, plus: (plusUntil || 0) > Date.now(), hasSubscription: Boolean(plusSubscriptionId), notice: notice || null, createdAt,
 });
 
 // What one side of a conversation may see about its connect state.

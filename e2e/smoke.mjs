@@ -280,7 +280,8 @@ if (process.env.MOD_EMAIL && process.env.MAIL_LOG) {
   await mod.getByText('No open reports.').waitFor();
   await alice.reload();
   await alice.getByText('Your account is paused').waitFor();
-  step('moderator reviewed the report and suspended the account');
+  await bob.getByText(/Thanks for your report\. A moderator has reviewed it/).waitFor();
+  step('moderator reviewed the report and suspended the account; the reporter hears back');
 
   // The suspended person appeals; the moderator restores them, and it's in the log
   await alice.getByLabel(/Think this was a mistake/).fill('That was a misunderstanding, sorry.');
