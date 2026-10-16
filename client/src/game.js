@@ -12,10 +12,13 @@ export const RARITY_COLORS = {
 const XP_PER_ACTION = 10;
 const XP_PER_LEVEL = 100;
 
-export function progress(history) {
-  const actions = history.filter((t) => t.role === 'player').length;
+export function progressFromActions(actions) {
   const xp = actions * XP_PER_ACTION;
   return { actions, xp, level: Math.floor(xp / XP_PER_LEVEL) + 1, toNext: XP_PER_LEVEL - (xp % XP_PER_LEVEL) };
+}
+
+export function progress(history) {
+  return progressFromActions(history.filter((t) => t.role === 'player').length);
 }
 
 export function newStory(hero) {

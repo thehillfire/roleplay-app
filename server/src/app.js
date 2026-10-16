@@ -1,20 +1,25 @@
 const path = require('path');
 const express = require('express');
-const cors = require('cors');
 const helmet = require('helmet');
-const { rollClassSeed, RARITY_NAMES } = require('./game');
+const { rollClassSeed } = require('./game');
 const { createNarrator } = require('./narrator');
+const { createAuth, hashPassword, verifyPassword } = require('./auth');
+const { parseStoryRequest, parseHero, parseHistory, parseAction, parseCredentials, badRequest } = require('./validate');
 
-const LIMITS = { name: 60, description: 300, action: 300, turnText: 1200, history: 60 };
+const MAX_STORY_TURNS = 400;
+const MAX_STORIES_PER_USER = 100;
+const MAX_IMPORT = 50;
 
-function createRateLimiter({ max, windowMs, now = Date.now }) {
+function createRateLimiter({ max, windowMs, now = Date.now, key = (req) => req.ip }) {
   const hits = new Map();
   return (req, res, next) => {
-    const key = req.ip;
+    const k = key(req);
     const t = now();
-    const entry = hits.get(key);
+    const entry = hits.get(k);
     if (!entry || t > entry.resetAt) {
-      hits.set(key, { count: 1, resetAt: t + windowMs });
+      // Opportunistic cleanup keeps the map from growing without bound.
+      if (hits.size > 10000) for (const [hk, hv] of hits) if (t > hv.resetAt) hits.delete(hk);
+      hits.set(k, { count: 1, resetAt: t + windowMs });
       return next();
     }
     if (entry.count >= max) {
@@ -26,94 +31,172 @@ function createRateLimiter({ max, windowMs, now = Date.now }) {
   };
 }
 
-function badRequest(message) {
-  const err = new Error(message);
-  err.status = 400;
-  return err;
+const httpError = (status, message) => Object.assign(new Error(message), { status, expose: true });
+
+// Runs one narration step and returns the turns to append.
+async function narrate(narrator, { hero, history, action }) {
+  const { passage, choices } = await narrator.tell({ hero, history, action });
+  if (!passage) throw httpError(502, 'Narrator returned an empty passage');
+  const turns = action ? [{ role: 'player', text: action }, { role: 'narrator', text: passage }] : [{ role: 'narrator', text: passage }];
+  return { turns, choices };
 }
 
-function str(value, field, max, { required = true } = {}) {
-  if (value === undefined || value === null || value === '') {
-    if (required) throw badRequest(`${field} is required`);
-    return undefined;
-  }
-  if (typeof value !== 'string') throw badRequest(`${field} must be a string`);
-  const trimmed = value.trim();
-  if (required && !trimmed) throw badRequest(`${field} is required`);
-  if (trimmed.length > max) throw badRequest(`${field} must be at most ${max} characters`);
-  return trimmed || undefined;
-}
+const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-function parseStoryRequest(body = {}) {
-  const heroIn = body.hero;
-  if (!heroIn || typeof heroIn !== 'object') throw badRequest('hero is required');
-  const hero = {
-    name: str(heroIn.name, 'hero.name', LIMITS.name),
-    description: str(heroIn.description, 'hero.description', LIMITS.description, { required: false }),
-    rarity: str(heroIn.rarity, 'hero.rarity', 20, { required: false }),
-  };
-  if (hero.rarity && !RARITY_NAMES.includes(hero.rarity)) throw badRequest('hero.rarity is not a known rarity');
-
-  const historyIn = body.history ?? [];
-  if (!Array.isArray(historyIn)) throw badRequest('history must be an array');
-  if (historyIn.length > LIMITS.history) throw badRequest(`history must have at most ${LIMITS.history} turns`);
-  const history = historyIn.map((turn, i) => {
-    if (!turn || (turn.role !== 'player' && turn.role !== 'narrator')) {
-      throw badRequest(`history[${i}].role must be "player" or "narrator"`);
-    }
-    return { role: turn.role, text: str(turn.text, `history[${i}].text`, LIMITS.turnText) };
-  });
-
-  const action = str(body.action, 'action', LIMITS.action, { required: false });
-  if (history.length > 0 && !action) throw badRequest('action is required to continue a story');
-  return { hero, history, action };
-}
-
-function createApp({ narrator = createNarrator(), rateLimit = { max: 20, windowMs: 60000 }, staticDir } = {}) {
+function createApp({
+  narrator = createNarrator(),
+  store,
+  rateLimit = { max: 20, windowMs: 60000 },
+  authRateLimit = { max: 10, windowMs: 60000 },
+  staticDir,
+} = {}) {
+  if (!store) throw new Error('createApp requires a store');
   const app = express();
+  const auth = createAuth(store);
+
   app.set('trust proxy', 1);
+  app.disable('x-powered-by');
   app.use(helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
     contentSecurityPolicy: {
-      directives: { 'font-src': ["'self'", 'https://fonts.gstatic.com'], 'style-src': ["'self'", 'https://fonts.googleapis.com', "'unsafe-inline'"] },
+      directives: {
+        'font-src': ["'self'", 'https://fonts.gstatic.com'],
+        'style-src': ["'self'", 'https://fonts.googleapis.com', "'unsafe-inline'"],
+      },
     },
   }));
-  app.use(cors());
-  app.use(express.json({ limit: '64kb' }));
+  app.use('/api', express.json({ limit: '256kb' }));
 
-  const limiter = createRateLimiter(rateLimit);
+  // State-changing API calls must be JSON. Cross-site forms can't send that without
+  // a CORS preflight, which this same-origin API never approves: a simple CSRF guard.
+  app.use('/api', (req, res, next) => {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+    if (!/^application\/json\b/i.test(req.get('content-type') || '')) {
+      return res.status(415).json({ error: 'Requests must be sent as JSON.' });
+    }
+    return next();
+  });
+  app.use('/api', auth.loadUser());
+
+  const limiter = createRateLimiter({ ...rateLimit, key: (req) => req.user?.id || req.ip });
+  const authLimiter = createRateLimiter(authRateLimit);
 
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', narrator: narrator.source });
   });
 
-  app.post('/api/class', limiter, async (req, res, next) => {
-    try {
-      const seed = rollClassSeed();
-      const { name, description } = await narrator.describeClass(seed);
-      if (!name || !description) throw Object.assign(new Error('Narrator returned an empty class'), { status: 502 });
-      res.json({ class: { name, description, ...seed }, source: narrator.source });
-    } catch (err) {
-      next(err);
-    }
+  // --- Accounts ---
+
+  app.post('/api/auth/signup', authLimiter, asyncRoute(async (req, res) => {
+    const { email, password, displayName } = parseCredentials(req.body, { signup: true });
+    const user = await store.createUser({ email, displayName, passwordHash: await hashPassword(password) });
+    if (!user) throw httpError(409, 'An account with that email already exists.');
+    await auth.startSession(req, res, user.id);
+    res.status(201).json({ user });
+  }));
+
+  app.post('/api/auth/login', authLimiter, asyncRoute(async (req, res) => {
+    const { email, password } = parseCredentials(req.body, { signup: false });
+    const found = await store.findUserByEmail(email);
+    const ok = await verifyPassword(password, found?.passwordHash);
+    if (!found || !ok) throw httpError(401, 'Email or password is incorrect.');
+    const { passwordHash, ...user } = found; // eslint-disable-line no-unused-vars
+    await auth.startSession(req, res, user.id);
+    res.json({ user });
+  }));
+
+  app.post('/api/auth/logout', asyncRoute(async (req, res) => {
+    await auth.endSession(req, res);
+    res.json({ ok: true });
+  }));
+
+  app.get('/api/auth/me', (req, res) => {
+    res.json({ user: req.user });
   });
 
-  app.post('/api/story', limiter, async (req, res, next) => {
-    try {
-      const input = parseStoryRequest(req.body);
-      const { passage, choices } = await narrator.tell(input);
-      if (!passage) throw Object.assign(new Error('Narrator returned an empty passage'), { status: 502 });
-      res.json({ passage, choices, source: narrator.source });
-    } catch (err) {
-      next(err);
+  // --- Game: available to guests and players ---
+
+  app.post('/api/class', limiter, asyncRoute(async (req, res) => {
+    const seed = rollClassSeed();
+    const { name, description } = await narrator.describeClass(seed);
+    if (!name || !description) throw httpError(502, 'Narrator returned an empty class');
+    res.json({ class: { name, description, ...seed }, source: narrator.source });
+  }));
+
+  // Stateless turn for guests: the client holds the history.
+  app.post('/api/story', limiter, asyncRoute(async (req, res) => {
+    const input = parseStoryRequest(req.body);
+    const { turns, choices } = await narrate(narrator, input);
+    res.json({ passage: turns[turns.length - 1].text, choices, source: narrator.source });
+  }));
+
+  // --- Saved stories: the server owns the history for signed-in players ---
+
+  app.get('/api/stories', auth.requireUser, asyncRoute(async (req, res) => {
+    res.json({ stories: await store.listStories(req.user.id) });
+  }));
+
+  app.post('/api/stories', auth.requireUser, limiter, asyncRoute(async (req, res) => {
+    const hero = parseHero(req.body.hero);
+    if (await store.countStories(req.user.id) >= MAX_STORIES_PER_USER) {
+      throw httpError(409, `You can keep up to ${MAX_STORIES_PER_USER} stories. Delete one to start another.`);
     }
-  });
+    const { turns, choices } = await narrate(narrator, { hero, history: [] });
+    const story = await store.createStory(req.user.id, { hero, history: turns, choices });
+    res.status(201).json({ story });
+  }));
+
+  app.post('/api/stories/import', auth.requireUser, asyncRoute(async (req, res) => {
+    const list = req.body.stories;
+    if (!Array.isArray(list)) throw badRequest('stories must be an array');
+    if (list.length > MAX_IMPORT) throw badRequest(`You can import at most ${MAX_IMPORT} stories at once`);
+    const existing = await store.countStories(req.user.id);
+    if (existing + list.length > MAX_STORIES_PER_USER) {
+      throw httpError(409, `Importing would exceed the ${MAX_STORIES_PER_USER}-story limit.`);
+    }
+    const parsed = list.map((s) => {
+      const history = parseHistory(s?.history, { max: MAX_STORY_TURNS });
+      if (history.length === 0) throw badRequest('Each imported story needs at least one turn');
+      const choices = Array.isArray(s.choices) ? s.choices.filter((c) => typeof c === 'string').map((c) => c.slice(0, 80)).slice(0, 3) : [];
+      const createdAt = Number.isFinite(s.createdAt) && s.createdAt > 0 && s.createdAt <= Date.now() ? s.createdAt : undefined;
+      return { hero: parseHero(s.hero), history, choices, createdAt };
+    });
+    const created = [];
+    for (const s of parsed) created.push((await store.createStory(req.user.id, s)).id);
+    res.status(201).json({ imported: created.length, ids: created });
+  }));
+
+  app.get('/api/stories/:id', auth.requireUser, asyncRoute(async (req, res) => {
+    const story = await store.getStory(req.user.id, req.params.id);
+    if (!story) throw httpError(404, 'Story not found.');
+    res.json({ story });
+  }));
+
+  app.post('/api/stories/:id/turns', auth.requireUser, limiter, asyncRoute(async (req, res) => {
+    const action = parseAction(req.body.action, { required: true });
+    const story = await store.getStory(req.user.id, req.params.id);
+    if (!story) throw httpError(404, 'Story not found.');
+    if (req.body.version !== undefined && req.body.version !== story.version) {
+      throw httpError(409, 'This story moved on in another tab. Reload to continue.');
+    }
+    if (story.history.length + 2 > MAX_STORY_TURNS) {
+      throw httpError(409, 'This story has reached its final page. Start a new tale!');
+    }
+    const { turns, choices } = await narrate(narrator, { hero: story.hero, history: story.history, action });
+    const updated = await store.updateStory(req.user.id, story, { history: [...story.history, ...turns], choices });
+    if (!updated) throw httpError(409, 'This story moved on in another tab. Reload to continue.');
+    res.json({ story: updated });
+  }));
+
+  app.delete('/api/stories/:id', auth.requireUser, asyncRoute(async (req, res) => {
+    if (!(await store.deleteStory(req.user.id, req.params.id))) throw httpError(404, 'Story not found.');
+    res.json({ ok: true });
+  }));
 
   app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 
   // In production the built client is served from the same origin.
   if (staticDir) {
-    app.use(express.static(staticDir));
+    app.use(express.static(staticDir, { index: false, maxAge: '1h' }));
     app.get('/{*splat}', (req, res) => res.sendFile(path.join(staticDir, 'index.html')));
   }
 
@@ -121,16 +204,21 @@ function createApp({ narrator = createNarrator(), rateLimit = { max: 20, windowM
 
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
-    const status = err.status || (err.type === 'entity.parse.failed' ? 400 : 500);
-    if (status >= 500) console.error(err);
-    const message = status === 400 ? err.message
-      : status === 429 ? 'The narrator is busy. Try again in a moment.'
-      : status === 502 ? 'The narrator lost the thread. Try again.'
-      : 'Something went wrong.';
+    let status = err.status || err.statusCode || 500;
+    if (err.type === 'entity.parse.failed') status = 400;
+    if (err.type === 'entity.too.large') status = 413;
+    if (status >= 500 && status !== 502) console.error(err);
+    let message;
+    if (status === 400 && err.type === 'entity.parse.failed') message = 'Request body is not valid JSON.';
+    else if (status === 413) message = 'Request is too large.';
+    else if (status < 500 && (err.expose || status === 400)) message = err.message;
+    else if (status === 429) message = 'The narrator is busy. Try again in a moment.';
+    else if (status === 502) message = 'The narrator lost the thread. Try again.';
+    else message = 'Something went wrong.';
     res.status(status).json({ error: message });
   });
 
   return app;
 }
 
-module.exports = { createApp, createRateLimiter, parseStoryRequest };
+module.exports = { createApp, createRateLimiter, MAX_STORY_TURNS };

@@ -1,9 +1,17 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createApp, createRateLimiter } = require('../src/app');
+const { createRateLimiter } = require('../src/app');
+const { boot } = require('../src/boot');
 const { createOfflineNarrator, createGeminiNarrator, storyPrompt, MAX_HISTORY_TURNS } = require('../src/narrator');
 
-async function withServer(app, fn) {
+// Builds an app on a fresh in-memory database.
+async function makeApp(options = {}) {
+  const { app } = await boot({ db: { url: '', sqliteFile: ':memory:' }, ...options });
+  return app;
+}
+
+async function withServer(appOrPromise, fn) {
+  const app = await appOrPromise;
   const server = app.listen(0);
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -23,14 +31,14 @@ const post = (base, path, body) => fetch(`${base}${path}`, {
 const hero = { name: 'Void Hunter', rarity: 'Rare', description: 'Stalks the gaps between stars.' };
 
 test('health reports which narrator is active', async () => {
-  await withServer(createApp({ narrator: createOfflineNarrator() }), async (base) => {
+  await withServer(makeApp({ narrator: createOfflineNarrator() }), async (base) => {
     const res = await fetch(`${base}/api/health`);
     assert.deepEqual(await res.json(), { status: 'ok', narrator: 'offline' });
   });
 });
 
 test('POST /api/class returns a full class', async () => {
-  await withServer(createApp({ narrator: createOfflineNarrator() }), async (base) => {
+  await withServer(makeApp({ narrator: createOfflineNarrator() }), async (base) => {
     const res = await post(base, '/api/class', {});
     assert.equal(res.status, 200);
     const body = await res.json();
@@ -41,7 +49,7 @@ test('POST /api/class returns a full class', async () => {
 });
 
 test('POST /api/story opens and continues a story', async () => {
-  await withServer(createApp({ narrator: createOfflineNarrator() }), async (base) => {
+  await withServer(makeApp({ narrator: createOfflineNarrator() }), async (base) => {
     const open = await (await post(base, '/api/story', { hero })).json();
     assert.ok(open.passage.includes('Void Hunter'));
     assert.equal(open.choices.length, 3);
@@ -57,7 +65,7 @@ test('POST /api/story opens and continues a story', async () => {
 });
 
 test('POST /api/story rejects bad input with 400', async () => {
-  await withServer(createApp({ narrator: createOfflineNarrator() }), async (base) => {
+  await withServer(makeApp({ narrator: createOfflineNarrator() }), async (base) => {
     const cases = [
       {},
       { hero: { name: '' } },
@@ -81,7 +89,7 @@ test('narrator failures surface as 502 without leaking details', async () => {
     describeClass: async () => { throw Object.assign(new Error('secret upstream detail'), { status: 502 }); },
     tell: async () => ({ passage: '', choices: [] }),
   };
-  await withServer(createApp({ narrator }), async (base) => {
+  await withServer(makeApp({ narrator }), async (base) => {
     const res = await post(base, '/api/class', {});
     assert.equal(res.status, 502);
     assert.ok(!JSON.stringify(await res.json()).includes('secret'));

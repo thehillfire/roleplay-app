@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { rollClass } from '../api.js';
+import { api } from '../api.js';
 import { RARITY_COLORS } from '../game.js';
 import Rarity from '../components/Rarity.jsx';
 
@@ -13,7 +13,7 @@ export default function Reveal({ onBegin, onBack }) {
     setLoading(true);
     setError('');
     try {
-      setHero(await rollClass());
+      setHero(await api.rollClass());
     } catch (err) {
       setError(err.message);
     } finally {

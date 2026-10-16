@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { tellStory } from '../api.js';
 import { progress } from '../game.js';
 import Rarity from '../components/Rarity.jsx';
 
-export default function Story({ story, onUpdate, onBack }) {
+// Renders a story and its composer. `advance(action?)` narrates the next turn
+// (no action = opening) and throws on failure; the parent owns the story data.
+export default function Story({ story, advance, onBack }) {
   const { hero, history, choices } = story;
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState(null); // the action being narrated, if any
@@ -11,16 +12,15 @@ export default function Story({ story, onUpdate, onBack }) {
   const opened = useRef(false);
   const p = progress(history);
 
-  const advance = async (action) => {
+  const run = async (action) => {
     setPending(action ?? '');
     setError('');
     try {
-      const { passage, choices: next } = await tellStory(hero, history, action);
-      const turns = action ? [{ role: 'player', text: action }, { role: 'narrator', text: passage }] : [{ role: 'narrator', text: passage }];
-      onUpdate({ history: [...history, ...turns], choices: next });
+      await advance(action);
       setDraft('');
     } catch (err) {
       setError(err.message);
+      if (action) setDraft(action); // keep what they wrote so they can retry
     } finally {
       setPending(null);
     }
@@ -29,20 +29,20 @@ export default function Story({ story, onUpdate, onBack }) {
   useEffect(() => {
     if (history.length === 0 && !opened.current) {
       opened.current = true;
-      advance();
+      run();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     // Scroll to the page bottom so the sticky composer sits below the newest passage, not over it.
     window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
-  }, [history.length, pending]);
+  }, [history.length, pending, error]);
 
   const busy = pending !== null;
   const submit = (e) => {
     e.preventDefault();
     const action = draft.trim();
-    if (action && !busy) advance(action);
+    if (action && !busy) run(action);
   };
 
   return (
@@ -67,11 +67,9 @@ export default function Story({ story, onUpdate, onBack }) {
         {busy && pending && <p className="turn player">{pending}</p>}
         {busy && <p className="loading">The story unfolds…</p>}
         {error && (
-          <div className="card error">
+          <div className="card error" role="alert">
             <p>{error}</p>
-            <button className="btn" onClick={() => advance(history.length ? draft.trim() || undefined : undefined)} disabled={history.length > 0 && !draft.trim()}>
-              Try again
-            </button>
+            {history.length === 0 && <button className="btn" onClick={() => run()}>Try again</button>}
           </div>
         )}
       </div>
@@ -81,7 +79,7 @@ export default function Story({ story, onUpdate, onBack }) {
           {choices.length > 0 && (
             <div className="choices">
               {choices.map((c) => (
-                <button key={c} className="chip" disabled={busy} onClick={() => { setDraft(c); advance(c); }}>{c}</button>
+                <button key={c} className="chip" disabled={busy} onClick={() => run(c)}>{c}</button>
               ))}
             </div>
           )}

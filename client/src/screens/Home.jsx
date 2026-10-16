@@ -1,5 +1,5 @@
 import Rarity from '../components/Rarity.jsx';
-import { progress } from '../game.js';
+import { progressFromActions } from '../game.js';
 
 function timeAgo(ts) {
   const mins = Math.round((Date.now() - ts) / 60000);
@@ -10,15 +10,34 @@ function timeAgo(ts) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
-export default function Home({ stories, onRoll, onImagine, onOpen, onDelete }) {
-  const sorted = [...stories].sort((a, b) => b.updatedAt - a.updatedAt);
-
+export default function Home({
+  user, stories, listError, onRetryList, notice, onDismissNotice,
+  onRoll, onImagine, onOpen, onDelete, onSignIn, onSignOut,
+}) {
   return (
     <main className="screen">
+      <nav className="topbar">
+        {user ? (
+          <>
+            <span className="who">{user.displayName}</span>
+            <button className="link" onClick={onSignOut}>Sign out</button>
+          </>
+        ) : (
+          <button className="link" onClick={onSignIn}>Sign in to save stories</button>
+        )}
+      </nav>
+
       <header className="hero">
         <h1>LoreForge</h1>
         <p className="tagline">A realm of infinite, quiet stories</p>
       </header>
+
+      {notice && (
+        <div className="notice" role="status">
+          <p>{notice}</p>
+          <button className="icon-btn" aria-label="Dismiss" onClick={onDismissNotice}>×</button>
+        </div>
+      )}
 
       <section className="paths">
         <button className="path" onClick={onRoll}>
@@ -31,30 +50,35 @@ export default function Home({ stories, onRoll, onImagine, onOpen, onDelete }) {
         </button>
       </section>
 
-      {sorted.length > 0 && (
+      {listError && (
+        <div className="card error"><p>{listError}</p><button className="btn" onClick={onRetryList}>Try again</button></div>
+      )}
+
+      {user && !stories && !listError && <p className="loading">Gathering your stories…</p>}
+
+      {stories?.length > 0 && (
         <section>
-          <h2 className="section-title">Your stories</h2>
+          <h2 className="section-title">{user ? 'Your stories' : 'Stories on this device'}</h2>
           <ul className="saved">
-            {sorted.map((s) => {
-              const p = progress(s.history);
-              return (
-                <li key={s.id} className="saved-item">
-                  <button className="saved-open" onClick={() => onOpen(s.id)}>
-                    <span className="saved-name">{s.hero.name} <Rarity rarity={s.hero.rarity} /></span>
-                    <span className="saved-meta">Level {p.level} · {p.actions} actions · {timeAgo(s.updatedAt)}</span>
-                  </button>
-                  <button
-                    className="icon-btn"
-                    aria-label={`Delete ${s.hero.name}`}
-                    onClick={() => {
-                      if (window.confirm(`Let "${s.hero.name}" fade from memory?`)) onDelete(s.id);
-                    }}
-                  >
-                    ×
-                  </button>
-                </li>
-              );
-            })}
+            {stories.map((s) => (
+              <li key={s.id} className="saved-item">
+                <button className="saved-open" onClick={() => onOpen(s.id)}>
+                  <span className="saved-name">{s.hero.name} <Rarity rarity={s.hero.rarity} /></span>
+                  <span className="saved-meta">
+                    Level {progressFromActions(s.actions).level} · {s.actions} {s.actions === 1 ? 'action' : 'actions'} · {timeAgo(s.updatedAt)}
+                  </span>
+                </button>
+                <button
+                  className="icon-btn"
+                  aria-label={`Delete ${s.hero.name}`}
+                  onClick={() => {
+                    if (window.confirm(`Let "${s.hero.name}" fade from memory?`)) onDelete(s.id);
+                  }}
+                >
+                  ×
+                </button>
+              </li>
+            ))}
           </ul>
         </section>
       )}
