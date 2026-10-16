@@ -10,7 +10,7 @@ const GUIDELINES = [
   'If someone is in danger, point them to real help (call or text 988 in the US).',
 ];
 
-export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey, initialMode = null, farewell = false }) {
+export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey, initialMode = null, farewell = false, notice = '' }) {
   const [mode, setMode] = useState(initialMode); // null | 'signup' | 'login' | 'forgot'
   const [sent, setSent] = useState(false);
   const [email, setEmail] = useState('');
@@ -91,7 +91,7 @@ export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey, initi
         <ul className="promises">
           <li><strong>No profiles, no photos.</strong> A random name like QuietHeron42. Phone numbers and socials are held back unless you both choose to connect.</li>
           <li><strong>Nobody around?</strong> Leave a message and go. The next person who comes to listen starts there.</li>
-          <li><strong>Adults only, with rules.</strong> Every message is screened before it's delivered, and reports are read by a person.</li>
+          <li><strong>Adults only, with rules.</strong> Messages are checked automatically for common risks before they're delivered, and reports are read by a person.</li>
         </ul>
         <div className="stack">
           <button className="btn primary big" onClick={() => setMode('signup')}>Get started</button>
@@ -114,6 +114,7 @@ export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey, initi
           <button type="button" role="tab" aria-selected={signup} className={signup ? 'tab active' : 'tab'} onClick={() => setMode('signup')}>Create account</button>
           <button type="button" role="tab" aria-selected={!signup} className={!signup ? 'tab active' : 'tab'} onClick={() => setMode('login')}>Sign in</button>
         </div>
+        {notice && !signup && <p className="notice" role="status">{notice}</p>}
         {signup && <p className="hint">Your email stays private. Everyone else only sees a random name like QuietHeron42.</p>}
         <label>
           <span>Email</span>

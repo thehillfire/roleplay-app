@@ -1018,7 +1018,16 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
           WHERE m.status = 'held' AND m.reviewed_at IS NULL ORDER BY m.created_at DESC LIMIT $1`,
         [limit],
       );
-      return rows.map((r) => ({ ...messageFromRow(r), sender: { id: r.sender_id, handle: r.sender_handle, status: r.sender_status } }));
+      // The few messages before each one, so "they're talking about their kid" is visible without a lookup.
+      return Promise.all(rows.map(async (r) => {
+        const before = await db.query(
+          `SELECT sender_id, body, status FROM messages WHERE conversation_id = $1 AND created_at < $2 AND status IN ('delivered', 'unsent')
+            ORDER BY created_at DESC LIMIT 3`,
+          [r.conversation_id, r.created_at],
+        );
+        const context = before.rows.reverse().map((m) => ({ fromSender: m.sender_id === r.sender_id, body: m.body, unsent: m.status === 'unsent' }));
+        return { ...messageFromRow(r), sender: { id: r.sender_id, handle: r.sender_handle, status: r.sender_status }, context };
+      }));
     },
 
     // --- messages for the next listener ("bottles") ---

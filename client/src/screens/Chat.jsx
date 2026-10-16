@@ -408,6 +408,8 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
       </header>
       {convo && (
         <ConnectBanner
+          key={id}
+          conversationId={id}
           connection={convo.connection}
           handle={convo.partner.handle}
           onAccept={() => setConnectSheet('accept')}

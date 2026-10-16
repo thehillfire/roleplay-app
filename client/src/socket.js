@@ -29,9 +29,9 @@ export function createSocket({ onStatus = () => {} } = {}) {
         // ignore malformed frames
       }
     };
-    ws.onclose = () => {
+    ws.onclose = (e) => {
       onStatus('offline');
-      emit('close', {});
+      emit('close', { code: e.code, attempt });
       if (closed) return;
       const delay = Math.min(30000, 1000 * 2 ** attempt) + Math.random() * 500;
       attempt += 1;

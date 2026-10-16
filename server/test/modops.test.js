@@ -322,3 +322,22 @@ test('a denied appeal shows its outcome and note, and a new note can follow a we
   await s.db.query('UPDATE appeals SET resolved_at = $1', [Date.now() - 8 * 24 * 60 * 60 * 1000]);
   assert.equal((await person('POST', '/api/appeal', { message: 'I have thought about it.' })).status, 201);
 });
+
+test('held messages come with the few messages just before them', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const mod = await moderator(s, 'mod-context@example.com');
+  const a = await signedUp(s.base);
+  const b = await signedUp(s.base);
+  const c = await matched(a, b);
+  t.after(c.close);
+  await b('POST', `/api/conversations/${c.id}/messages`, { body: 'how was your week' });
+  await a('POST', `/api/conversations/${c.id}/messages`, { body: 'rough, my kid had a fever' });
+  await a('POST', `/api/conversations/${c.id}/messages`, { body: 'whats your snap?' });
+  const [held] = (await mod('GET', '/api/admin/held')).body.messages;
+  assert.equal(held.body, 'whats your snap?');
+  assert.deepEqual(held.context, [
+    { fromSender: false, body: 'how was your week', unsent: false },
+    { fromSender: true, body: 'rough, my kid had a fever', unsent: false },
+  ]);
+});

@@ -17,6 +17,28 @@ function StatusTag({ status }) {
   return <span className={`tag ${status}`}>{label}</span>;
 }
 
+const ACTION_LABELS = {
+  report_dismissed: 'Dismissed a report',
+  report_warned: 'Warned after a report',
+  report_suspended: 'Suspended after a report',
+  suspend: 'Suspended',
+  restore: 'Restored',
+  auto_pause: 'Paused automatically',
+  held_released: 'Delivered a held message',
+  held_kept: 'Kept a message held',
+  appeal_granted: 'Granted an appeal',
+  appeal_denied: 'Kept paused after an appeal',
+  appeal_closed_account_deleted: 'Closed an appeal (account deleted)',
+  support_replied: 'Replied to a support request',
+  support_closed: 'Closed a support request',
+};
+// "Suspended after a report (Harassment)" rather than "report suspended (harassment)".
+function actionLabel(e) {
+  const label = ACTION_LABELS[e.action] || e.action.replace(/_/g, ' ');
+  const detail = e.action.startsWith('report_') ? REASON_LABELS[e.detail] || e.detail : e.detail;
+  return detail ? `${label} (${detail})` : label;
+}
+
 export default function Moderate({ onBack }) {
   const [tab, setTab] = useState('reports');
   const [reports, setReports] = useState(null);
@@ -25,6 +47,11 @@ export default function Moderate({ onBack }) {
   const [appeals, setAppeals] = useState(null);
   const [log, setLog] = useState(null);
   const [error, setError] = useState('');
+  // A failed action shows its error inside the card it came from, not at the top of a long list.
+  const [cardError, setCardError] = useState(null);
+  const errorIn = (...keys) => cardError && keys.includes(cardError.key)
+    ? <p className="form-error" role="alert">{cardError.message}</p>
+    : null;
   const [busy, setBusy] = useState('');
   const [query, setQuery] = useState('');
   const [inbox, setInbox] = useState(null);
@@ -60,12 +87,13 @@ export default function Moderate({ onBack }) {
   const act = async (key, fn) => {
     setBusy(key);
     setError('');
+    setCardError(null);
     try {
       await fn();
       load();
       if (found) setFound(await api.admin.lookup(found.handle));
     } catch (err) {
-      setError(err.message);
+      setCardError({ key, message: err.message });
     } finally {
       setBusy('');
     }
@@ -149,6 +177,7 @@ export default function Moderate({ onBack }) {
               Restore {r.reported.handle}'s account
             </button>
           )}
+          {errorIn(r.id, `u-${r.reported.id}`)}
         </article>
       ))}
 
@@ -159,16 +188,27 @@ export default function Moderate({ onBack }) {
             <strong>{m.sender.handle} <StatusTag status={m.sender.status} /></strong>
             <small>{when(m.createdAt)}</small>
           </header>
+          {m.context?.length > 0 && (
+            <ol className="transcript" aria-label="Just before">
+              {m.context.map((c, i) => (
+                <li key={i} className={c.fromSender ? 'reported' : 'reporter'}>
+                  <span className="who-line">{c.fromSender ? m.sender.handle : 'the other person'}{c.unsent ? ' · unsent by sender' : ''}</span>
+                  {c.body}
+                </li>
+              ))}
+            </ol>
+          )}
           <p className="details">{m.body}</p>
           <p className="meta">{m.flags.map((f) => <span key={f} className="tag flag">{FLAG_LABELS[f] || f}</span>)}</p>
           <div className="actions">
             <button className="btn" disabled={!!busy} onClick={() => act(m.id, () => api.admin.reviewHeld(m.id, true))}>Deliver anyway</button>
             <button className="btn" disabled={!!busy} onClick={() => act(m.id, () => api.admin.reviewHeld(m.id, false))}>Keep held</button>
-            {m.sender.status === 'active' && <button className="btn danger" disabled={!!busy} onClick={() => act(m.id, () => api.admin.setStatus(m.sender.id, 'suspended'))}>Suspend sender</button>}
+            {m.sender.status === 'active' && <button className="btn danger" disabled={!!busy} onClick={() => window.confirm(`Suspend ${m.sender.handle}? Their devices are banned too.`) && act(m.id, () => api.admin.setStatus(m.sender.id, 'suspended'))}>Suspend sender</button>}
             {(m.sender.status === 'review' || m.sender.status === 'suspended') && (
               <button className="btn" disabled={!!busy} onClick={() => act(m.id, () => api.admin.setStatus(m.sender.id, 'active'))}>Restore sender</button>
             )}
           </div>
+          {errorIn(m.id)}
         </article>
       ))}
       {tab === 'appeals' && appeals?.length === 0 && <p className="empty">No open appeals.</p>}
@@ -192,6 +232,7 @@ export default function Moderate({ onBack }) {
             <button className="btn primary" disabled={!!busy} onClick={() => act(a.id, () => api.admin.resolveAppeal(a.id, true, appealNotes[a.id]))}>Restore account</button>
             <button className="btn" disabled={!!busy} onClick={() => act(a.id, () => api.admin.resolveAppeal(a.id, false, appealNotes[a.id]))}>Keep paused</button>
           </div>
+          {errorIn(a.id)}
         </article>
       ))}
 
@@ -217,6 +258,7 @@ export default function Moderate({ onBack }) {
             )}
             <button className="btn" disabled={!!busy} onClick={() => act(r.id, () => api.admin.resolveSupport(r.id, ''))}>Close without reply</button>
           </div>
+          {errorIn(r.id)}
         </article>
       ))}
 
@@ -244,7 +286,7 @@ export default function Moderate({ onBack }) {
               {found.actions.map((e) => (
                 <li key={e.id}>
                   <small>{when(e.createdAt)}</small>
-                  <span><strong>{e.moderator}</strong> · {e.action.replace(/_/g, ' ')}{e.detail ? ` (${e.detail})` : ''}</span>
+                  <span><strong>{e.moderator}</strong> · {actionLabel(e)}</span>
                 </li>
               ))}
             </ol>
@@ -257,6 +299,7 @@ export default function Moderate({ onBack }) {
               <button className="btn" disabled={!!busy} onClick={() => act(`l-${found.id}`, () => api.admin.setStatus(found.id, 'active'))}>Restore</button>
             )}
           </div>
+          {errorIn(`l-${found.id}`)}
         </article>
       )}
 
@@ -266,7 +309,7 @@ export default function Moderate({ onBack }) {
           {log?.map((e) => (
             <li key={e.id}>
               <small>{when(e.createdAt)}</small>
-              <span><strong>{e.moderator}</strong> · {e.action.replace(/_/g, ' ')}{e.target ? ` · ${e.target}` : ''}{e.detail ? ` (${e.detail})` : ''}</span>
+              <span><strong>{e.moderator}</strong> · {actionLabel(e)}{e.target ? ` · ${e.target}` : ''}</span>
             </li>
           ))}
         </ol>

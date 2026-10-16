@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { enablePush, pushSupported } from '../notifications.js';
+import { enablePush, pushBlocked, pushSupported } from '../notifications.js';
 
 const LINES = [
   'Finding someone kind…',
@@ -35,7 +35,11 @@ export default function Waiting({ onCancel, error, presence, canLeaveMessage, on
   const goOnCall = async () => {
     setCallError('');
     try {
-      if (!(await enablePush(pushKey, api.pushSubscribe))) throw new Error('Allow notifications for Kindred first, then try again.');
+      if (!(await enablePush(pushKey, api.pushSubscribe))) {
+        throw new Error(pushBlocked()
+          ? 'Notifications are blocked for Kindred. Allow them in your browser\'s site settings, then try again.'
+          : 'Allow notifications for Kindred first, then try again.');
+      }
       await api.setListenerAlerts(true);
       onWentOnCall();
     } catch (err) {

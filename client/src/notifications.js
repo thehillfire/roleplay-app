@@ -3,6 +3,13 @@
 
 export const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
+export function pushDismissed() {
+  try { return localStorage.getItem('kd_push_dismissed') === '1'; } catch { return false; }
+}
+
+// True when the browser has blocked notifications for this site; only the browser settings can undo it.
+export const pushBlocked = () => pushSupported() && Notification.permission === 'denied';
+
 export function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return Promise.resolve(null);
   return navigator.serviceWorker.register('/sw.js').catch(() => null);

@@ -9,7 +9,7 @@ import Moderate from './screens/Moderate.jsx';
 import Account from './screens/Account.jsx';
 import Legal from './screens/Legal.jsx';
 import ResetPassword from './screens/ResetPassword.jsx';
-import { disablePushOnThisDevice, enablePush, pushSupported, syncPush } from './notifications.js';
+import { disablePushOnThisDevice, enablePush, pushDismissed, pushSupported, syncPush } from './notifications.js';
 
 function Paused({ onSignOut }) {
   const [appeal, setAppeal] = useState(undefined);
@@ -61,7 +61,7 @@ function Paused({ onSignOut }) {
   );
 }
 
-function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere, onDeleted, onPaused, onRefreshMe, onOpenLegal, initialNotice, externalNotice }) {
+function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere, onDeleted, onPaused, onRefreshMe, onCheckSession, onOpenLegal, initialNotice, externalNotice }) {
   // A reload mid-chat stays in the chat (the browser keeps history.state across reloads). Opening
   // the site afresh (typing the address, a link) starts at home even if the state survived.
   const restoreChat = () => {
@@ -125,7 +125,12 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
     if (view.name === 'home' || view.name === 'waiting') api.presence().then(setPresence, () => {});
   }, [view.name]);
 
-  const [askPush, setAskPush] = useState(() => Boolean(pushKey) && pushSupported() && Notification.permission === 'default');
+  // Asked once per device: "not now" sticks until they turn it on from Account.
+  const [askPush, setAskPush] = useState(() => Boolean(pushKey) && pushSupported() && Notification.permission === 'default' && !pushDismissed());
+  const dismissPush = () => {
+    try { localStorage.setItem('kd_push_dismissed', '1'); } catch { /* private mode */ }
+    setAskPush(false);
+  };
   useEffect(() => {
     if (pushKey) syncPush(api.pushSubscribe).catch(() => {});
   }, [pushKey]);
@@ -135,7 +140,7 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
     } catch {
       // Permission denied or the browser refused; nothing else to do.
     }
-    setAskPush(false);
+    dismissPush();
   };
 
   const refresh = useCallback(() => {
@@ -162,7 +167,12 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
           socket.send({ type: 'match.join', ...lastFind.current });
         }
       }),
-      socket.on('close', () => { if (viewRef.current.name === 'waiting') setMatchError('Connection lost. Reconnecting…'); }),
+      socket.on('close', ({ code, attempt }) => {
+        if (viewRef.current.name === 'waiting') setMatchError('Connection lost. Reconnecting…');
+        // 4003: the server closed it because the account is unavailable. A refused upgrade (signed out)
+        // looks like any other failure, so check after a couple of failed tries too.
+        if (code === 4003 || attempt === 2) onCheckSession();
+      }),
       socket.on('credits.updated', onRefreshMe),
       socket.on('presence', ({ online, waiting, waitingToTalk }) => setPresence({ online, waiting, waitingToTalk })),
       socket.on('bottle.answered', ({ partner }) => {
@@ -177,7 +187,7 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
       }),
     ];
     return () => offs.forEach((off) => off());
-  }, [socket, refresh, onRefreshMe, navigate]);
+  }, [socket, refresh, onRefreshMe, onCheckSession, navigate]);
 
   // Leaving the waiting room any way (cancel, back button) takes you out of the queue.
   const prevView = useRef(view.name);
@@ -226,7 +236,7 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
           ads={ads}
           askPush={askPush}
           onEnablePush={turnOnPush}
-          onDismissPush={() => setAskPush(false)}
+          onDismissPush={dismissPush}
         />
       )}
       {view.name === 'moderate' && <Moderate onBack={goHome} />}
@@ -284,6 +294,8 @@ function takeCheckoutNotice() {
 
 export default function App() {
   const [user, setUser] = useState(undefined); // undefined while checking the session
+  const userRef = useRef(user);
+  userRef.current = user;
   const [billing, setBilling] = useState(null);
   const [pushKey, setPushKey] = useState(null);
   const [ads, setAds] = useState(null);
@@ -291,6 +303,8 @@ export default function App() {
   const [checkoutNotice] = useState(takeCheckoutNotice);
 
   const refreshMe = useCallback(() => api.me().then((d) => {
+    // Signed in a moment ago and now not: the session ended elsewhere.
+    if (!d.user && userRef.current) setWelcomeMode('expired');
     setUser(d.user);
     setBilling(d.billing);
     setPushKey(d.push?.publicKey || null);
@@ -299,10 +313,23 @@ export default function App() {
   }), []);
 
   const refreshMeQuietly = useCallback(() => { refreshMe().catch(() => {}); }, [refreshMe]);
+  // The live connection was refused or keeps failing: find out whether the session or account changed.
+  const checkSession = refreshMeQuietly;
 
   useEffect(() => {
     refreshMe().catch(() => setUser(null));
   }, [refreshMe]);
+
+  // A 401 from any request means this session is gone: show sign-in with a word about why.
+  useEffect(() => {
+    const onSignedOut = () => {
+      if (!userRef.current) return;
+      setWelcomeMode('expired');
+      setUser(null);
+    };
+    window.addEventListener('kindred:signed-out', onSignedOut);
+    return () => window.removeEventListener('kindred:signed-out', onSignedOut);
+  }, []);
 
   const signOut = async () => {
     await disablePushOnThisDevice(api.pushUnsubscribe).catch(() => {});
@@ -390,7 +417,7 @@ export default function App() {
       )}
       <div hidden={Boolean(legal) || resetToken !== null}>
       {user === undefined && <main className="screen"><p className="loading">One moment…</p></main>}
-      {user === null && <Welcome key={welcomeMode || 'landing'} initialMode={welcomeMode === 'forgot' ? 'forgot' : null} farewell={welcomeMode === 'deleted'} onSignedIn={(u) => refreshMe().catch(() => setUser(u))} onOpenLegal={openLegal} captchaSiteKey={captchaSiteKey} />}
+      {user === null && <Welcome key={welcomeMode || 'landing'} initialMode={welcomeMode === 'forgot' ? 'forgot' : welcomeMode === 'expired' ? 'login' : null} farewell={welcomeMode === 'deleted'} notice={welcomeMode === 'expired' ? 'You were signed out. Sign in again to pick up where you left off.' : ''} onSignedIn={(u) => refreshMe().catch(() => setUser(u))} onOpenLegal={openLegal} captchaSiteKey={captchaSiteKey} />}
       {user && user.status !== 'active' && <Paused onSignOut={signOut} />}
       {user && user.status === 'active' && (
         <Signedin
@@ -406,6 +433,7 @@ export default function App() {
           onDeleted={deleted}
           onPaused={() => setUser({ ...user, status: 'review' })}
           onRefreshMe={refreshMeQuietly}
+          onCheckSession={checkSession}
           onOpenLegal={openLegal}
         />
       )}

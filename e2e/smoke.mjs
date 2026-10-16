@@ -311,12 +311,12 @@ if (process.env.MOD_EMAIL && process.env.MAIL_LOG) {
   await mod.getByRole('button', { name: 'Restore account' }).click();
   await mod.getByText('No open appeals.').waitFor();
   await mod.getByRole('tab', { name: 'Log' }).click();
-  await mod.locator('.modlog li', { hasText: 'appeal granted' }).waitFor();
+  await mod.locator('.modlog li', { hasText: 'Granted an appeal' }).waitFor();
   await mod.getByRole('tab', { name: 'Look up' }).click();
   await mod.getByLabel('Handle').fill(aliceHandle.toLowerCase());
   await mod.getByRole('button', { name: 'Look up', exact: true }).click();
   const profile = mod.locator('.report', { hasText: aliceHandle });
-  await profile.getByText('appeal granted').waitFor();
+  await profile.getByText('Granted an appeal').waitFor();
   assert.match(await profile.innerText(), /Reports against: 0 open · 1 total/);
   // A reload keeps her in her last chat (now ended by Bob, read-only and reportable); go home from there.
   await alice.reload();
@@ -396,6 +396,12 @@ await carol.getByText(/picked up your message/).waitFor();
 await carol.locator('.waiting-message').waitFor({ state: 'detached' });
 pages.push(carol, dave);
 step('message left for the next listener is picked up later');
+
+// Signed out on another device: the live connection closes and this one lands on sign-in, saying why.
+await dave.evaluate(() => fetch('/api/auth/logout-all', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }));
+await dave.getByText('You were signed out. Sign in again').waitFor();
+await dave.getByRole('button', { name: 'Sign in', exact: true }).waitFor();
+step('a session ended elsewhere goes to sign-in');
 
 // Account: download data, then delete the account
 await bob.goto(BASE);

@@ -5,7 +5,12 @@ import { api } from '../api.js';
 const money = (cents, currency) => new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(cents / 100);
 
 // Shown above the messages: the state of a connect request in this conversation.
-export function ConnectBanner({ connection, handle, onAccept, onDecline, onCancel }) {
+const seenKey = (id) => `kd_declined_seen_${id}`;
+const seenDecline = (id) => { try { return localStorage.getItem(seenKey(id)) === '1'; } catch { return false; } };
+
+export function ConnectBanner({ conversationId, connection, handle, onAccept, onDecline, onCancel }) {
+  // The "stayed anonymous" note is worth seeing once, not on every visit.
+  const [declineSeen, setDeclineSeen] = useState(() => seenDecline(conversationId));
   if (!connection || connection.status === 'none') return null;
   if (connection.status === 'accepted') {
     const { name, contact } = connection.partner;
@@ -34,8 +39,17 @@ export function ConnectBanner({ connection, handle, onAccept, onDecline, onCance
       </aside>
     );
   }
-  if (connection.status === 'declined' && connection.mine) {
-    return <aside className="connect-banner" role="status"><p>{handle} chose to stay anonymous. You can keep talking as you are.</p></aside>;
+  if (connection.status === 'declined' && connection.mine && !declineSeen) {
+    const dismiss = () => {
+      try { localStorage.setItem(seenKey(conversationId), '1'); } catch { /* private mode */ }
+      setDeclineSeen(true);
+    };
+    return (
+      <aside className="connect-banner" role="status">
+        <p>{handle} chose to stay anonymous. You can keep talking as you are.</p>
+        <button className="link" onClick={dismiss}>OK</button>
+      </aside>
+    );
   }
   return null;
 }
