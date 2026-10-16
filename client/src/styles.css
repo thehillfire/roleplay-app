@@ -247,3 +247,9 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); box-sh
 .home-ad { border: 1px dashed var(--line); border-radius: 14px; padding: 8px; min-height: 60px; }
 .home-ad-label { display: block; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
 .notice.verify { border-color: var(--line); background: var(--bg-2); }
+
+/* --- wide screens --- */
+@media (min-width: 760px) {
+  .chat { border-left: 1px solid var(--line); border-right: 1px solid var(--line); background: rgba(10, 15, 25, 0.55); }
+  .bubble { max-width: min(80%, 520px); }
+}

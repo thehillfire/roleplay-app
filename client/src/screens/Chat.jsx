@@ -129,12 +129,16 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     }
   };
 
-  const block = async () => {
+  // "End" and "Block" both close the conversation for good; they differ only in tone.
+  const close = async (kind) => {
     setMenuOpen(false);
-    if (!window.confirm(`Block ${convo.partner.handle}? You won't see each other again.`)) return;
+    const ask = kind === 'end'
+      ? `End this conversation with ${convo.partner.handle}? Neither of you will be able to message the other, and you won't be matched again.`
+      : `Block ${convo.partner.handle}? You won't see each other again.`;
+    if (!window.confirm(ask)) return;
     try {
       await api.block(id);
-      onLeft(`You blocked ${convo.partner.handle}.`);
+      onLeft(kind === 'end' ? `Conversation with ${convo.partner.handle} ended.` : `You blocked ${convo.partner.handle}.`);
     } catch (err) {
       setSendError(err.message);
     }
@@ -230,8 +234,9 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
                 {convo.connection?.status === 'none' && (
                   <button role="menuitem" onClick={() => { setMenuOpen(false); setConnectSheet('request'); }}>Connect…</button>
                 )}
+                <button role="menuitem" onClick={() => close('end')}>End conversation</button>
                 <button role="menuitem" onClick={() => { setMenuOpen(false); setReporting(true); }}>Report</button>
-                <button role="menuitem" onClick={block}>Block</button>
+                <button role="menuitem" onClick={() => close('block')}>Block</button>
               </div>
             )}
           </div>
