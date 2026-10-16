@@ -187,6 +187,15 @@ const CRISIS_PATTERNS = [
   /\bacabar\s+con\s+(todo|mi\s+vida)\b/,
 ];
 
+// The most common slurs, including dodged spellings (checked on the un-dodged text). Kept short
+// on purpose: the optional ML classifier and reports cover the rest.
+const HATE_PATTERNS = [
+  /\bn+[i1!]+g+(a+|e+r+|u+h+|a+z+|e+r+z+|a+s+|e+r+s+)\b/,
+  /\bf+a+g+(s|g+o+t+s?)?\b/,
+  /\b(kike|kikes|chink|chinks|spic|spics|wetback|wetbacks|beaner|beaners|tranny|trannies|raghead|towelhead|gook|gooks)\b/,
+  /\b(maricon|maricones|joto|jotos|sudaca|sudacas)\b/,
+];
+
 // Telling someone to kill themselves is abuse, not a crisis.
 const ABUSE_PATTERNS = [
   /\bkys\b/,
@@ -207,6 +216,7 @@ function screenMessage(body, { connected = false } = {}) {
   if (any(MINOR_PATTERNS, aged)) flags.push('minor');
   else if ((BARE_AGE.test(aged) || BARE_AGE_ES.test(aged) || any(SELF_ID_MAYBE, aged)) && !RATING_CONTEXT.test(aged)) flags.push('minor_maybe');
   if (any(SEXUAL_PATTERNS, t)) flags.push('sexual');
+  if (any(HATE_PATTERNS, deobfuscate(t))) flags.push('hate');
   if (any(ABUSE_PATTERNS, t)) flags.push('harassment');
   const crisis = any(CRISIS_PATTERNS, t);
   if (crisis) flags.push('crisis');

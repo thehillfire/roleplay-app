@@ -202,3 +202,14 @@ test('crisis language people actually use is caught (and delivered); abuse aimed
     assert.ok(r.flags.includes('harassment'), text);
   }
 });
+
+test('common slurs are held as hate, including dodged spellings; look-alike words are not', () => {
+  for (const text of ['you n1gga', 'shut up f@g', 'stupid faggot', 'go back you wetback', 'eres un maricon']) {
+    const r = screenMessage(text);
+    assert.equal(r.deliver, false, text);
+    assert.ok(r.flags.includes('hate'), text);
+  }
+  for (const text of ['the snigger in class', 'raccoon in my yard', 'cocoon', 'my niece loved the nigeria trip', 'spicy food', 'chinking glasses', 'coon hound']) {
+    assert.deepEqual(flagsOf(text), [], text);
+  }
+});
