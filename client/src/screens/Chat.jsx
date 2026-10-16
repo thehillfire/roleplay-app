@@ -161,6 +161,16 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     }
   };
 
+  // Escape or a tap elsewhere closes the options menu.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onKey = (e) => e.key === 'Escape' && setMenuOpen(false);
+    const onClick = (e) => !e.target.closest('.menu-wrap') && setMenuOpen(false);
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('click', onClick);
+    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('click', onClick); };
+  }, [menuOpen]);
+
   const giveFeedback = async (helpful) => {
     setFeedbackDone(true);
     try {
@@ -198,7 +208,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
           <div className="chat-who">
             <span className="avatar" aria-hidden="true">{convo.partner.handle.slice(0, 1)}</span>
             <span>
-              <strong>{convo.partner.handle}</strong>
+              <h1 className="chat-name">{convo.partner.handle}</h1>
               <small>{partnerTyping ? 'typing…' : convo.partner.online ? 'online' : 'anonymous'}</small>
             </span>
           </div>

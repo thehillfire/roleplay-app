@@ -39,6 +39,7 @@ jobs:
           PORT=3000 SQLITE_FILE=/tmp/e2e.db ADMIN_EMAILS=mod@e2e.test npm start &
           npx --yes wait-on@8 -t 30000 http://localhost:3000/api/health
           npm run e2e
+          npm run a11y
         env:
           BASE_URL: http://localhost:3000
           MOD_EMAIL: mod@e2e.test

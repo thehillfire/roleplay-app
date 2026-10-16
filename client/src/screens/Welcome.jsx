@@ -59,6 +59,7 @@ export default function Welcome({ onSignedIn, onOpenLegal }) {
     <main className="screen">
       <button className="back" onClick={() => { setMode(null); setError(''); }}>← Back</button>
       <form className="card form" onSubmit={submit}>
+        <h1 className="sr-only">{signup ? 'Create your Kindred account' : 'Sign in to Kindred'}</h1>
         <div className="tabs" role="tablist">
           <button type="button" role="tab" aria-selected={signup} className={signup ? 'tab active' : 'tab'} onClick={() => setMode('signup')}>Create account</button>
           <button type="button" role="tab" aria-selected={!signup} className={!signup ? 'tab active' : 'tab'} onClick={() => setMode('login')}>Sign in</button>

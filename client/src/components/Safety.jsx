@@ -55,13 +55,14 @@ export function ReportSheet({ handle, onSubmit, onClose }) {
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <form className="sheet" onSubmit={submit} onClick={(e) => e.stopPropagation()} aria-label={`Report ${handle}`}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label={`Report ${handle}`} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
+        <form className="sheet-form" onSubmit={submit}>
         <h2>Report {handle}</h2>
         <p className="hint">A moderator will review the recent messages. You won't be matched with them again.</p>
         <fieldset className="reasons">
           {REASONS.map(([id, label]) => (
             <label key={id} className={reason === id ? 'reason active' : 'reason'}>
-              <input type="radio" name="reason" value={id} checked={reason === id} onChange={() => setReason(id)} />
+              <input type="radio" name="reason" value={id} checked={reason === id} onChange={() => setReason(id)} autoFocus={id === 'harassment'} />
               <span>{label}</span>
             </label>
           ))}
@@ -72,7 +73,8 @@ export function ReportSheet({ handle, onSubmit, onClose }) {
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
           <button type="submit" className="btn danger" disabled={!reason || busy}>{busy ? 'Sending…' : 'Report and block'}</button>
         </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }

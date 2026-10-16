@@ -16,6 +16,7 @@ export default function Waiting({ onCancel, error }) {
 
   return (
     <main className="screen waiting">
+      <h1 className="sr-only">Finding someone to talk to</h1>
       <div className="pulse" aria-hidden="true"><span /><span /><span /></div>
       <p className="loading" role="status">{error || LINES[i]}</p>
       <button className="btn" onClick={onCancel}>Cancel</button>

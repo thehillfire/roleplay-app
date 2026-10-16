@@ -21,6 +21,7 @@ No keys needed (see `.env.example` for optional Postgres and Stripe settings). D
 | `npm test` | Server tests on in-memory SQLite |
 | `npm run test:pg` | Same tests on Postgres (`TEST_DATABASE_URL=postgres://…`) |
 | `npm run e2e` | Two-browser smoke test against a running server (`BASE_URL`, `CHROMIUM_PATH`) |
+| `npm run a11y` | axe-core accessibility audit of every main screen against a running server |
 
 ## How it works
 

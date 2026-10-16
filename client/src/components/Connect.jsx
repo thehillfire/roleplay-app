@@ -76,7 +76,8 @@ export function ConnectSheet({ handle, accepting, billing, credits, onSubmit, on
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <form className="sheet" onSubmit={submit} onClick={(e) => e.stopPropagation()} aria-label={`Connect with ${handle}`}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label={`Connect with ${handle}`} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
+        <form className="sheet-form" onSubmit={submit}>
         <h2>{accepting ? `Connect with ${handle}` : `Ask ${handle} to connect`}</h2>
         <p className="hint">
           {accepting
@@ -85,7 +86,7 @@ export function ConnectSheet({ handle, accepting, billing, credits, onSubmit, on
         </p>
         <label>
           <span>First name or nickname</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} required />
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} required autoFocus />
         </label>
         <label>
           <span>A way to reach you <em>(optional: number, email, social)</em></span>
@@ -105,7 +106,8 @@ export function ConnectSheet({ handle, accepting, billing, credits, onSubmit, on
             {busy ? 'One moment…' : needsPurchase ? `Buy for ${money(billing.priceCents, billing.currency)}` : accepting ? 'Accept and connect' : 'Send request'}
           </button>
         </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }
