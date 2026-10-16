@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000';
 const SHOTS = process.env.SHOTS_DIR;
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium' });
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
