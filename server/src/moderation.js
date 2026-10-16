@@ -12,10 +12,18 @@
 //   sexual      sexual solicitation: held
 //   crisis      self-harm / suicide language: DELIVERED, sender is shown crisis resources
 
+// Look-alike letters people swap in to dodge filters ("gmаil" with a Cyrillic а).
+const CONFUSABLES = {
+  а: 'a', в: 'b', е: 'e', ё: 'e', к: 'k', м: 'm', н: 'h', о: 'o', р: 'p', с: 'c', т: 't', у: 'y', х: 'x', і: 'i', ј: 'j', ѕ: 's', ԁ: 'd', ԛ: 'q', ԝ: 'w',
+  α: 'a', β: 'b', ε: 'e', η: 'n', ι: 'i', κ: 'k', ν: 'v', ο: 'o', ρ: 'p', τ: 't', υ: 'u', χ: 'x', ω: 'w',
+};
 const normalize = (text) => text
   .toLowerCase()
   .normalize('NFKD')
+  // Invisible characters (zero-width spaces/joiners, soft hyphens, Hangul fillers) split words.
+  .replace(/[\p{Cf}\u034f\u115f\u1160\u3164\uffa0]/gu, '')
   .replace(/[̀-ͯ]/g, '')
+  .replace(/[авеёкмнорстухіјѕԁԛԝαβεηικνορτυχω]/g, (c) => CONFUSABLES[c])
   .replace(/[’`]/g, "'");
 
 // Digits written with separators ("555 123 4567", "555.123.4567") or as words.

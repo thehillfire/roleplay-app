@@ -258,3 +258,14 @@ test('the venting corpus is never held or paused', () => {
     assert.equal(r.suspend, false, text);
   }
 });
+
+test('invisible characters and look-alike letters do not slip past the screener', () => {
+  for (const [text, flag] of [
+    ['my s​nap is janedoe99', 'contact'],
+    ['how​ old are you', 'age_probe'],
+    ['jane d0e at gmаil dot com', 'contact'], // Cyrillic а
+    ['whats ur іnsta', 'contact'], // Cyrillic і
+    ['n​i​g​g​a', 'hate'],
+  ]) assert.ok(flagsOf(text).includes(flag), JSON.stringify(text));
+  for (const text of ['Привет, как дела?', 'καλημέρα']) assert.deepEqual(flagsOf(text), [], text);
+});
