@@ -30,6 +30,7 @@ export const api = {
 
   conversations: () => request('GET', '/api/conversations').then((d) => d.conversations),
   conversation: (id, before) => request('GET', `/api/conversations/${enc(id)}${before ? `?before=${before.createdAt}&beforeId=${enc(before.id)}` : ''}`),
+  react: (id, messageId, reaction) => request('POST', `/api/conversations/${enc(id)}/messages/${enc(messageId)}/react`, { reaction }),
   unsend: (id, messageId) => request('POST', `/api/conversations/${enc(id)}/messages/${enc(messageId)}/unsend`, {}),
   send: (id, body) => request('POST', `/api/conversations/${enc(id)}/messages`, { body }),
   feedback: (id, helpful) => request('POST', `/api/conversations/${enc(id)}/feedback`, { helpful }),

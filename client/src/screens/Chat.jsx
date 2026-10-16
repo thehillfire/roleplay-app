@@ -5,6 +5,7 @@ import { ConnectBanner, ConnectSheet } from '../components/Connect.jsx';
 
 const PAGE = 50; // server page size
 const UNSEND_WINDOW_MS = 5 * 60 * 1000;
+const REACTIONS = [['💙', 'Support'], ['🫂', 'Hug'], ['🙏', 'Thank you']];
 
 // Shown in an empty conversation so nobody has to stare at a blank box.
 const OPENERS = [
@@ -43,6 +44,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
   const [hasMore, setHasMore] = useState(false);
   const [feedbackDone, setFeedbackDone] = useState(false);
   const [partnerReadAt, setPartnerReadAt] = useState(0);
+  const [reactingTo, setReactingTo] = useState(null); // message id with the picker open
   const [loadingMore, setLoadingMore] = useState(false);
   const endRef = useRef(null);
   const typingTimer = useRef(null);
@@ -79,6 +81,10 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     const offEnded = socket.on('conversation.ended', ({ conversationId }) => {
       if (conversationId === id) setEnded(true);
     });
+    const offReacted = socket.on('message.reacted', ({ conversationId, messageId, reaction }) => {
+      if (conversationId !== id) return;
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reaction } : m)));
+    });
     const offUnsent = socket.on('message.unsent', ({ conversationId, messageId }) => {
       if (conversationId !== id) return;
       setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, status: 'unsent', body: '' } : m)));
@@ -97,7 +103,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     const onVisible = () => markReadIfVisible(id);
     document.addEventListener('visibilitychange', onVisible);
     return () => {
-      offMessage(); offTyping(); offEnded(); offUnsent(); offRead(); offConnect(); offOpen();
+      offMessage(); offTyping(); offEnded(); offReacted(); offUnsent(); offRead(); offConnect(); offOpen();
       document.removeEventListener('visibilitychange', onVisible);
       clearTimeout(typingTimer.current);
     };
@@ -209,6 +215,19 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('click', onClick); };
   }, [menuOpen]);
 
+  const react = async (messageId, reaction) => {
+    setReactingTo(null);
+    const current = messages.find((m) => m.id === messageId)?.reaction;
+    const next = current === reaction ? null : reaction; // tapping the same one clears it
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reaction: next } : m)));
+    try {
+      await api.react(id, messageId, next);
+    } catch (err) {
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reaction: current } : m)));
+      setSendError(err.message);
+    }
+  };
+
   const unsend = async (messageId) => {
     try {
       await api.unsend(id, messageId);
@@ -314,8 +333,19 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
             <div key={m.id} className={`bubble ${m.fromMe ? 'me' : 'them'}${m.status === 'held' ? ' held' : ''}`}>
               <p>{m.body}</p>
               {m.status === 'held' && <p className="held-note">{heldNote(m.flags)}</p>}
+              {m.reaction && <span className="reaction" aria-label={`Reaction ${m.reaction}`}>{m.reaction}</span>}
+              {reactingTo === m.id && (
+                <div className="reaction-picker" role="group" aria-label="React">
+                  {REACTIONS.map(([emoji, label]) => (
+                    <button key={emoji} aria-label={label} aria-pressed={m.reaction === emoji} onClick={() => react(m.id, emoji)}>{emoji}</button>
+                  ))}
+                </div>
+              )}
               <time dateTime={new Date(m.createdAt).toISOString()}>
                 {formatTime(m.createdAt)}{m.id === seenId && ' · Seen'}
+                {!m.fromMe && m.status === 'delivered' && (
+                  <> · <button className="link unsend" aria-expanded={reactingTo === m.id} onClick={() => setReactingTo(reactingTo === m.id ? null : m.id)}>React</button></>
+                )}
                 {m.fromMe && Date.now() - m.createdAt < UNSEND_WINDOW_MS && (
                   <> · <button className="link unsend" onClick={() => unsend(m.id)}>Unsend</button></>
                 )}

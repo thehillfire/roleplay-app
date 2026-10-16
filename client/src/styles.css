@@ -274,3 +274,10 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); box-sh
 .bubble.unsent { background: transparent; border: 1px dashed var(--line); }
 .bubble.unsent p { font-style: italic; color: var(--muted); font-size: 14px; }
 .link.unsend { font-size: 11px; padding: 0; color: var(--muted); }
+.bubble { position: relative; }
+.reaction { position: absolute; bottom: -10px; right: 8px; font-size: 14px; background: var(--bg-3); border: 1px solid var(--line); border-radius: 999px; padding: 0 5px; line-height: 20px; }
+.bubble.me .reaction { right: auto; left: 8px; }
+.bubble:has(.reaction) { margin-bottom: 10px; }
+.reaction-picker { display: flex; gap: 4px; margin-top: 6px; }
+.reaction-picker button { background: var(--bg); border: 1px solid var(--line); border-radius: 999px; font-size: 18px; padding: 2px 8px; }
+.reaction-picker button[aria-pressed="true"] { border-color: var(--accent); }

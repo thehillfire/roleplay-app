@@ -115,7 +115,11 @@ await alice.getByLabel('Message').fill('Yeah. Maybe.');
 await alice.getByLabel('Message').press('Enter');
 await alice.locator('.bubble.me time', { hasText: 'Seen' }).waitFor();
 await alice.shot('3-chat');
-step('messages delivered both ways, typing shown');
+// Bob reacts to Alice's message; she sees it
+await bob.locator('.bubble.them', { hasText: 'Rent is due Friday' }).getByRole('button', { name: 'React' }).click();
+await bob.getByRole('button', { name: 'Hug' }).click();
+await alice.locator('.bubble.me', { hasText: 'Rent is due Friday' }).locator('.reaction', { hasText: '🫂' }).waitFor();
+step('messages delivered both ways, typing shown, reactions');
 
 // Bob leaves the chat; Alice's next message shows up as unread in his list
 await bob.getByRole('button', { name: 'Back to conversations' }).click();

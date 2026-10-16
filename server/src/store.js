@@ -28,6 +28,7 @@ function messageFromRow(row) {
     body: row.body,
     status: row.status,
     flags: row.flags ? JSON.parse(row.flags) : [],
+    reaction: row.reaction || null,
     createdAt: num(row.created_at),
   };
 }
@@ -319,6 +320,16 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         [t, conversationId, senderId, status === 'delivered' ? 1 : 0],
       );
       return message;
+    },
+
+    // The person who received a message can react to it (or clear the reaction with null).
+    async setReaction(userId, conversationId, messageId, reaction) {
+      const { rowCount } = await db.query(
+        `UPDATE messages SET reaction = $1
+          WHERE id = $2 AND conversation_id = $3 AND sender_id <> $4 AND status = 'delivered'`,
+        [reaction, messageId, conversationId, userId],
+      );
+      return rowCount === 1;
     },
 
     // The sender can take a message back for a short while. Returns false if it's not theirs or too old.

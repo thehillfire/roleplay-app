@@ -254,3 +254,28 @@ test('a message can be unsent for 5 minutes: hidden from both, kept for moderato
   await s.db.query('UPDATE messages SET created_at = $1 WHERE id = $2', [Date.now() - 6 * 60 * 1000, old.id]);
   assert.equal((await alice('POST', `/api/conversations/${id}/messages/${old.id}/unsend`, {})).status, 409);
 });
+
+test('the receiver can react to a message with a gentle emoji', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const alice = await signedUp(s.base);
+  const bob = await signedUp(s.base);
+  const aws = await alice.socket();
+  const bws = await bob.socket();
+  t.after(() => Promise.all([aws.close(), bws.close()]));
+  aws.send({ type: 'match.join', role: 'talk' });
+  await aws.next('match.waiting');
+  bws.send({ type: 'match.join', role: 'listen' });
+  const { conversationId: id } = await aws.next('match.found');
+  const m = (await alice('POST', `/api/conversations/${id}/messages`, { body: 'today was a lot' })).body.message;
+  const url = `/api/conversations/${id}/messages/${m.id}/react`;
+
+  assert.equal((await alice('POST', url, { reaction: '💙' })).status, 404, "can't react to your own message");
+  assert.equal((await bob('POST', url, { reaction: '😂' })).status, 400, 'only the gentle set');
+  assert.equal((await bob('POST', url, { reaction: '🫂' })).status, 200);
+  const pushed = await aws.next('message.reacted');
+  assert.equal(pushed.reaction, '🫂');
+  assert.equal((await alice('GET', `/api/conversations/${id}`)).body.messages[0].reaction, '🫂');
+  await bob('POST', url, { reaction: null });
+  assert.equal((await alice('GET', `/api/conversations/${id}`)).body.messages[0].reaction, null);
+});

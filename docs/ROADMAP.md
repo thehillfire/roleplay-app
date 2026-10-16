@@ -32,6 +32,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Deployment: Dockerfile (tested: production mode, non-root, clean SIGTERM), Render Blueprint, docs/DEPLOY.md
 
 ## 5. Community & launch readiness
+- [x] Gentle reactions (💙 🫂 🙏) on the other person's messages; age-band matching preference; sign out everywhere; `npm run verify`
 - [x] Unsend within 5 minutes (hidden for both; kept for moderators if reported)
 - [x] Per-account login lockout; database-aware health check
 - [x] First-run onboarding (3 cards, once per device) and listener tips

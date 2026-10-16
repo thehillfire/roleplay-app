@@ -134,6 +134,10 @@ const MIGRATIONS = [
       expires_at BIGINT NOT NULL
     )`,
   ],
+  // 9: one gentle reaction per person per message
+  [
+    'ALTER TABLE messages ADD COLUMN reaction TEXT',
+  ],
 ];
 
 async function migrate(db) {

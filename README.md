@@ -52,13 +52,13 @@ e2e/      Playwright test: two strangers sign up, match and chat
 - `POST /api/auth/forgot { email }`, `POST /api/auth/reset { token, password }`, `POST /api/auth/verify { token }`, `POST /api/auth/resend-verification`
 - `GET /api/conversations`: your threads, with partner handle, online flag, last message and unread count
 - `GET /api/conversations/:id?before=<ms>&beforeId=<id>`: messages, newest 50 (cursor is the oldest message you have)
-- `POST /api/conversations/:id/messages { body }`, `POST /api/conversations/:id/read`, `POST /api/conversations/:id/messages/:messageId/unsend` (within 5 minutes)
+- `POST /api/conversations/:id/messages { body }`, `POST /api/conversations/:id/read`, `POST /api/conversations/:id/messages/:messageId/unsend` (within 5 minutes), `POST /api/conversations/:id/messages/:messageId/react { reaction: 💙|🫂|🙏|null }`
 - `POST /api/conversations/:id/feedback { helpful }`, `GET /api/presence`
 - `POST /api/conversations/:id/block`, `POST /api/conversations/:id/report { reason, details? }`
 - `POST /api/conversations/:id/connect { name, contact? }` (request or accept), `…/connect/decline`, `…/connect/cancel`
 - `GET /api/account/export`, `POST /api/account/delete { password }`
 - `POST /api/billing/checkout` → Stripe Checkout URL. `POST /api/billing/webhook` (Stripe, signature-verified, idempotent)
-- WebSocket `/ws`. Send `match.join { role, topic }`, `match.leave`, `typing { conversationId }`. Receive `match.waiting`, `match.found`, `message`, `message.unsent`, `typing`, `read`, `conversation.ended`, `connect.updated`, `thanks`, `credits.updated`.
+- WebSocket `/ws`. Send `match.join { role, topic }`, `match.leave`, `typing { conversationId }`. Receive `match.waiting`, `match.found`, `message`, `message.unsent`, `message.reacted`, `typing`, `read`, `conversation.ended`, `connect.updated`, `thanks`, `credits.updated`.
 
 ## Deploying
 
