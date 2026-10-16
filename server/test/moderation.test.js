@@ -223,3 +223,11 @@ test('arranging to meet or asking for photos is held until both connect', () => 
     assert.deepEqual(flagsOf(text), [], text);
   }
 });
+
+test('adversarial 2,000-character messages screen quickly', () => {
+  for (const text of ['n'.repeat(700) + 'i'.repeat(700) + 'g'.repeat(600), 'a.'.repeat(1000), 'a'.repeat(1999) + '@', '1 '.repeat(1000)]) {
+    const t = process.hrtime.bigint();
+    screenMessage(text);
+    assert.ok(Number(process.hrtime.bigint() - t) / 1e6 < 50, 'under 50 ms');
+  }
+});

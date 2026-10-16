@@ -35,6 +35,7 @@ function hasPhoneNumber(t) {
 // Undo the usual dodges before looking for platform names: "sn@p", "1nsta", "i n s t a".
 const LEET = { '@': 'a', 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', $: 's', 7: 't' };
 const deobfuscate = (t) => t
+  .replace(/(.)\1{3,}/g, '$1$1$1') // "niiiiii..." → "niii" (the patterns allow repeats)
   .replace(/[@0134$57]/g, (c) => LEET[c])
   .replace(/\b(?:[a-z][\s.*_-]){2,}[a-z]\b/g, (m) => m.replace(/[\s.*_-]/g, ''));
 const PLATFORMS = 'snap(chat)?|insta(gram)?|ig|tiktok|whats\\s?app|telegram|discord|kik|wickr|signal|facebook|fb|twitter|onlyfans|venmo|cash\\s?app|paypal';
@@ -51,8 +52,10 @@ const CONTACT_PATTERNS = [
   new RegExp(`\\b(hmu|hit\\s+me\\s+up|find\\s+me|follow\\s+me|dm\\s+me|message\\s+me|add\\s+me)\\s+(on|at)\\s+(${PLATFORMS})\\b`),
   /\b(cual|que)\s+es\s+tu\s+(numero|cel(ular)?|telefono|correo|snap|insta|whats(app)?|discord|telegram)\b/,
   /\b(pasame|dame|mandame|enviame)\s+tu\s+(numero|cel(ular)?|telefono|correo|snap|insta|whats(app)?|discord|telegram)\b/,
-  /[a-z0-9._%+-]+\s*@\s*[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}/, // emails
-  /[a-z0-9._%+-]+\s*(\(at\)|\[at\]|\sat\s)\s*[a-z0-9-]+\s*(\(dot\)|\[dot\]|\sdot\s|\.)\s*(com|net|org|edu|gov|io|co|me|us|uk|ca)\b/, // "jane at gmail dot com"
+  // Emails. The lookbehind starts matches only at the beginning of a word, so a long run of
+  // letters can't make these retry from every position (quadratic time).
+  /(?<![a-z0-9._%+-])[a-z0-9._%+-]+\s*@\s*[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}/,
+  /(?<![a-z0-9._%+-])[a-z0-9._%+-]+\s*(\(at\)|\[at\]|\sat\s)\s*[a-z0-9-]+\s*(\(dot\)|\[dot\]|\sdot\s|\.)\s*(com|net|org|edu|gov|io|co|me|us|uk|ca)\b/, // "jane at gmail dot com"
   /\b(https?:\/\/|www\.)\S+/,
   /\b[a-z0-9-]+\.(com|net|org|io|me|co|app|gg|ly|tv|xyz)\b/,
   /(^|\s)@[a-z0-9_.]{3,}/, // @handles
