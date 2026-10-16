@@ -216,3 +216,41 @@ test('reading a conversation tells the other person it was seen', async (t) => {
   assert.ok(seen.at >= sent.createdAt);
   assert.ok((await alice('GET', `/api/conversations/${id}`)).body.conversation.partnerReadAt >= sent.createdAt);
 });
+
+test('a message can be unsent for 5 minutes: hidden from both, kept for moderators', async (t) => {
+  const s = await start({ autoPauseMinReporterAgeMs: 0 });
+  t.after(s.stop);
+  const alice = await signedUp(s.base);
+  const bob = await signedUp(s.base);
+  const aws = await alice.socket();
+  const bws = await bob.socket();
+  t.after(() => Promise.all([aws.close(), bws.close()]));
+  aws.send({ type: 'match.join', role: 'talk' });
+  await aws.next('match.waiting');
+  bws.send({ type: 'match.join', role: 'listen' });
+  const { conversationId: id } = await aws.next('match.found');
+
+  const m = (await alice('POST', `/api/conversations/${id}/messages`, { body: 'I overshared, sorry' })).body.message;
+  await bws.next('message');
+  assert.equal((await bob('POST', `/api/conversations/${id}/messages/${m.id}/unsend`, {})).status, 409, "can't unsend someone else's");
+  assert.equal((await alice('POST', `/api/conversations/${id}/messages/${m.id}/unsend`, {})).status, 200);
+  assert.deepEqual(await bws.next('message.unsent'), { type: 'message.unsent', conversationId: id, messageId: m.id, seen: true });
+
+  for (const who of [alice, bob]) {
+    const [msg] = (await who('GET', `/api/conversations/${id}`)).body.messages;
+    assert.equal(msg.status, 'unsent');
+    assert.equal(msg.body, '');
+  }
+  assert.equal((await bob('GET', '/api/conversations')).body.conversations[0].lastMessage, null);
+
+  // Moderators still see what was said if it's reported.
+  await bob('POST', `/api/conversations/${id}/report`, { reason: 'harassment', block: false });
+  const [report] = await s.store.listReports();
+  assert.equal(report.snapshot[0].body, 'I overshared, sorry');
+  assert.equal(report.snapshot[0].unsent, true);
+
+  // Too old to unsend.
+  const old = (await alice('POST', `/api/conversations/${id}/messages`, { body: 'older' })).body.message;
+  await s.db.query('UPDATE messages SET created_at = $1 WHERE id = $2', [Date.now() - 6 * 60 * 1000, old.id]);
+  assert.equal((await alice('POST', `/api/conversations/${id}/messages/${old.id}/unsend`, {})).status, 409);
+});

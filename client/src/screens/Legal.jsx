@@ -10,7 +10,7 @@ function Privacy() {
       <ul>
         <li><strong>Account:</strong> email, birthdate (to confirm you're 18+), a hashed password, and your random anonymous name.</li>
         <li><strong>Conversations:</strong> the messages you send and receive, so you can continue chats later.</li>
-        <li><strong>Safety records:</strong> reports, blocks, and messages our filters held back.</li>
+        <li><strong>Safety records:</strong> reports, blocks, and messages our filters held back. If you unsend a message it disappears for both of you, but moderators can still see it if the conversation is reported.</li>
         <li><strong>Connect:</strong> the name and contact you chose to share with a specific person, only after you both agreed.</li>
         <li><strong>Payments:</strong> handled by Stripe. We store that a payment happened and its amount, never your card.</li>
         <li><strong>Notifications:</strong> if you turn them on, a push address for your device. Notifications never include message text.</li>

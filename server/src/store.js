@@ -247,9 +247,9 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
                 (SELECT COUNT(*) FROM messages m
                    WHERE m.conversation_id = c.id AND m.sender_id <> $1 AND m.status = 'delivered'
                      AND m.created_at > CASE WHEN c.user_a = $1 THEN c.read_a ELSE c.read_b END) AS unread,
-                (SELECT m.body FROM messages m WHERE m.conversation_id = c.id AND (m.status = 'delivered' OR m.sender_id = $1)
+                (SELECT m.body FROM messages m WHERE m.conversation_id = c.id AND (m.status = 'delivered' OR (m.sender_id = $1 AND m.status = 'held'))
                    ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_body,
-                (SELECT m.sender_id FROM messages m WHERE m.conversation_id = c.id AND (m.status = 'delivered' OR m.sender_id = $1)
+                (SELECT m.sender_id FROM messages m WHERE m.conversation_id = c.id AND (m.status = 'delivered' OR (m.sender_id = $1 AND m.status = 'held'))
                    ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_sender
            FROM conversations c
            JOIN users p ON p.id = CASE WHEN c.user_a = $1 THEN c.user_b ELSE c.user_a END
@@ -281,11 +281,12 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         beforeClause = 'AND created_at < $4';
       }
       const { rows } = await db.query(
-        `SELECT * FROM messages WHERE conversation_id = $1 AND (status = 'delivered' OR sender_id = $2) ${beforeClause}
+        `SELECT * FROM messages WHERE conversation_id = $1 AND (status IN ('delivered', 'unsent') OR sender_id = $2) ${beforeClause}
          ORDER BY created_at DESC, id DESC LIMIT $3`,
         params,
       );
-      return rows.map(messageFromRow).reverse();
+      // Unsent messages stay in place as a placeholder; their text never goes back to either side.
+      return rows.map(messageFromRow).map((m) => (m.status === 'unsent' ? { ...m, body: '' } : m)).reverse();
     },
 
     async addMessage({ conversationId, senderId, body, status = 'delivered', flags }) {
@@ -305,6 +306,16 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         [t, conversationId, senderId, status === 'delivered' ? 1 : 0],
       );
       return message;
+    },
+
+    // The sender can take a message back for a short while. Returns false if it's not theirs or too old.
+    async unsendMessage(userId, conversationId, messageId, windowMs) {
+      const { rowCount } = await db.query(
+        `UPDATE messages SET status = 'unsent'
+          WHERE id = $1 AND conversation_id = $2 AND sender_id = $3 AND status IN ('delivered', 'held') AND created_at >= $4`,
+        [messageId, conversationId, userId, now() - windowMs],
+      );
+      return rowCount === 1;
     },
 
     async markRead(userId, conversationId, at = now()) {
@@ -341,7 +352,8 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       const snapshot = rows.reverse().map((r) => ({
         from: r.sender_id === reportedId ? 'reported' : 'reporter',
         body: r.body,
-        held: r.status !== 'delivered',
+        held: r.status === 'held',
+        unsent: r.status === 'unsent',
         at: num(r.created_at),
       }));
       const report = { id: newId(), createdAt: now() };
@@ -544,7 +556,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       const threads = [];
       for (const c of conversations) {
         const { rows } = await db.query(
-          `SELECT body, status, sender_id, created_at FROM messages WHERE conversation_id = $1 AND (status = 'delivered' OR sender_id = $2)
+          `SELECT body, status, sender_id, created_at FROM messages WHERE conversation_id = $1 AND status <> 'unsent' AND (status = 'delivered' OR sender_id = $2)
            ORDER BY created_at ASC, id ASC`,
           [c.id, userId],
         );

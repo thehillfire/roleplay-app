@@ -93,7 +93,7 @@ export default function Moderate({ onBack }) {
           <ol className="transcript">
             {r.snapshot.map((m, i) => (
               <li key={i} className={m.from}>
-                <span className="who-line">{m.from === 'reported' ? r.reported.handle : r.reporter.handle}{m.held ? ' · held' : ''}</span>
+                <span className="who-line">{m.from === 'reported' ? r.reported.handle : r.reporter.handle}{m.held ? ' · held' : ''}{m.unsent ? ' · unsent by sender' : ''}</span>
                 {m.body}
               </li>
             ))}

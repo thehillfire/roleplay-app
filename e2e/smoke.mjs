@@ -150,6 +150,16 @@ await bob.waitForTimeout(500);
 assert.equal(await bob.locator('.bubble', { hasText: '555' }).count(), 0, 'partner never sees held messages');
 step('contact info held with an explanation');
 
+// Unsend: gone for both, a placeholder stays
+await alice.getByLabel('Message').fill('ugh ignore that, I overshared');
+await alice.getByLabel('Message').press('Enter');
+await bob.locator('.bubble.them', { hasText: 'I overshared' }).waitFor();
+await alice.locator('.bubble.me', { hasText: 'I overshared' }).getByRole('button', { name: 'Unsend' }).click();
+await alice.getByText('You unsent a message').waitFor();
+await bob.getByText('Message unsent').waitFor();
+assert.equal(await bob.locator('.bubble', { hasText: 'I overshared' }).count(), 0);
+step('unsend removes a message for both');
+
 // Crisis language: sender sees resources, listener sees guidance
 await alice.getByLabel('Message').fill('some days I just want to die');
 await alice.getByLabel('Message').press('Enter');

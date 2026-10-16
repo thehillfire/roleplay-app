@@ -4,6 +4,7 @@ import { CrisisCard, ReportSheet, heldNote } from '../components/Safety.jsx';
 import { ConnectBanner, ConnectSheet } from '../components/Connect.jsx';
 
 const PAGE = 50; // server page size
+const UNSEND_WINDOW_MS = 5 * 60 * 1000;
 
 // Shown in an empty conversation so nobody has to stare at a blank box.
 const OPENERS = [
@@ -78,6 +79,10 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     const offEnded = socket.on('conversation.ended', ({ conversationId }) => {
       if (conversationId === id) setEnded(true);
     });
+    const offUnsent = socket.on('message.unsent', ({ conversationId, messageId }) => {
+      if (conversationId !== id) return;
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, status: 'unsent', body: '' } : m)));
+    });
     const offRead = socket.on('read', ({ conversationId, at }) => {
       if (conversationId === id) setPartnerReadAt((prev) => Math.max(prev, at));
     });
@@ -92,7 +97,7 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     const onVisible = () => markReadIfVisible(id);
     document.addEventListener('visibilitychange', onVisible);
     return () => {
-      offMessage(); offTyping(); offEnded(); offRead(); offConnect(); offOpen();
+      offMessage(); offTyping(); offEnded(); offUnsent(); offRead(); offConnect(); offOpen();
       document.removeEventListener('visibilitychange', onVisible);
       clearTimeout(typingTimer.current);
     };
@@ -204,6 +209,15 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
     return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('click', onClick); };
   }, [menuOpen]);
 
+  const unsend = async (messageId) => {
+    try {
+      await api.unsend(id, messageId);
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, status: 'unsent', body: '' } : m)));
+    } catch (err) {
+      setSendError(err.message);
+    }
+  };
+
   const giveFeedback = async (helpful) => {
     setFeedbackDone(true);
     try {
@@ -292,11 +306,22 @@ export default function Chat({ id, socket, onBack, onLeft, onPaused, billing, cr
           </div>
         )}
         {messages.map((m) => (
-          <div key={m.id} className={`bubble ${m.fromMe ? 'me' : 'them'}${m.status === 'held' ? ' held' : ''}`}>
-            <p>{m.body}</p>
-            {m.status === 'held' && <p className="held-note">{heldNote(m.flags)}</p>}
-            <time dateTime={new Date(m.createdAt).toISOString()}>{formatTime(m.createdAt)}{m.id === seenId && ' · Seen'}</time>
-          </div>
+          m.status === 'unsent' ? (
+            <div key={m.id} className={`bubble unsent ${m.fromMe ? 'me' : 'them'}`}>
+              <p>{m.fromMe ? 'You unsent a message' : 'Message unsent'}</p>
+            </div>
+          ) : (
+            <div key={m.id} className={`bubble ${m.fromMe ? 'me' : 'them'}${m.status === 'held' ? ' held' : ''}`}>
+              <p>{m.body}</p>
+              {m.status === 'held' && <p className="held-note">{heldNote(m.flags)}</p>}
+              <time dateTime={new Date(m.createdAt).toISOString()}>
+                {formatTime(m.createdAt)}{m.id === seenId && ' · Seen'}
+                {m.fromMe && Date.now() - m.createdAt < UNSEND_WINDOW_MS && (
+                  <> · <button className="link unsend" onClick={() => unsend(m.id)}>Unsend</button></>
+                )}
+              </time>
+            </div>
+          )
         ))}
         {partnerTyping && <div className="bubble them typing" aria-label="typing"><span /><span /><span /></div>}
         <div ref={endRef} />

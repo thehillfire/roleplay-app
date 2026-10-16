@@ -12,6 +12,7 @@ const crypto = require('crypto');
 
 const RESET_TTL_MS = 60 * 60 * 1000;
 const VERIFY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const UNSEND_WINDOW_MS = 5 * 60 * 1000;
 
 const REPORT_REASONS = ['harassment', 'sexual', 'minor', 'hate', 'spam', 'self_harm', 'other'];
 // Auto-pause (pending human review) when this many different people report someone within a week.
@@ -570,6 +571,13 @@ function createApp({
     if (!user) throw httpError(404, 'User not found.');
     if (!(await store.setUserStatus(user.id, status))) throw httpError(409, 'This account was deleted by its owner.');
     if (status !== 'active') hub.disconnect(user.id);
+    res.json({ ok: true });
+  }));
+
+  app.post('/api/conversations/:id/messages/:messageId/unsend', member, conversation, asyncRoute(async (req, res) => {
+    const ok = await store.unsendMessage(req.user.id, req.conversation.id, req.params.messageId, UNSEND_WINDOW_MS);
+    if (!ok) throw httpError(409, 'Messages can only be unsent for 5 minutes after sending.');
+    hub.push(req.conversation.partnerId, { type: 'message.unsent', conversationId: req.conversation.id, messageId: req.params.messageId });
     res.json({ ok: true });
   }));
 
