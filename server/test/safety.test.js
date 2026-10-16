@@ -205,3 +205,29 @@ test('there is a daily cap on meeting new people', async (t) => {
   assert.match(err.error, /met a lot of new people today/);
   assert.equal(s.server.realtime.matchmaker.size, 0);
 });
+
+test('moderators see headline stats', async (t) => {
+  const s = await start({ autoPauseMinReporterAgeMs: 0 });
+  t.after(s.stop);
+  const mod = await signedUp(s.base, { email: 'stats-mod@example.com' });
+  await s.store.setUserRole('stats-mod@example.com', 'admin');
+  const a = await signedUp(s.base);
+  const b = await signedUp(s.base);
+  const c = await matched(s, a, b);
+  t.after(c.close);
+  await a('POST', `/api/conversations/${c.id}/messages`, { body: 'hi' });
+  await b('POST', `/api/conversations/${c.id}/messages`, { body: 'hey' });
+  await a('POST', `/api/conversations/${c.id}/messages`, { body: 'send nudes' });
+  await b('POST', `/api/conversations/${c.id}/report`, { reason: 'sexual' });
+  assert.equal((await a('GET', '/api/admin/stats')).status, 403);
+  const stats = (await mod('GET', '/api/admin/stats')).body;
+  assert.equal(stats.users, 3);
+  assert.equal(stats.signupsDay, 3);
+  assert.equal(stats.activeDay, 2);
+  assert.equal(stats.messagesDay, 2);
+  assert.equal(stats.matchesDay, 1);
+  assert.equal(stats.openReports, 1);
+  assert.equal(stats.held, 1);
+  assert.equal(stats.revenueCents, 0);
+  assert.equal(typeof stats.online, 'number');
+});

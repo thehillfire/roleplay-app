@@ -18,14 +18,16 @@ export default function Moderate({ onBack }) {
   const [tab, setTab] = useState('reports');
   const [reports, setReports] = useState(null);
   const [held, setHeld] = useState(null);
+  const [stats, setStats] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
 
   const load = useCallback(() => {
     setError('');
-    Promise.all([api.admin.reports(), api.admin.held()]).then(([r, h]) => {
+    Promise.all([api.admin.reports(), api.admin.held(), api.admin.stats()]).then(([r, h, st]) => {
       setReports(r);
       setHeld(h);
+      setStats(st);
     }, (err) => setError(err.message));
   }, []);
   useEffect(load, [load]);
@@ -47,6 +49,24 @@ export default function Moderate({ onBack }) {
     <main className="screen moderate">
       <button className="back" onClick={onBack}>← Back</button>
       <h1 className="find-title">Moderation</h1>
+      {stats && (
+        <section className="stats-grid" aria-label="Today at a glance">
+          {[
+            ['Here now', stats.online],
+            ['Active today', stats.activeDay],
+            ['Messages today', stats.messagesDay],
+            ['New matches today', stats.matchesDay],
+            ['Signups today', stats.signupsDay],
+            ['Signups this week', stats.signupsWeek],
+            ['Members', stats.users],
+            ['"Helped" this week', stats.helpfulWeek],
+            ['Connections made', stats.connectsAccepted],
+            ['Revenue', new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(stats.revenueCents / 100)],
+          ].map(([label, value]) => (
+            <div key={label} className="stat"><span>{label}</span><strong>{value}</strong></div>
+          ))}
+        </section>
+      )}
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === 'reports'} className={tab === 'reports' ? 'tab active' : 'tab'} onClick={() => setTab('reports')}>
           Reports {reports ? `(${reports.length})` : ''}

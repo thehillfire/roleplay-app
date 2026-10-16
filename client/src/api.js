@@ -40,6 +40,7 @@ export const api = {
   deleteAccount: (password) => request('POST', '/api/account/delete', { password }),
   checkout: () => request('POST', '/api/billing/checkout', {}),
   admin: {
+    stats: () => request('GET', '/api/admin/stats'),
     reports: (status = 'open') => request('GET', `/api/admin/reports?status=${status}`).then((d) => d.reports),
     resolve: (id, resolution) => request('POST', `/api/admin/reports/${enc(id)}/resolve`, { resolution }),
     held: () => request('GET', '/api/admin/held').then((d) => d.messages),

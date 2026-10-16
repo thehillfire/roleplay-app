@@ -488,6 +488,10 @@ function createApp({
     return next();
   });
 
+  app.get('/api/admin/stats', admin, asyncRoute(async (req, res) => {
+    res.json({ ...(await store.adminStats()), online: hub.stats().online, waiting: hub.stats().waiting });
+  }));
+
   app.get('/api/admin/reports', admin, asyncRoute(async (req, res) => {
     const status = req.query.status === 'resolved' ? 'resolved' : 'open';
     res.json({ reports: await store.listReports({ status }) });

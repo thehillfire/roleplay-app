@@ -595,6 +595,27 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return rowCount;
     },
 
+    // Headline numbers for the owner/moderators.
+    async adminStats(t = now()) {
+      const day = t - 24 * 60 * 60 * 1000;
+      const week = t - 7 * 24 * 60 * 60 * 1000;
+      const one = async (sql, params = []) => Number(Object.values((await db.query(sql, params)).rows[0])[0]) || 0;
+      const [users, signupsDay, signupsWeek, activeDay, messagesDay, matchesDay, openReports, held, connectsAccepted, revenueCents, helpfulWeek] = await Promise.all([
+        one("SELECT COUNT(*) FROM users WHERE status <> 'deleted'"),
+        one('SELECT COUNT(*) FROM users WHERE created_at >= $1', [day]),
+        one('SELECT COUNT(*) FROM users WHERE created_at >= $1', [week]),
+        one("SELECT COUNT(DISTINCT sender_id) FROM messages WHERE created_at >= $1 AND status = 'delivered'", [day]),
+        one("SELECT COUNT(*) FROM messages WHERE created_at >= $1 AND status = 'delivered'", [day]),
+        one('SELECT COUNT(*) FROM conversations WHERE created_at >= $1', [day]),
+        one("SELECT COUNT(*) FROM reports WHERE status = 'open'"),
+        one("SELECT COUNT(*) FROM messages WHERE status = 'held' AND created_at >= $1", [week]),
+        one("SELECT COUNT(*) FROM connections WHERE status = 'accepted'"),
+        one('SELECT COALESCE(SUM(amount_cents), 0) FROM payments'),
+        one('SELECT COUNT(*) FROM feedback WHERE helpful = 1 AND created_at >= $1', [week]),
+      ]);
+      return { users, signupsDay, signupsWeek, activeDay, messagesDay, matchesDay, openReports, held, connectsAccepted, revenueCents, helpfulWeek };
+    },
+
     async listHeldMessages({ limit = 50 } = {}) {
       const { rows } = await db.query(
         `SELECT m.*, u.handle AS sender_handle, u.status AS sender_status FROM messages m JOIN users u ON u.id = m.sender_id
