@@ -265,3 +265,20 @@ test('two tabs joining at once only queue once', async (t) => {
   assert.equal(new Set(found.map((e) => e.conversationId)).size, 1, 'matched exactly once');
   assert.equal(s.server.realtime.matchmaker.size, 0);
 });
+
+test('the same long message pasted to many people is held as spam', async (t) => {
+  const s = await start({ realtime: { dailyMatchLimit: 100 } });
+  t.after(s.stop);
+  const spammer = await signedUp(s.base);
+  const promo = 'Check out my amazing crypto group, guaranteed returns every week!!';
+  const results = [];
+  for (let i = 0; i < 3; i += 1) {
+    const c = await matched(s, spammer, await signedUp(s.base));
+    results.push((await spammer('POST', `/api/conversations/${c.id}/messages`, { body: promo })).body.message.status);
+    await spammer('POST', `/api/conversations/${c.id}/messages`, { body: 'hi there' }); // short greetings are fine
+    await c.close();
+  }
+  assert.deepEqual(results, ['delivered', 'delivered', 'held']);
+  const held = await s.store.listHeldMessages();
+  assert.deepEqual(held[0].flags, ['spam']);
+});

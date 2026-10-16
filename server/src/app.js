@@ -207,6 +207,28 @@ function createApp({
       text: `${line}\n\nOpen the moderation queue: ${base ? `${base}/` : '(set PUBLIC_URL)'} → Account menu → Moderate.`,
     }).catch((err) => console.error('moderator alert failed', err.message))));
   };
+  // The same longer message pasted into 3+ different conversations within an hour is spam
+  // (promos, scams). Short greetings are exempt; everyone says "hi" to everyone.
+  const recentBodies = new Map(); // userId -> Map(normalized body -> { convos: Set, first })
+  const SPAM = { minLength: 25, conversations: 3, windowMs: 60 * 60 * 1000 };
+  const isCopyPasteSpam = (userId, conversationId, body) => {
+    const key = body.toLowerCase().replace(/\s+/g, ' ').trim();
+    if (key.length < SPAM.minLength) return false;
+    const t = Date.now();
+    let mine = recentBodies.get(userId);
+    if (!mine) {
+      if (recentBodies.size > 20000) recentBodies.clear(); // memory bound; worst case a spammer gets a fresh hour
+      mine = new Map();
+      recentBodies.set(userId, mine);
+    }
+    for (const [k, v] of mine) if (t - v.first > SPAM.windowMs) mine.delete(k);
+    const entry = mine.get(key) || { convos: new Set(), first: t };
+    entry.convos.add(conversationId);
+    mine.set(key, entry);
+    if (mine.size > 50) mine.delete(mine.keys().next().value);
+    return entry.convos.size >= SPAM.conversations;
+  };
+
   // At most one alert per person and reason per hour, and never in the request's way.
   const recentAlerts = new Map();
   const alertOnce = (key, send) => {
@@ -475,6 +497,10 @@ function createApp({
     if (ctx.partnerStatus === 'deleted') throw httpError(403, 'This person has left Kindred.');
 
     const screen = screenMessage(body, { connected: ctx.connected });
+    if (isCopyPasteSpam(req.user.id, id, body)) {
+      screen.deliver = false;
+      screen.flags.push('spam');
+    }
     // Optional ML second opinion for what rules can't see (only when the rules let it through).
     if (screen.deliver && classifier.enabled) {
       const verdict = await classifier.classify(body);
