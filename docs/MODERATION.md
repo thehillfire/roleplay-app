@@ -10,7 +10,7 @@ A playbook for whoever opens **Moderate** (at first, that's you). It covers what
 4. **Appeals.** Answer within a day; a paused person can't use the app until you do.
 5. **Inbox.** Reply or close. Replies are emailed only to confirmed addresses (it says so if not).
 
-Urgent items also arrive by email: possible minors, people at risk, possible ban evasion. Those can't wait for the daily pass.
+Urgent items also arrive by email: possible minors (including a new signup from a browser where an under-18 signup was just refused), people at risk, possible ban evasion. Those can't wait for the daily pass.
 
 ## Held messages
 
