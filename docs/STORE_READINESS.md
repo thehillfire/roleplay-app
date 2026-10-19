@@ -30,6 +30,7 @@ an account, money, a key or a legal decision only the owner can provide. How-to 
 | No purchases outside store billing inside the apps | Done (hidden) | `shell.js` |
 | In-app purchases through store billing | Not built (decision for Jav: keep connect web-only, or add Play Billing / StoreKit) | n/a |
 | Camera permission explained before asking | Done in the game panel; the iOS Info.plist string is in `docs/IOS.md` | `NoSmile.jsx` |
+| Listing screenshots (Play 1080×1920, App Store 6.5" 1284×2778) and Play feature graphic | Script: `node e2e/store-shots.mjs` against a running server (`BASE_URL`, `OUT`) | `e2e/store-shots.mjs` |
 | Reviewer can test alone | Solo practice round in game modes; demo accounts go in the review notes | Practice screen |
 | Real keys: email, push, Turnstile, Stripe, moderation API | Jav | `docs/DEPLOY.md` |
 

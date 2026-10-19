@@ -359,7 +359,8 @@ export default function Chat({ id, socket, unreadElsewhere = 0, onBack, onLeft, 
   // Ask once a real exchange has happened (server says so, or we can see it here).
   const sentByMe = messages.filter((m) => m.fromMe && m.status !== 'held').length;
   const sentByThem = messages.filter((m) => !m.fromMe).length;
-  const askFeedback = convo && !feedbackDone && !ended && convo.feedback?.helpful == null
+  // Support chats only: a Cringe Duel or Don't Smile round isn't something that "helped".
+  const askFeedback = convo && convo.mode === 'talk' && !feedbackDone && !ended && convo.feedback?.helpful == null
     && (convo.feedback?.canRate || (sentByMe >= 2 && sentByThem >= 2));
 
   const report = async (reason, details) => {
