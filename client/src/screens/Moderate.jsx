@@ -105,7 +105,10 @@ export default function Moderate({ onBack }) {
     <main className="screen moderate">
       <button className="back" onClick={onBack}>← Back</button>
       <h1 className="find-title">Moderation</h1>
+      {/* Folded by default so the queues (the actual work) are on the first screen of a phone. */}
       {stats && (
+        <details className="stats-fold">
+        <summary>Today at a glance · {stats.heldToReview} held · {stats.supportOpen} support</summary>
         <section className="stats-grid" aria-label="Today at a glance">
           {[
             ['Here now', stats.online],
@@ -125,6 +128,7 @@ export default function Moderate({ onBack }) {
             <div key={label} className="stat"><span>{label}</span><strong>{value}</strong></div>
           ))}
         </section>
+        </details>
       )}
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === 'reports'} className={tab === 'reports' ? 'tab active' : 'tab'} onClick={() => setTab('reports')}>

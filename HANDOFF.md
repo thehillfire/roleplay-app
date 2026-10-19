@@ -67,7 +67,13 @@ TEST_DATABASE_URL=postgres://postgres@localhost:5433/loreforge_test npm run test
    - `sw.js` is served with `no-cache`.
    - `capacitor.config.json` is ready for the iOS wrapper (remote-URL mode); nothing native is generated or installed.
    - **iOS blockers before submitting:** native push (APNs); Google sign-in is refused inside web views (needs a native plugin, or hide the button on iOS); guideline 4.2 risk. Details in `docs/IOS.md`.
-   - A full-app QA pass (QA 4) was running when this was written; its findings go below.
+   - **QA pass 4 (whole app, phone sizes, landscape, 320px)**: fixed in the commit after b398105.
+     - A failed session check on first load (offline, server waking) no longer shows the landing page: the loader says it can't reach Kindred and retries every 4 s and on `online`. Only a server answer means signed out.
+     - A blocked/ended chat no longer shows the partner as online and no longer offers Unsend/React.
+     - Don't Smile keeps its score per conversation on the device (reload-safe; the two players can still disagree if one misses an event while offline). "I smiled" shows "Counted ✓" during the 4 s cooldown.
+     - Landscape: game panels shrink to one row so the chat and composer stay on screen. Color picker fits 320px. Tap targets ≥44px for links, icon buttons and chips. Rush is brighter (#ff6aaa) for small-text contrast.
+     - A bad `/verify#…` link explains itself on the sign-in screen. The paused screen links to the community rules. The topic survives a cancelled search. Support needs 5+ characters. The moderator stats fold away so the queues are first, and the tabs wrap.
+     - Left as is: re-matching the same person in another mode reuses one thread (by design: one thread per pair; ask Jav if modes should get separate threads). The strike-over-onboarding and preview-mode social copy went to the other session (fixed in 4d81c4d).
 
 ## Decisions waiting on Jav
 

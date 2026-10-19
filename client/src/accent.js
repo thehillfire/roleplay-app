@@ -4,7 +4,7 @@ const KEY = 'kindred.accent';
 export const ACCENTS = [
   { id: 'volt', label: 'Volt', swatch: '#ffe14d' },
   { id: 'ion', label: 'Ion', swatch: '#3de8ff' },
-  { id: 'rush', label: 'Rush', swatch: '#ff4f9a' },
+  { id: 'rush', label: 'Rush', swatch: '#ff6aaa' },
   { id: 'blaze', label: 'Blaze', swatch: '#ff8a3d' },
   { id: 'toxic', label: 'Toxic', swatch: '#7dff6b' },
   { id: 'void', label: 'Void', swatch: '#b98cff' },

@@ -6,9 +6,25 @@ const COOLDOWN_MS = 4000; // one smile counts once, not every frame
 
 // Don't Smile: text each other until someone cracks. Your camera (optional) only checks your
 // own face, on this device; the other person never sees it. Without a camera, own up with a tap.
+// The score is kept per conversation on this device, so a reload doesn't wipe it.
+const scoreKey = (id) => `kindred.nosmile.${id}`;
+function readScore(id) {
+  try {
+    const s = JSON.parse(localStorage.getItem(scoreKey(id)) || 'null');
+    return { mine: Number(s?.mine) || 0, theirs: Number(s?.theirs) || 0 };
+  } catch {
+    return { mine: 0, theirs: 0 };
+  }
+}
+
 export default function NoSmile({ conversationId, socket, solo = false }) {
-  const [mine, setMine] = useState(0); // times I smiled (their points)
-  const [theirs, setTheirs] = useState(0); // times they smiled (my points)
+  const [mine, setMine] = useState(() => (solo ? 0 : readScore(conversationId).mine)); // times I smiled (their points)
+  const [theirs, setTheirs] = useState(() => (solo ? 0 : readScore(conversationId).theirs)); // times they smiled (my points)
+  const [cooling, setCooling] = useState(false); // just counted: show it, so repeat taps don't look ignored
+  useEffect(() => {
+    if (solo) return;
+    try { localStorage.setItem(scoreKey(conversationId), JSON.stringify({ mine, theirs })); } catch { /* private mode */ }
+  }, [solo, conversationId, mine, theirs]);
   const [camera, setCamera] = useState('off'); // off | loading | on | error
   const [cameraError, setCameraError] = useState('');
   const [live, setLive] = useState(null); // current smile score, for the meter
@@ -21,6 +37,8 @@ export default function NoSmile({ conversationId, socket, solo = false }) {
     if (t - lastSmile.current < COOLDOWN_MS) return;
     lastSmile.current = t;
     setMine((n) => n + 1);
+    setCooling(true);
+    setTimeout(() => setCooling(false), COOLDOWN_MS);
     if (!solo) socket.send({ type: 'game', conversationId, kind: 'smiled' });
     hype({ kind: 'cracked' });
   };
@@ -111,7 +129,7 @@ export default function NoSmile({ conversationId, socket, solo = false }) {
           {camera === 'on' && <button className="link" onClick={stopCamera}>Turn camera off</button>}
         </div>
         {!watching && <button className="btn" onClick={startCamera}>Use my camera</button>}
-        <button className="btn" onClick={smiled}>I smiled 😬</button>
+        <button className="btn" onClick={smiled} disabled={cooling}>{cooling ? 'Counted ✓' : 'I smiled 😬'}</button>
       </div>
       {cameraError && <p className="hint">{cameraError}</p>}
     </section>

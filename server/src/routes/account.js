@@ -36,6 +36,8 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
   app.post('/api/support', member, authLimiter, asyncRoute(async (req, res) => {
     const topic = SUPPORT_TOPICS.includes(req.body.topic) ? req.body.topic : 'other';
     const message = str(req.body.message, 'message', 2000);
+    // "x" or "?" leaves a moderator nothing to act on.
+    if (message.replace(/\s/g, '').length < 5) throw httpError(400, 'Tell us a little more: a sentence is plenty.');
     if (!(await store.createSupportRequest(req.user.id, topic, message))) {
       throw httpError(429, "You have a few requests waiting already. We'll get back to you soon.");
     }

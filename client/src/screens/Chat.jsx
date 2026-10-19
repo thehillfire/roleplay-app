@@ -119,7 +119,10 @@ export default function Chat({ id, socket, unreadElsewhere = 0, onBack, onLeft, 
       typingTimer.current = setTimeout(() => setPartnerTyping(false), 4000);
     });
     const offEnded = socket.on('conversation.ended', ({ conversationId, reason }) => {
-      if (conversationId === id) setEnded(reason || 'ended');
+      if (conversationId !== id) return;
+      setEnded(reason || 'ended');
+      // Whoever ended it (blocked, left, paused) shouldn't keep showing as online here.
+      setConvo((c) => (c ? { ...c, partner: { ...c.partner, online: false } } : c));
     });
     const offReacted = socket.on('message.reacted', ({ conversationId, messageId, reaction }) => {
       if (conversationId !== id) return;
@@ -481,10 +484,10 @@ export default function Chat({ id, socket, unreadElsewhere = 0, onBack, onLeft, 
               )}
               <time dateTime={new Date(m.createdAt).toISOString()}>
                 {formatTime(m.createdAt)}{m.id === seenId && ' · Seen'}
-                {!m.fromMe && m.status === 'delivered' && (
+                {!ended && !m.fromMe && m.status === 'delivered' && (
                   <span className="msg-actions"> · <button className="link unsend" aria-expanded={reactingTo === m.id} onClick={() => setReactingTo(reactingTo === m.id ? null : m.id)}>React</button></span>
                 )}
-                {m.fromMe && m.status === 'delivered' && now - m.createdAt < UNSEND_WINDOW_MS - 5000 && (
+                {!ended && m.fromMe && m.status === 'delivered' && now - m.createdAt < UNSEND_WINDOW_MS - 5000 && (
                   <span className="msg-actions"> · <button className="link unsend" onClick={() => unsend(m.id)}>Unsend</button></span>
                 )}
               </time>

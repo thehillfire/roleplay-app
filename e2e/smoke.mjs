@@ -271,6 +271,8 @@ await bob.getByRole('button', { name: 'Report and block' }).click();
 await bob.locator('.notice', { hasText: 'was reported and blocked' }).waitFor();
 assert.equal(await bob.locator('.convo').count(), 0);
 await alice.getByText('This conversation has ended.').waitFor();
+assert.equal(await alice.locator('.chat-who small', { hasText: /online/i }).count(), 0, 'the blocker no longer shows as online');
+assert.equal(await alice.getByRole('button', { name: 'Unsend' }).count(), 0, 'nothing to unsend in an ended chat');
 step('report blocks and ends the chat for both');
 
 // Moderator (MOD_EMAIL must be in the server's ADMIN_EMAILS, and MAIL_LOG must point at the

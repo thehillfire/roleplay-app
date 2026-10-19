@@ -646,3 +646,43 @@ input::placeholder, textarea::placeholder { color: #7d7a8e; }
   .strike-stage { animation: strike-out 0.1s 1s ease-in forwards !important; }
   .strike-slash { transform: skewY(-9deg) scaleX(1) !important; animation: strike-out 0.1s 1s ease-in forwards !important; }
 }
+
+/* --- QA round 4 fixes --- */
+/* Your color fits a 320px screen. */
+.swatches { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.swatch { min-width: 0; padding: 10px 8px; }
+@media (max-width: 340px) { .swatches { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Rush (pink) needs a brighter tone for small text on dark, and darker ink on its own bubbles. */
+:root[data-accent="rush"] { --accent: #ff6aaa; }
+.bubble.me time, .bubble.me .link.unsend { opacity: 0.85; }
+/* Tap targets: at least ~44px tall for small text buttons and links. */
+.link, .back, .icon-btn, .chip, .reaction-picker button, .menu-wrap > .icon-btn { min-height: 44px; }
+.icon-btn { min-width: 44px; }
+.link.unsend { min-height: 32px; padding: 6px 4px; }
+.chip { display: inline-flex; align-items: center; }
+.connect-banner .link { padding: 0 6px; }
+/* The Connect banner takes less of a small screen until it's answered. */
+.connect-banner { padding: 10px 12px; }
+.connect-banner p { font-size: 14px; line-height: 1.4; }
+/* Short screens (phones in landscape): game panels shrink so the chat stays usable. */
+@media (max-height: 480px) {
+  .game-panel { padding: 8px 12px; gap: 4px; max-height: 38vh; overflow-y: auto; }
+  .game-card { font-size: 14px; line-height: 1.35; }
+  .game-panel .hint { display: none; }
+  .selfcam video { width: 64px; height: 48px; }
+  .connect-banner p { font-size: 13px; }
+}
+/* First load while the server can't be reached. */
+.boot-offline { position: fixed; left: 16px; right: 16px; bottom: max(32px, env(safe-area-inset-bottom)); z-index: 2; margin: 0; text-align: center; color: var(--muted); font-size: 15px; }
+/* Moderator screen: stats fold away; every tab visible (wrapping, never half cut off). */
+.stats-fold summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-family: var(--label); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.stats-fold[open] summary { margin-bottom: 8px; }
+.moderate .tabs { flex-wrap: wrap; overflow-x: visible; }
+.moderate .tabs .tab { flex: 1 1 auto; }
+@media (max-height: 480px) {
+  .nosmile .game-card { display: none; } /* the rules are in the header tag; the row below is what matters */
+  .game-actions { flex-wrap: nowrap; }
+  .selfcam { flex: 1 1 auto; flex-wrap: nowrap; }
+  .selfcam .hint { display: none; }
+  .game-panel { max-height: none; }
+}

@@ -16,7 +16,7 @@ import Legal from './screens/Legal.jsx';
 import ResetPassword from './screens/ResetPassword.jsx';
 import { disablePushOnThisDevice, enablePush, pushDismissed, pushSupported, syncPush } from './notifications.js';
 
-function Paused({ onSignOut, onCheck }) {
+function Paused({ onSignOut, onCheck, onOpenLegal }) {
   const [appeal, setAppeal] = useState(undefined);
   const [text, setText] = useState('');
   const [error, setError] = useState('');
@@ -78,6 +78,7 @@ function Paused({ onSignOut, onCheck }) {
           <button className="btn primary" type="submit" disabled={!text.trim()}>Send to moderators</button>
         </form>
       )}
+      <p className="fine">Pauses follow our <button className="link" onClick={() => onOpenLegal('terms')}>community rules</button>.</p>
       <button className="btn" onClick={onSignOut}>Sign out</button>
     </main>
   );
@@ -405,8 +406,23 @@ export default function App() {
   // The live connection was refused or keeps failing: find out whether the session or account changed.
   const checkSession = refreshMeQuietly;
 
+  // First load: only the server saying "nobody is signed in" means signed out. A failed request
+  // (offline, server waking up) keeps the loader up and tries again, instead of showing the
+  // landing page to someone who is signed in.
+  const [unreachable, setUnreachable] = useState(false);
   useEffect(() => {
-    refreshMe().catch(() => setUser(null));
+    let timer;
+    let stopped = false;
+    const attempt = () => refreshMe().then(() => setUnreachable(false), (err) => {
+      if (stopped) return;
+      if (err.status) { setUser(null); return; } // the server answered
+      setUnreachable(true);
+      timer = setTimeout(attempt, 4000);
+    });
+    attempt();
+    const onOnline = () => { clearTimeout(timer); attempt(); };
+    window.addEventListener('online', onOnline);
+    return () => { stopped = true; clearTimeout(timer); window.removeEventListener('online', onOnline); };
   }, [refreshMe]);
 
   // A 401 from any request means this session is gone: show sign-in with a word about why.
@@ -467,7 +483,10 @@ export default function App() {
           : 'Email confirmed. Thank you!');
         refreshMe().catch(() => {});
       },
-      (err) => setVerifyNotice(err.message),
+      (err) => {
+        setVerifyNotice(err.message);
+        setWelcomeMode('verify'); // signed out: say so on the sign-in screen instead of a bare landing page
+      },
     );
   }, [refreshMe]);
 
@@ -505,9 +524,10 @@ export default function App() {
         />
       )}
       <div hidden={Boolean(legal) || resetToken !== null}>
-      {booting && <Loader />}
-      {!booting && user === null && <Welcome key={welcomeMode || 'landing'} initialMode={welcomeMode === 'forgot' ? 'forgot' : welcomeMode === 'expired' ? 'login' : arrival.socialNotice ? (arrival.tab === 'signup' ? 'signup' : 'login') : null} farewell={welcomeMode === 'deleted'} notice={welcomeMode === 'expired' ? 'You were signed out. Sign in again to carry on.' : arrival.socialNotice || ''} onSignedIn={(u, meta) => { setEntry(meta?.isNew ? 'new' : 'back'); refreshMe().catch(() => setUser(u)); }} onOpenLegal={openLegal} captchaSiteKey={captchaSiteKey} social={social} />}
-      {!booting && user && user.status !== 'active' && <Paused onSignOut={signOut} onCheck={refreshMeQuietly} />}
+      {booting && <Loader label={unreachable ? "Can't reach Kindred. Trying again…" : undefined} />}
+      {booting && unreachable && <p className="boot-offline" role="status">Can't reach Kindred right now. We'll keep trying.</p>}
+      {!booting && user === null && <Welcome key={welcomeMode || 'landing'} initialMode={welcomeMode === 'forgot' ? 'forgot' : welcomeMode === 'expired' || welcomeMode === 'verify' ? 'login' : arrival.socialNotice ? (arrival.tab === 'signup' ? 'signup' : 'login') : null} farewell={welcomeMode === 'deleted'} notice={welcomeMode === 'expired' ? 'You were signed out. Sign in again to carry on.' : welcomeMode === 'verify' ? `${verifyNotice} Sign in to send a new confirmation link.` : arrival.socialNotice || ''} onSignedIn={(u, meta) => { setEntry(meta?.isNew ? 'new' : 'back'); refreshMe().catch(() => setUser(u)); }} onOpenLegal={openLegal} captchaSiteKey={captchaSiteKey} social={social} />}
+      {!booting && user && user.status !== 'active' && <Paused onSignOut={signOut} onCheck={refreshMeQuietly} onOpenLegal={openLegal} />}
       {!booting && user && user.status === 'active' && (
         <Signedin
           key={user.id}

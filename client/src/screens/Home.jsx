@@ -38,7 +38,12 @@ export function timeAgo(ts) {
 export default function Home({ user, conversations, listError, onRetry, onFind, onOpen, onAccount, connection, notice, onDismissNotice, onModerate, askPush, onEnablePush, onDismissPush, presence, ads }) {
   const [mode, setMode] = useState('talk');
   const [role, setRole] = useState('talk');
-  const [topic, setTopic] = useState('');
+  // The topic survives a cancelled search (Home remounts when you come back).
+  const [topic, setTopicState] = useState(() => { try { return sessionStorage.getItem('kindred.topic') || ''; } catch { return ''; } });
+  const setTopic = (t) => {
+    setTopicState(t);
+    try { sessionStorage.setItem('kindred.topic', t); } catch { /* private mode */ }
+  };
   const talking = mode === 'talk';
   const [onboarding, setOnboarding] = useState(shouldOnboard);
 
