@@ -43,6 +43,20 @@ services:
         sync: false
       - key: TURNSTILE_SECRET_KEY
         sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: APPLE_CLIENT_ID
+        sync: false
+      - key: APPLE_TEAM_ID
+        sync: false
+      - key: APPLE_KEY_ID
+        sync: false
+      - key: APPLE_PRIVATE_KEY
+        sync: false
+      - key: SOCIAL_PREVIEW
+        sync: false
       - key: ANDROID_PACKAGE_NAME
         sync: false
       - key: ANDROID_CERT_SHA256

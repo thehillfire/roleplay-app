@@ -2,9 +2,12 @@
 const crypto = require('crypto');
 const { hashPassword, verifyPassword, hashToken, deviceHash } = require('../auth');
 const { parseCredentials, badRequest } = require('../validate');
-const { httpError, asyncRoute, publicUser, RESET_TTL_MS, VERIFY_TTL_MS, PLUS_MONTHLY_CREDITS } = require('./common');
+const { httpError, asyncRoute, publicUser, RESET_TTL_MS, PLUS_MONTHLY_CREDITS } = require('./common');
+const { createSignup } = require('./signup');
 
-module.exports = function register(app, { store, hub, auth, payments, push, mailer, captcha, emailCooldownMs, ads, adminEmails, authLimiter, member, siteUrl }) {
+const SOCIAL_PROVIDERS = [{ id: 'google', label: 'Google' }, { id: 'apple', label: 'Apple' }];
+
+module.exports = function register(app, { store, hub, auth, payments, push, mailer, captcha, social, socialPreview, emailCooldownMs, ads, adminEmails, authLimiter, member, siteUrl }) {
   // Failed logins per account, whatever IPs they come from (slow down distributed guessing).
   const failedLogins = new Map(); // email -> { count, resetAt }
   const LOGIN_FAILS = { max: 10, windowMs: 15 * 60 * 1000 };
@@ -30,19 +33,7 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
       e.count += 1;
     }
   };
-  // Emails a confirmation link. Moderator rights (ADMIN_EMAILS) need a confirmed inbox, so
-  // registering someone else's address first gets you nothing.
-  const sendVerification = async (req, user) => {
-    const base = siteUrl(req);
-    if (!base) return;
-    const token = crypto.randomBytes(32).toString('base64url');
-    await store.createEmailVerification(hashToken(token), user.id, VERIFY_TTL_MS);
-    mailer.send({
-      to: user.email,
-      subject: 'Confirm your email for Kindred',
-      text: `Welcome to Kindred, ${user.handle}.\n\nConfirm this is your email so you can reset your password if you ever forget it:\n${base}/verify#${token}\n\nIf you didn't sign up, ignore this email.`,
-    }).catch((err) => console.error('verification email failed', err.message));
-  };
+  const { sendVerification, finish: finishSignup } = createSignup({ store, auth, mailer, siteUrl });
   // Moderator rights for ADMIN_EMAILS are granted only when a password reset completes: that
   // proves the inbox AND replaces a password a squatter may have chosen, and it signs out every
   // other session. (Confirming the email isn't enough: someone could register the owner's
@@ -93,25 +84,8 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
       }
       throw httpError(409, 'An account with that email already exists.');
     }
-    const device = deviceHash(req, res);
-    const banReason = await store.deviceBanReason(device);
-    await store.noteDevice(user.id, device);
-    let created = user;
-    if (banReason) {
-      // Same browser as a suspended account, or as an under-18 signup that was turned away:
-      // a moderator takes a look first (they can appeal).
-      await store.setUserStatus(user.id, 'review');
-      await store.logModAction({ targetId: user.id, action: 'auto_pause', detail: banReason === 'suspended' ? 'Signed up on the device of a suspended account' : 'Signed up on a device that was refused as under 18' });
-      created = { ...user, status: 'review' };
-      store.moderatorEmails().then((emails) => Promise.all(emails.map((to) => mailer.send({
-        to,
-        subject: banReason === 'suspended' ? '[Kindred] Possible ban evasion paused' : '[Kindred] Possible minor paused',
-        text: `A new account (${user.handle}) signed up on a device ${banReason === 'suspended' ? 'used by a suspended account' : 'where an under-18 signup was just refused'} and was paused for review. Look it up under Moderate → Look up.`,
-      })))).catch((err) => console.error('evasion alert failed', err.message));
-    }
-    await sendVerification(req, user);
-    await auth.startSession(req, res, user.id);
-    res.status(201).json({ user: publicUser(created) });
+    const created = await finishSignup(req, res, user);
+    res.status(201).json({ user: created });
   }));
 
   app.post('/api/auth/login', authLimiter, asyncRoute(async (req, res) => {
@@ -196,10 +170,18 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
     // Sessions from before device tracking pick it up here (and it keeps last_seen fresh).
     if (req.user) await store.noteDevice(req.user.id, deviceHash(req, res));
     res.json({
-      user: req.user ? { ...publicUser(req.user), helped: await store.helpedCount(req.user.id) } : null,
+      user: req.user
+        ? {
+          ...publicUser(req.user),
+          helped: await store.helpedCount(req.user.id),
+          // How this person signs in: decides whether deleting the account asks for a password or a provider.
+          signIn: { hasPassword: await store.hasPassword(req.user.id), providers: await store.identityProviders(req.user.id) },
+        }
+        : null,
       billing: { enabled: payments.enabled, priceCents: payments.priceCents, plusPriceCents: payments.plusPriceCents, plusCredits: PLUS_MONTHLY_CREDITS, currency: payments.currency },
       push: { publicKey: push.publicKey },
       captcha: { siteKey: captcha.siteKey },
+      social: { providers: social.list(), soon: socialPreview ? SOCIAL_PROVIDERS.filter((p) => !social.has(p.id)) : [] },
       ads,
     });
   }));

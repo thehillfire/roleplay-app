@@ -52,6 +52,28 @@ Anonymous chat apps attract spam bots. Kindred supports Cloudflare Turnstile at 
 
 The signup form then shows the check, the server verifies every token, and the Content Security Policy opens for `challenges.cloudflare.com` only. If Cloudflare can't be reached, signups are let through and a warning is logged.
 
+## Sign in with Google / Apple
+
+Each provider switches on when its keys are set; with none set, the buttons don't appear. `PUBLIC_URL` must be set too, because the provider sends people back to `PUBLIC_URL/auth/callback/<provider>`.
+
+**Google** (free)
+1. In [Google Cloud Console](https://console.cloud.google.com), create a project, then **APIs & Services → OAuth consent screen** (External; app name Kindred; your support email).
+2. **Credentials → Create credentials → OAuth client ID → Web application.** Under **Authorised redirect URIs** add `https://YOUR-SITE/auth/callback/google` (exactly; it must match `PUBLIC_URL`).
+3. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. While the consent screen is in *Testing*, only test users you add can sign in; **Publish app** when you're ready (email-only scopes need no review).
+
+**Apple** (needs the paid Apple Developer Program, $99/year)
+1. Create an **App ID** with Sign in with Apple, then a **Services ID** (this is `APPLE_CLIENT_ID`). Under it, add your domain and the return URL `https://YOUR-SITE/auth/callback/apple`.
+2. Create a **Key** with Sign in with Apple and download the `.p8` once.
+3. Set `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` (the `.p8` text; `\n` for line breaks is fine).
+
+Kindred only ever stores the provider's account id and the verified email; never a name, photo or token. Rules the code enforces:
+- **18+ still applies.** A new account sends its birthdate and agreement before leaving for the provider; an under-18 answer is refused and the device flagged, exactly like email sign-up.
+- **No merging.** If the email already belongs to an account, the person is told to sign in with their password. Nothing is linked automatically.
+- **No moderator rights from a provider sign-in.** `ADMIN_EMAILS` are still only granted after a password reset.
+- **Deleting an account without a password** asks the person to confirm with the provider again first.
+
+`SOCIAL_PREVIEW=1` shows the providers that aren't set up yet as disabled "coming soon" buttons, to preview the layout. Leave it unset for real users. Not verified against the real Google and Apple services (they can't be reached from the test environment): the browser test `e2e/social.mjs` drives the whole flow against a fake provider, so the first real sign-in is the one thing left to try by hand.
+
 ## Payments (Connect)
 
 1. Create a Stripe account and copy the **secret key** into `STRIPE_SECRET_KEY`.

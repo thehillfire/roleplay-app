@@ -8,6 +8,7 @@ const { createPayments } = require('./payments');
 const { createPush } = require('./push');
 const { createMailer } = require('./mailer');
 const { createCaptcha } = require('./captcha');
+const { createSocial } = require('./social');
 const { createErrorAlerts } = require('./alerts');
 const { envInt } = require('./env');
 
@@ -15,6 +16,7 @@ const { AUTO_PAUSE, createRateLimiter, httpError, asyncRoute } = require('./rout
 const routes = {
   webhook: require('./routes/webhook'),
   auth: require('./routes/auth'),
+  social: require('./routes/social'),
   account: require('./routes/account'),
   billing: require('./routes/billing'),
   conversations: require('./routes/conversations'),
@@ -35,6 +37,10 @@ function createApp({
   push = createPush(),
   mailer = createMailer(),
   captcha = createCaptcha(),
+  // "Continue with Google/Apple": each provider is on only when its keys are set.
+  social = createSocial(),
+  // Shows the not-yet-configured providers as disabled buttons, so the layout can be previewed.
+  socialPreview = process.env.SOCIAL_PREVIEW === '1',
   errorAlerts = createErrorAlerts(),
   trustProxy = envInt('TRUST_PROXY', 1),
   emailCooldownMs = 2 * 60 * 1000, // per address, for reset/confirmation emails
@@ -150,8 +156,9 @@ function createApp({
   // Rough live numbers for the home screen ("12 people here now").
   app.get('/api/presence', member, (req, res) => res.json(hub.stats()));
 
-  const ctx = { store, hub, auth, payments, classifier, push, mailer, captcha, emailCooldownMs, ads, adminEmails, autoPauseMinReporterAgeMs, authLimiter, messageLimiter, member, siteUrl, conversation };
+  const ctx = { store, hub, auth, payments, classifier, push, mailer, captcha, social, socialPreview, emailCooldownMs, ads, adminEmails, autoPauseMinReporterAgeMs, authLimiter, messageLimiter, member, siteUrl, conversation };
   routes.auth(app, ctx);
+  routes.social(app, ctx);
   routes.account(app, ctx);
   routes.billing(app, ctx);
   routes.conversations(app, ctx);

@@ -6,7 +6,7 @@ const { httpError, asyncRoute } = require('./common');
 const APPEAL_WAIT_MS = 7 * 24 * 60 * 60 * 1000;
 const SUPPORT_TOPICS = ['account', 'billing', 'safety', 'feedback', 'other'];
 
-module.exports = function register(app, { store, hub, auth, payments, push, mailer, siteUrl, authLimiter, member }) {
+module.exports = function register(app, { store, hub, auth, payments, push, mailer, social, siteUrl, authLimiter, member }) {
   // Moderators hear about new support requests at most once an hour (topic only, never the text).
   let lastSupportAlert = 0;
   const alertSupport = async (req, topic) => {
@@ -76,8 +76,13 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
 
   app.post('/api/account/delete', auth.requireUser, authLimiter, asyncRoute(async (req, res) => {
     const found = await store.findUserByEmail(req.user.email);
-    if (typeof req.body.password !== 'string' || !(await verifyPassword(req.body.password, found?.passwordHash))) {
-      throw httpError(401, 'Password is incorrect.');
+    if (String(found?.passwordHash || '').startsWith('scrypt$')) {
+      if (typeof req.body.password !== 'string' || !(await verifyPassword(req.body.password, found.passwordHash))) {
+        throw httpError(401, 'Password is incorrect.');
+      }
+    } else if (!social.consumeReauth(req.user.id)) {
+      // No password to ask for (the account signs in through Google or Apple): they confirm with the provider.
+      throw httpError(401, 'Confirm with your sign-in provider first, then try again.');
     }
     // Stop Plus billing first: a deleted account can't reach the portal to cancel.
     if (req.user.plusSubscriptionId && payments.enabled) {

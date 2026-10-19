@@ -320,6 +320,18 @@ const MIGRATIONS = [
   [
     "ALTER TABLE conversations ADD COLUMN mode TEXT NOT NULL DEFAULT 'talk'",
   ],
+  // 30: "Continue with Google/Apple": which provider account signs in to which user. Only the
+  // provider's stable id (`subject`) is kept: no name, photo or token.
+  [
+    `CREATE TABLE IF NOT EXISTS oauth_identities (
+      provider TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at BIGINT NOT NULL,
+      PRIMARY KEY (provider, subject)
+    )`,
+    'CREATE INDEX IF NOT EXISTS oauth_identities_user_idx ON oauth_identities(user_id)',
+  ],
 ];
 
 async function migrate(db) {

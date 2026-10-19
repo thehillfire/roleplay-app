@@ -52,14 +52,18 @@ function parseCredentials(body = {}, { signup, today } = {}) {
     throw badRequest('That password is too easy to guess. Try a few words that mean something to you.');
   }
   const out = { email, password: body.password };
-  if (signup) {
-    const age = ageOn(body.birthdate, today);
-    if (!Number.isFinite(age) || age > 120 || age < 0) throw badRequest('Enter a valid birthdate');
-    if (age < MIN_AGE) throw Object.assign(new Error(`Kindred is for adults ${MIN_AGE} and over.`), { status: 403, expose: true, underage: true });
-    if (body.agree !== true) throw badRequest('Please agree to the community guidelines');
-    out.birthdate = body.birthdate;
-  }
+  if (signup) out.birthdate = parseAdult(body, { today });
   return out;
+}
+
+// The 18+ gate every new account passes, however it signs up (email or "Continue with Google").
+// Returns the birthdate; an under-18 answer carries `underage` so the caller can flag the device.
+function parseAdult(body = {}, { today } = {}) {
+  const age = ageOn(body.birthdate, today);
+  if (!Number.isFinite(age) || age > 120 || age < 0) throw badRequest('Enter a valid birthdate');
+  if (age < MIN_AGE) throw Object.assign(new Error(`Kindred is for adults ${MIN_AGE} and over.`), { status: 403, expose: true, underage: true });
+  if (body.agree !== true) throw badRequest('Please agree to the community guidelines');
+  return body.birthdate;
 }
 
 function parseMessageBody(value) {
@@ -71,4 +75,4 @@ function parseMessageBody(value) {
   return body;
 }
 
-module.exports = { MIN_AGE, MAX_MESSAGE, badRequest, str, ageOn, parseCredentials, parseMessageBody };
+module.exports = { MIN_AGE, MAX_MESSAGE, badRequest, str, ageOn, parseCredentials, parseAdult, parseMessageBody };

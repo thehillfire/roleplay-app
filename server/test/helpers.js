@@ -6,7 +6,7 @@ const { boot } = require('../src/boot');
 async function start(options = {}) {
   const url = process.env.TEST_DATABASE_URL || '';
   const built = await boot({ db: { url, sqliteFile: ':memory:' }, realtime: { sweepMs: 50, ...options.realtime }, ...options });
-  if (url) await built.db.query('TRUNCATE users, sessions, conversations, messages, blocks, reports, connections, payments, push_subscriptions, feedback, password_resets, email_verifications, checkins, mod_actions, appeals, support_requests, user_devices, banned_devices, bottles, connect_asks CASCADE');
+  if (url) await built.db.query('TRUNCATE users, sessions, conversations, messages, blocks, reports, connections, payments, push_subscriptions, feedback, password_resets, email_verifications, checkins, mod_actions, appeals, support_requests, user_devices, banned_devices, bottles, connect_asks, oauth_identities CASCADE');
   const server = built.listen(0);
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -29,6 +29,11 @@ function client(base, device) {
       headers: { 'Content-Type': 'application/json', ...(jar.size ? { Cookie: cookie() } : {}) },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    absorb(res);
+    const set = res.headers.get('set-cookie');
+    return { status: res.status, body: await res.json(), setCookie: set };
+  };
+  const absorb = (res) => {
     for (const c of res.headers.getSetCookie()) {
       const [pair] = c.split(';');
       const [name, ...rest] = pair.split('=');
@@ -36,8 +41,20 @@ function client(base, device) {
       if (value) jar.set(name, value);
       else jar.delete(name);
     }
-    const set = res.headers.get('set-cookie');
-    return { status: res.status, body: await res.json(), setCookie: set };
+  };
+  // For endpoints that answer with a redirect instead of JSON (the Google/Apple callback). Doesn't follow it.
+  api.raw = async (method, path, { form, body } = {}) => {
+    const res = await fetch(`${base}${path}`, {
+      method,
+      redirect: 'manual',
+      headers: {
+        ...(form ? { 'Content-Type': 'application/x-www-form-urlencoded' } : body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(jar.size ? { Cookie: cookie() } : {}),
+      },
+      body: form ? new URLSearchParams(form) : body === undefined ? undefined : JSON.stringify(body),
+    });
+    absorb(res);
+    return { status: res.status, location: res.headers.get('location'), setCookies: res.headers.getSetCookie() };
   };
   // Same browser, new person: keeps the device cookie, drops the session.
   api.device = () => jar.get('kd_dev');

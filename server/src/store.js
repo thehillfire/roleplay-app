@@ -92,6 +92,33 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       return rows[0] ? { ...userFromRow(rows[0]), passwordHash: rows[0].password_hash } : null;
     },
 
+    // --- social sign-in (Google, Apple) ---
+
+    async findUserByIdentity(provider, subject) {
+      const { rows } = await db.query(
+        'SELECT u.* FROM oauth_identities i JOIN users u ON u.id = i.user_id WHERE i.provider = $1 AND i.subject = $2',
+        [provider, subject],
+      );
+      return userFromRow(rows[0]);
+    },
+
+    async addIdentity(userId, provider, subject) {
+      await db.query(
+        'INSERT INTO oauth_identities (provider, subject, user_id, created_at) VALUES ($1, $2, $3, $4)',
+        [provider, subject, userId, now()],
+      );
+    },
+
+    async identityProviders(userId) {
+      const { rows } = await db.query('SELECT provider FROM oauth_identities WHERE user_id = $1 ORDER BY provider', [userId]);
+      return rows.map((r) => r.provider);
+    },
+
+    async hasPassword(userId) {
+      const { rows } = await db.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+      return String(rows[0]?.password_hash || '').startsWith('scrypt$');
+    },
+
     // Coarse age band used only for matching preference: '18-24' | '25-34' | '35-49' | '50+'.
     async ageBand(userId) {
       const { rows } = await db.query('SELECT birthdate FROM users WHERE id = $1', [userId]);
@@ -808,6 +835,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       await db.query('DELETE FROM push_subscriptions WHERE user_id = $1', [userId]);
       await db.query('DELETE FROM password_resets WHERE user_id = $1', [userId]);
       await db.query('DELETE FROM email_verifications WHERE user_id = $1', [userId]);
+      await db.query('DELETE FROM oauth_identities WHERE user_id = $1', [userId]); // so the same Google account can start fresh
       await db.query('DELETE FROM checkins WHERE user_id = $1', [userId]); // private, no safety value
       await db.query('UPDATE feedback SET note = NULL WHERE rater_id = $1', [userId]); // words they wrote
       await db.query("UPDATE bottles SET status = 'withdrawn' WHERE user_id = $1 AND status = 'open'", [userId]);
