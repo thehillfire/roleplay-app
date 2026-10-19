@@ -603,7 +603,9 @@ input::placeholder, textarea::placeholder { color: #7d7a8e; }
 
 /* --- Strike: the full-screen "you're in" after signing in or signing up. --- */
 .strike { position: fixed; inset: 0; z-index: 70; pointer-events: none; overflow: hidden; background: #050409; display: grid; place-items: center; animation: strike-life 1.9s linear forwards; }
-@keyframes strike-life { 0% { opacity: 0; } 6% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
+/* The text and slash leave first (against the dark veil), then the veil lifts: two headlines are never on screen at once. */
+@keyframes strike-life { 0% { opacity: 0; } 5% { opacity: 1; } 84% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes strike-out { to { opacity: 0; } }
 .strike-flash { position: absolute; inset: 0; opacity: 0; background: radial-gradient(60vmax 60vmax at 50% 36%, #fffbe0, var(--accent) 45%, transparent 76%); animation: strike-flash 0.34s 0.22s ease-out both; }
 @keyframes strike-flash { 0% { opacity: 0; } 18% { opacity: 0.95; } 100% { opacity: 0; } }
 .strike-bolts { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -616,8 +618,8 @@ input::placeholder, textarea::placeholder { color: #7d7a8e; }
 .strike-bolts .b3 { animation-delay: 0.16s, 0.62s; }
 @keyframes strike-draw { to { stroke-dashoffset: 0; } }
 @keyframes strike-fade { to { opacity: 0; } }
-.strike-slash { position: absolute; left: -20%; right: -20%; top: 50%; height: 30vh; translate: 0 -50%; background: var(--accent); transform: skewY(-9deg) scaleX(0); transform-origin: left; animation: hype-slash 0.36s 0.42s cubic-bezier(0.7, 0, 0.2, 1) forwards; box-shadow: 0 0 90px var(--accent-glow); }
-.strike-stage { position: relative; display: grid; justify-items: center; gap: 6px; width: 100%; padding: 0 16px; animation: strike-shake 0.38s 0.24s linear both; }
+.strike-slash { position: absolute; left: -20%; right: -20%; top: 50%; height: 30vh; translate: 0 -50%; background: var(--accent); transform: skewY(-9deg) scaleX(0); transform-origin: left; animation: hype-slash 0.36s 0.42s cubic-bezier(0.7, 0, 0.2, 1) forwards, strike-out 0.14s 1.42s ease-in forwards; box-shadow: 0 0 90px var(--accent-glow); }
+.strike-stage { position: relative; display: grid; justify-items: center; gap: 6px; width: 100%; padding: 0 16px; animation: strike-shake 0.38s 0.24s linear both, strike-out 0.14s 1.42s ease-in forwards; }
 @keyframes strike-shake { 15% { translate: -7px 3px; } 30% { translate: 6px -4px; } 45% { translate: -4px -2px; } 60% { translate: 3px 3px; } 80% { translate: -2px 0; } }
 .strike-name { font-family: var(--display); font-size: clamp(20px, 6.4vw, 40px); text-transform: uppercase; color: var(--accent); background: var(--accent-ink); padding: 2px 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transform: skewX(-9deg); animation: hype-in-left 0.4s 0.6s cubic-bezier(0.2, 1.3, 0.4, 1) both; }
 .strike-title { font-family: var(--display); font-size: clamp(54px, 18vw, 110px); line-height: 0.9; text-transform: uppercase; color: var(--accent-ink); transform: skewX(-9deg); animation: hype-hit 0.42s 0.66s cubic-bezier(0.2, 1.7, 0.4, 1) both; }
@@ -640,6 +642,7 @@ input::placeholder, textarea::placeholder { color: #7d7a8e; }
   .boot-bar span { animation: none !important; width: 60%; transform: none; }
   .strike { animation: strike-life 1.4s linear forwards !important; }
   .strike-flash, .strike-bolts { display: none; }
-  .strike-stage, .strike-name, .strike-title { animation: none !important; }
-  .strike-slash { animation: none !important; transform: skewY(-9deg) scaleX(1) !important; }
+  .strike-name, .strike-title { animation: none !important; }
+  .strike-stage { animation: strike-out 0.1s 1s ease-in forwards !important; }
+  .strike-slash { transform: skewY(-9deg) scaleX(1) !important; animation: strike-out 0.1s 1s ease-in forwards !important; }
 }

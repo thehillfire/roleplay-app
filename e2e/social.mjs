@@ -100,6 +100,22 @@ async function axe(page, label) {
   assert.equal(serious.length, 0, `${label}: ${serious.map((v) => `${v.id} ${v.nodes.map((n) => n.target.join(' ')).join(',')}`).join('; ')}`);
 }
 
+// 0. Preview only (SOCIAL_PREVIEW, no keys): the buttons are visibly "coming soon", disabled, and don't give instructions for something unusable.
+{
+  const previewApp = await boot({ db: { sqliteFile: ':memory:' }, staticDir, social: createSocial({ providers: {}, log: { warn() {} } }), socialPreview: true });
+  const previewServer = previewApp.listen(0);
+  await new Promise((r) => previewServer.once('listening', r));
+  const page = await phone('preview');
+  await page.goto(`http://127.0.0.1:${previewServer.address().port}`);
+  await page.getByRole('button', { name: 'Get started' }).click();
+  for (const name of ['Google: coming soon', 'Apple: coming soon']) assert.equal(await page.getByRole('button', { name }).isDisabled(), true, name);
+  assert.equal(await page.getByText(/Enter your birthdate and agree above/).count(), 0, 'no instruction for buttons that cannot be used yet');
+  await page.context().close();
+  await new Promise((r) => previewServer.close(r));
+  await previewApp.db.close();
+  step('preview only: buttons say "coming soon", are disabled, and show no instruction');
+}
+
 // 1. Both screens show the button; sign-up keeps it off until the 18+ answers are in. Accessibility is clean with it live.
 {
   const page = await phone('a11y', { bypassCSP: true }); // (axe injects a script; the app's CSP rightly blocks that)

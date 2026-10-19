@@ -166,7 +166,7 @@ export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey, socia
   const socialBlock = showSocial && (
     <>
       <SocialButtons providers={social.providers} soon={social.soon} disabled={busy || (signup && !ageReady)} onPick={startSocial} />
-      {signup && !ageReady && <p className="hint">Enter your birthdate and agree above to continue with Google or Apple.</p>}
+      {signup && !ageReady && social.providers.length > 0 && <p className="hint">Enter your birthdate and agree above to continue with Google or Apple.</p>}
       <div className="or"><span>or use email</span></div>
     </>
   );
