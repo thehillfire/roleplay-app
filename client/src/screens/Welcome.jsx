@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
 import { api } from '../api.js';
 import Turnstile from '../components/Turnstile.jsx';
+import Bolt from '../components/Bolt.jsx';
+import SocialButtons from '../components/SocialButtons.jsx';
 
 const GUIDELINES = [
   'Be kind. People come here when things are hard.',
@@ -10,7 +12,7 @@ const GUIDELINES = [
   'If someone is in danger, point them to real help (call or text 988 in the US).',
 ];
 
-export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey, initialMode = null, farewell = false, notice = '' }) {
+export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey, social = { providers: [], soon: [] }, initialMode = null, farewell = false, notice = '' }) {
   const [mode, setMode] = useState(initialMode); // null | 'signup' | 'login' | 'forgot'
   const [sent, setSent] = useState(false);
   const [email, setEmail] = useState('');
@@ -68,11 +70,25 @@ export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey, initi
     setError('');
     try {
       const user = signup ? await api.signup({ email, password, birthdate, agree, captchaToken: captchaToken || undefined }) : await api.login(email, password);
-      onSignedIn(user);
+      onSignedIn(user, { isNew: signup });
     } catch (err) {
       setError(err.message);
       setBusy(false);
       if (signup && captchaSiteKey) setCaptchaRound((n) => n + 1); // tokens are single-use
+    }
+  };
+
+  // Off to Google/Apple and back. Signing up sends the birthdate and agreement along, so the 18+
+  // gate is the same as for email: it is checked before anyone leaves.
+  const startSocial = async (provider) => {
+    setBusy(true);
+    setError('');
+    try {
+      const { url } = await api.socialStart({ provider, mode: signup ? 'signup' : 'login', ...(signup ? { birthdate, agree } : {}) });
+      window.location.assign(url);
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
     }
   };
 
@@ -81,6 +97,7 @@ export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey, initi
       <main className="screen welcome">
         {farewell && <p className="notice" role="status">Your account was deleted. Take care of yourself, and you're welcome back any time.</p>}
         <header className="hero">
+          <Bolt className="hero-bolt" />
           <h1>Kindred</h1>
           <p className="tagline">Talk to someone. Nobody has to know.</p>
         </header>
@@ -105,6 +122,55 @@ export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey, initi
     );
   }
 
+  const emailFields = (
+    <>
+      <label>
+        <span>Email</span>
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+      </label>
+      <label>
+        <span>Password {signup && <em>(8+ characters)</em>}</span>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          minLength={signup ? 8 : undefined}
+          maxLength={200}
+          autoComplete={signup ? 'new-password' : 'current-password'}
+          required
+        />
+      </label>
+    </>
+  );
+  const ageFields = signup && (
+    <>
+      <label>
+        <span>Birthdate <em>(you must be 18+)</em></span>
+        <input type="date" value={birthdate} onChange={(e) => setBirthdate(e.target.value)} required />
+      </label>
+      <div className="guidelines">
+        <strong>Community guidelines</strong>
+        <ul>{GUIDELINES.map((g) => <li key={g}>{g}</li>)}</ul>
+      </div>
+      <label className="check">
+        <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} required />
+        <span>
+          I'm 18 or older and I agree to the guidelines, <button type="button" className="link" onClick={() => onOpenLegal('terms')}>terms</button> and{' '}
+          <button type="button" className="link" onClick={() => onOpenLegal('privacy')}>privacy policy</button>.
+        </span>
+      </label>
+    </>
+  );
+  const showSocial = social.providers.length + social.soon.length > 0;
+  const ageReady = Boolean(birthdate) && agree;
+  const socialBlock = showSocial && (
+    <>
+      <SocialButtons providers={social.providers} soon={social.soon} disabled={busy || (signup && !ageReady)} onPick={startSocial} />
+      {signup && !ageReady && <p className="hint">Enter your birthdate and agree above to continue with Google or Apple.</p>}
+      <div className="or"><span>or use email</span></div>
+    </>
+  );
+
   return (
     <main className="screen">
       <button className="back" onClick={() => { setMode(null); setError(''); }}>← Back</button>
@@ -114,43 +180,9 @@ export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey, initi
           <button type="button" role="tab" aria-selected={signup} className={signup ? 'tab active' : 'tab'} onClick={() => setMode('signup')}>Create account</button>
           <button type="button" role="tab" aria-selected={!signup} className={!signup ? 'tab active' : 'tab'} onClick={() => setMode('login')}>Sign in</button>
         </div>
-        {notice && !signup && <p className="notice" role="status">{notice}</p>}
+        {notice && <p className="notice" role="status">{notice}</p>}
         {signup && <p className="hint">Your email stays private. Everyone else only sees a random name like QuietHeron42.</p>}
-        <label>
-          <span>Email</span>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
-        </label>
-        <label>
-          <span>Password {signup && <em>(8+ characters)</em>}</span>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={signup ? 8 : undefined}
-            maxLength={200}
-            autoComplete={signup ? 'new-password' : 'current-password'}
-            required
-          />
-        </label>
-        {signup && (
-          <>
-            <label>
-              <span>Birthdate <em>(you must be 18+)</em></span>
-              <input type="date" value={birthdate} onChange={(e) => setBirthdate(e.target.value)} required />
-            </label>
-            <div className="guidelines">
-              <strong>Community guidelines</strong>
-              <ul>{GUIDELINES.map((g) => <li key={g}>{g}</li>)}</ul>
-            </div>
-            <label className="check">
-              <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} required />
-              <span>
-                I'm 18 or older and I agree to the guidelines, <button type="button" className="link" onClick={() => onOpenLegal('terms')}>terms</button> and{' '}
-                <button type="button" className="link" onClick={() => onOpenLegal('privacy')}>privacy policy</button>.
-              </span>
-            </label>
-          </>
-        )}
+        {signup && showSocial ? <>{ageFields}{socialBlock}{emailFields}</> : signup ? <>{emailFields}{ageFields}</> : <>{socialBlock}{emailFields}</>}
         {signup && captchaSiteKey && <Turnstile siteKey={captchaSiteKey} onToken={onCaptchaToken} resetKey={captchaRound} />}
         {error && <p className="form-error" role="alert">{error}</p>}
         {!signup && <button type="button" className="link forgot" onClick={() => { setMode('forgot'); setError(''); }}>Forgot password?</button>}

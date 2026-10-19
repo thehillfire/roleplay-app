@@ -5,7 +5,7 @@ import { ACCENTS, getAccent, setAccent } from '../accent.js';
 import { enablePush, pushBlocked, pushSupported } from '../notifications.js';
 import Support from '../components/Support.jsx';
 
-export default function Account({ user, billing, pushKey, onUserChanged, onBack, onSignOut, onSignOutEverywhere, onDeleted, onOpenLegal }) {
+export default function Account({ user, billing, pushKey, onUserChanged, onBack, onSignOut, onSignOutEverywhere, onDeleted, onOpenLegal, reauthDone = false }) {
   const [confirming, setConfirming] = useState(false);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -79,15 +79,34 @@ export default function Account({ user, billing, pushKey, onUserChanged, onBack,
     }
   };
 
+  // No password on this account (it signs in with Google or Apple): they confirm with that provider instead.
+  const noPassword = user.signIn?.hasPassword === false;
+  const provider = user.signIn?.providers?.[0];
+  const providerName = provider === 'apple' ? 'Apple' : 'Google';
+  const [confirmedAtProvider, setConfirmedAtProvider] = useState(reauthDone);
+
+  const confirmWithProvider = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const { url } = await api.socialStart({ provider, mode: 'reauth' });
+      window.location.assign(url);
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  };
+
   const remove = async (e) => {
     e.preventDefault();
     setBusy(true);
     setError('');
     try {
-      await api.deleteAccount(password);
+      await api.deleteAccount(noPassword ? undefined : password);
       onDeleted();
     } catch (err) {
       setError(err.message);
+      if (noPassword) setConfirmedAtProvider(false); // the confirmation is single-use and short-lived
       setBusy(false);
     }
   };
@@ -192,17 +211,25 @@ export default function Account({ user, billing, pushKey, onUserChanged, onBack,
         <button className="row link-row danger-text" onClick={() => setConfirming(true)}>Delete account</button>
       </section>
 
-      {confirming && (
+      {(confirming || (noPassword && confirmedAtProvider)) && (
         <form className="card form" onSubmit={remove} ref={(el) => { if (el && !el.dataset.shown) { el.dataset.shown = '1'; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.querySelector('input')?.focus({ preventScroll: true }); } }}>
           <p>Deleting removes your email, password and anything you revealed through Connect right away. People you talked to will see that you left.</p>
           <p className="hint">Messages and reports are kept for 90 days only so moderators can finish any safety review, then they're erased.</p>
-          <label>
-            <span>Enter your password to confirm</span>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
-          </label>
+          {noPassword ? (
+            confirmedAtProvider
+              ? <p role="status"><strong>Confirmed with {providerName}.</strong> You can delete now. This stays valid for a few minutes.</p>
+              : <p>This account signs in with {providerName}, so there's no password to type. Confirm with {providerName} first.</p>
+          ) : (
+            <label>
+              <span>Enter your password to confirm</span>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+            </label>
+          )}
           <div className="sheet-actions">
-            <button type="button" className="btn" onClick={() => { setConfirming(false); setPassword(''); }}>Keep my account</button>
-            <button type="submit" className="btn danger" disabled={busy || !password}>{busy ? 'Deleting…' : 'Delete forever'}</button>
+            <button type="button" className="btn" onClick={() => { setConfirming(false); setConfirmedAtProvider(false); setPassword(''); }}>Keep my account</button>
+            {noPassword && !confirmedAtProvider
+              ? <button type="button" className="btn primary" onClick={confirmWithProvider} disabled={busy}>{busy ? 'One moment…' : `Confirm with ${providerName}`}</button>
+              : <button type="submit" className="btn danger" disabled={busy || (!noPassword && !password)}>{busy ? 'Deleting…' : 'Delete forever'}</button>}
           </div>
         </form>
       )}

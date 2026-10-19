@@ -28,6 +28,9 @@ for _ in $(seq 1 50); do curl -fs "http://localhost:$PORT/api/health" > /dev/nul
 
 echo "▶ e2e"
 SHOTS_DIR="${SHOTS_DIR:-}" BASE_URL="http://localhost:$PORT" MOD_EMAIL=mod@e2e.test MAIL_LOG="$LOG" node e2e/smoke.mjs
+echo "▶ social sign-in (real browser, fake Google)"
+NODE_ENV=test CHROMIUM_PATH="${CHROMIUM_PATH:-}" node --disable-warning=ExperimentalWarning e2e/social.mjs > "$TMP/social.log" 2>&1 || { tail -40 "$TMP/social.log"; exit 1; }
+grep -E '^(✓|SOCIAL)' "$TMP/social.log"
 echo "▶ accessibility"
 BASE_URL="http://localhost:$PORT" node e2e/a11y.mjs | tail -1
 echo "✅ all checks passed"

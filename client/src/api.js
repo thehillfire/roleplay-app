@@ -29,6 +29,7 @@ export const api = {
   verify: (token) => request('POST', '/api/auth/verify', { token }),
   resendVerification: () => request('POST', '/api/auth/resend-verification', {}),
   forgot: (email) => request('POST', '/api/auth/forgot', { email }),
+  socialStart: (body) => request('POST', '/api/auth/social/start', body),
   reset: (token, password) => request('POST', '/api/auth/reset', { token, password }),
 
   conversations: () => request('GET', '/api/conversations').then((d) => d.conversations),

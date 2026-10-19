@@ -10,7 +10,8 @@ Kindred: anonymous 1:1 texting with strangers, 18+ only. The owner is Jav.
 - **Game modes:** Cringe Duel (shared awkward-scenario cards) and Don't Smile (on-device smile check via MediaPipe; the camera never leaves the phone).
 - **Matching** only within the same mode. You can keep chatting with past matches. "Connect" (a mutual name reveal) is the paid feature.
 - **Strong moderation:** a screener (EN/ES), reports, held queue, appeals, device bans and a moderator screen.
-- **Look:** fighting-game HUD (2XKO-*inspired*, no Riot assets). Each person picks their color in Account (Volt, Ion, Rush, Blaze, Toxic, Void). Splashes on match, connect and thanks. Crisis and report screens stay calm on purpose.
+- **Sign-in:** email + password, or Continue with Google / Apple (each appears only when its keys are set; see `docs/DEPLOY.md`). Provider accounts stay anonymous: only the provider's account id and the verified email are kept, the 18+ gate still applies, and a provider account is never merged into an existing email account.
+- **Look:** fighting-game HUD (2XKO-*inspired*, no Riot assets). Animated loader (`Loader.jsx`), and a lightning "strike" after sign-in or sign-up (`Strike.jsx`; one flash only, still and short under reduced motion). Each person picks their color in Account (Volt, Ion, Rush, Blaze, Toxic, Void). Splashes on match, connect and thanks. Crisis and report screens stay calm on purpose.
 
 ## Stack
 
@@ -39,6 +40,10 @@ TEST_DATABASE_URL=postgres://postgres@localhost:5433/loreforge_test npm run test
 
 ## Where things stand right now
 
+0. **Social sign-in is built but dormant until keys exist.** Tested end to end against a fake Google (`e2e/social.mjs`, `server/test/social.test.js`); never run against the real Google or Apple, which the test environment can't reach. The first real sign-in must be tried by hand. Google needs only a free Cloud Console client ID. Apple needs the paid Developer Program. `SOCIAL_PREVIEW=1` shows the providers that aren't set up as disabled "coming soon" buttons.
+   - Single instance matters here too: in-progress sign-ins are held in memory (10 minutes), like matchmaking.
+   - Accounts that only sign in through a provider have no password. Deleting one asks them to confirm with the provider again first.
+
 1. **Not live anywhere yet. This is the top priority.** Jav is setting up **Render** from his phone:
    - Web Service, branch `ccr-2e9faa94-hbk5np`, Docker, Free plan.
    - Env: `NODE_ENV=production`, `ADMIN_EMAILS=<his email>`, then `PUBLIC_URL=<the onrender URL>`.
@@ -64,10 +69,18 @@ TEST_DATABASE_URL=postgres://postgres@localhost:5433/loreforge_test npm run test
 
 ## Known gaps / next ideas
 
+- **Game modes need two people at once.** On a quiet server a lone tester waits forever on the searching screen (it said nothing for 45 s, which looked like a black screen). After 6 s it now says so and offers a solo practice round and an invite link. Don't Smile's camera preview was a black box (stream attached to a different `<video>` than the one shown); fixed, and `e2e/smoke.mjs` now checks the preview really has the stream.
+- **Linking a provider to an existing account** from Account is not built (sign in with the password instead). Also not built: Discord/Microsoft; the provider table in `server/src/social.js` is where they'd go.
+
 - **Don't Smile:** detection is untested on a real face (CI uses a black fake camera). Add a round timer ("first to crack in 60s").
 - **More modes:** Hot Takes, Two Truths and a Lie. Add the id to `MODES` in `server/src/matchmaker.js` and `client/src/games.js`, plus a panel component.
 - **MediaPipe** pings `odml.pa.googleapis.com` with usage stats. The CSP blocks it on purpose, and e2e ignores that console line.
 - **Re-sign-in** lands on home, not the chat you were in.
+
+## Sandbox gotchas
+
+- `pkill -f <pattern>` kills your own shell if the command line contains the pattern (exit 144). `ss -p` can't show pids here: find a stale local server with `ps -eo pid,args | grep server/src/index.js` and kill by pid. A stale server also serves an old `index.html` that points at deleted asset hashes (a blank page): restart it after every build.
+- Outbound network is allow-listed, so the real Google/Apple/APIs can't be reached; use the fakes.
 
 ## Working with Jav
 

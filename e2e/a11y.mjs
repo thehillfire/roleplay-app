@@ -12,11 +12,13 @@ let failures = 0;
 let onboardingAudited = false;
 
 async function audit(page, name) {
+  // The loader and the sign-in strike are decorative and brief; audit the screen they cover, not the cover.
+  await page.locator('.boot, .strike').first().waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
   await page.waitForTimeout(400);
   await page.addScriptTag({ content: axeSource });
   // The match/connect splash is decorative (aria-hidden) and gone in under 2s; mid-animation it
   // would be measured against whatever is behind it, so the audit checks the screen under it.
-  const result = await page.evaluate(() => window.axe.run({ include: [document], exclude: [['.hype']] }, { resultTypes: ['violations'] }));
+  const result = await page.evaluate(() => window.axe.run({ include: [document], exclude: [['.hype'], ['.strike'], ['.boot']] }, { resultTypes: ['violations'] }));
   const serious = result.violations.filter((v) => ['serious', 'critical'].includes(v.impact));
   for (const v of result.violations) {
     console.log(`${serious.includes(v) ? '✗' : '·'} [${name}] ${v.impact} ${v.id}: ${v.help}`);

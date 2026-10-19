@@ -9,6 +9,8 @@ import Waiting from './screens/Waiting.jsx';
 import Chat from './screens/Chat.jsx';
 import Moderate from './screens/Moderate.jsx';
 import Practice from './screens/Practice.jsx';
+import Loader from './components/Loader.jsx';
+import Strike from './components/Strike.jsx';
 import Account from './screens/Account.jsx';
 import Legal from './screens/Legal.jsx';
 import ResetPassword from './screens/ResetPassword.jsx';
@@ -81,7 +83,7 @@ function Paused({ onSignOut, onCheck }) {
   );
 }
 
-function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere, onDeleted, onPaused, onRefreshMe, onCheckSession, onOpenLegal, initialNotice, externalNotice }) {
+function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere, onDeleted, onPaused, onRefreshMe, onCheckSession, onOpenLegal, initialNotice, externalNotice, reauthDone }) {
   // A reload mid-chat stays in the chat (the browser keeps history.state across reloads). Opening
   // the site afresh (typing the address, a link) starts at home even if the state survived.
   const restoreChat = () => {
@@ -112,6 +114,10 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
     window.history[replace ? 'replaceState' : 'pushState']({ view: next }, '');
     setView(next);
   }, []);
+  // Back from confirming with Google/Apple to delete an account: land on Account, where the delete button waits.
+  useEffect(() => {
+    if (reauthDone) navigate({ name: 'account' });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const goHome = useCallback(() => {
     if (window.history.state?.view && window.history.state.view.name !== 'home') window.history.back();
     else setView({ name: 'home' });
@@ -279,7 +285,7 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
       )}
       {view.name === 'moderate' && <Moderate onBack={goHome} />}
       {view.name === 'practice' && <Practice mode={view.mode} onBack={goHome} />}
-      {view.name === 'account' && <Account user={user} billing={billing} pushKey={pushKey} onUserChanged={onRefreshMe} onBack={goHome} onSignOut={onSignOut} onSignOutEverywhere={onSignOutEverywhere} onDeleted={onDeleted} onOpenLegal={onOpenLegal} />}
+      {view.name === 'account' && <Account user={user} billing={billing} pushKey={pushKey} onUserChanged={onRefreshMe} onBack={goHome} onSignOut={onSignOut} onSignOutEverywhere={onSignOutEverywhere} onDeleted={onDeleted} onOpenLegal={onOpenLegal} reauthDone={reauthDone} />}
       {view.name === 'waiting' && <Waiting
           onCancel={cancel}
           onPractice={findMode === 'talk' ? undefined : () => navigate({ name: 'practice', mode: findMode }, { replace: true })}
@@ -324,6 +330,34 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
 }
 
 // Returning from Stripe Checkout lands on /?checkout=success|cancelled.
+// Words for how a Google/Apple sign-in ended (the server sends only a short code, never text).
+const SOCIAL_MESSAGES = {
+  cancelled: 'Sign-in was cancelled. No problem: try again whenever you like.',
+  expired: 'That sign-in took too long or was already used. Please try again.',
+  email_taken: 'An account with that email already exists. Sign in with your email and password (use "Forgot password?" if you need to).',
+  no_account: "There's no Kindred account for that Google or Apple account yet. Create one below.",
+  unverified_email: "We couldn't get a verified email from that account. Try another way to sign in.",
+  no_email: "We couldn't get an email from that account. Try another way to sign in.",
+  wrong_account: "That wasn't the account you signed up with. Try again with the same one.",
+  failed: "That sign-in didn't work. Please try again.",
+};
+
+// A redirect back from Google/Apple lands on /?signed_in=…, /?social=… or /?reauth=ok: read it once, then tidy the address.
+function takeArrival() {
+  const q = new URLSearchParams(window.location.search);
+  const signedIn = q.get('signed_in');
+  const social = q.get('social');
+  const reauth = q.get('reauth') === 'ok';
+  if (!signedIn && !social && !reauth) return {};
+  window.history.replaceState(null, '', window.location.pathname);
+  return {
+    entry: signedIn === 'new' ? 'new' : signedIn ? 'back' : null,
+    socialNotice: social ? SOCIAL_MESSAGES[social] || SOCIAL_MESSAGES.failed : '',
+    tab: q.get('tab'),
+    reauth,
+  };
+}
+
 function takeCheckoutNotice() {
   const result = new URLSearchParams(window.location.search).get('checkout');
   if (!result) return '';
@@ -343,6 +377,18 @@ export default function App() {
   const [ads, setAds] = useState(null);
   const [captchaSiteKey, setCaptchaSiteKey] = useState(null);
   const [checkoutNotice] = useState(takeCheckoutNotice);
+  const [arrival] = useState(takeArrival);
+  const [social, setSocial] = useState({ providers: [], soon: [] });
+  // The lightning "you're in" after signing in or up ('new' | 'back' | null).
+  const [entry, setEntry] = useState(arrival.entry || null);
+  const endEntry = useCallback(() => setEntry(null), []);
+  // The loader is on screen at least a moment, so the strike is seen; not at all for people who asked for less motion.
+  const [bootHeld, setBootHeld] = useState(() => !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+  useEffect(() => {
+    const timer = setTimeout(() => setBootHeld(false), 650);
+    return () => clearTimeout(timer);
+  }, []);
+  const booting = user === undefined || bootHeld;
 
   const refreshMe = useCallback(() => api.me().then((d) => {
     // Signed in a moment ago and now not: the session ended elsewhere.
@@ -352,6 +398,7 @@ export default function App() {
     setPushKey(d.push?.publicKey || null);
     setAds(d.ads || null);
     setCaptchaSiteKey(d.captcha?.siteKey || null);
+    setSocial(d.social || { providers: [], soon: [] });
   }), []);
 
   const refreshMeQuietly = useCallback(() => { refreshMe().catch(() => {}); }, [refreshMe]);
@@ -458,10 +505,10 @@ export default function App() {
         />
       )}
       <div hidden={Boolean(legal) || resetToken !== null}>
-      {user === undefined && <main className="screen"><p className="loading">One moment…</p></main>}
-      {user === null && <Welcome key={welcomeMode || 'landing'} initialMode={welcomeMode === 'forgot' ? 'forgot' : welcomeMode === 'expired' ? 'login' : null} farewell={welcomeMode === 'deleted'} notice={welcomeMode === 'expired' ? 'You were signed out. Sign in again to carry on.' : ''} onSignedIn={(u) => refreshMe().catch(() => setUser(u))} onOpenLegal={openLegal} captchaSiteKey={captchaSiteKey} />}
-      {user && user.status !== 'active' && <Paused onSignOut={signOut} onCheck={refreshMeQuietly} />}
-      {user && user.status === 'active' && (
+      {booting && <Loader />}
+      {!booting && user === null && <Welcome key={welcomeMode || 'landing'} initialMode={welcomeMode === 'forgot' ? 'forgot' : welcomeMode === 'expired' ? 'login' : arrival.socialNotice ? (arrival.tab === 'signup' ? 'signup' : 'login') : null} farewell={welcomeMode === 'deleted'} notice={welcomeMode === 'expired' ? 'You were signed out. Sign in again to carry on.' : arrival.socialNotice || ''} onSignedIn={(u, meta) => { setEntry(meta?.isNew ? 'new' : 'back'); refreshMe().catch(() => setUser(u)); }} onOpenLegal={openLegal} captchaSiteKey={captchaSiteKey} social={social} />}
+      {!booting && user && user.status !== 'active' && <Paused onSignOut={signOut} onCheck={refreshMeQuietly} />}
+      {!booting && user && user.status === 'active' && (
         <Signedin
           key={user.id}
           user={user}
@@ -469,6 +516,7 @@ export default function App() {
           ads={ads}
           pushKey={pushKey}
           initialNotice={checkoutNotice}
+          reauthDone={arrival.reauth}
           externalNotice={verifyNotice}
           onSignOut={signOut}
           onSignOutEverywhere={signOutEverywhere}
@@ -480,6 +528,7 @@ export default function App() {
         />
       )}
       </div>
+      {entry && !booting && user?.status === 'active' && <Strike name={user.handle} isNew={entry === 'new'} onDone={endEntry} />}
     </div>
   );
 }
