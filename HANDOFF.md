@@ -58,6 +58,17 @@ TEST_DATABASE_URL=postgres://postgres@localhost:5433/loreforge_test npm run test
    - Next: once the site is live, package it with PWABuilder, then the Play Console ($25). New personal accounts need a 12-tester, 14-day closed test.
    - Steps are in `docs/ANDROID.md`.
 
+4. **Store readiness (2026-10-19, session 017tKMDq):** the checklist for both stores is `docs/STORE_READINESS.md`; the iOS guide is `docs/IOS.md`.
+   - Store apps open the site with `?app=android` / `?app=ios`. `client/src/shell.js` remembers that for the session (sessionStorage, because Chrome shares storage between a TWA and the browser) and sets `<html data-shell>`.
+   - In a store app, every purchase button and AdSense are hidden (Play Payments policy / App Store 3.1.1). Credits and Plus bought on the web still apply.
+   - New public page `/delete-account` (required by Play). It has a `[support email]` placeholder to fill in.
+   - Privacy policy now covers Google/Apple sign-in and the on-device camera.
+   - The service worker caches `offline.html` and serves it when a page can't load. Verified by killing the server under a live page. Playwright's `setOffline` doesn't reach service-worker fetches, so e2e checks the cache instead.
+   - `sw.js` is served with `no-cache`.
+   - `capacitor.config.json` is ready for the iOS wrapper (remote-URL mode); nothing native is generated or installed.
+   - **iOS blockers before submitting:** native push (APNs); Google sign-in is refused inside web views (needs a native plugin, or hide the button on iOS); guideline 4.2 risk. Details in `docs/IOS.md`.
+   - A full-app QA pass (QA 4) was running when this was written; its findings go below.
+
 ## Decisions waiting on Jav
 
 - **Email-first signup:** today, signup reveals whether an email already has an account.
@@ -65,6 +76,7 @@ TEST_DATABASE_URL=postgres://postgres@localhost:5433/loreforge_test npm run test
 - **A real age-assurance vendor.**
 - **Pricing:** see `docs/LAUNCH.md`.
 - **Legal review:** the privacy and terms pages are still marked Draft.
+- **Store purchases:** keep connect credits web-only inside the store apps (current: hidden there), or add Play Billing / StoreKit.
 - **Real keys before launch:** Stripe, Resend (email), Turnstile, VAPID push, AdSense, OpenAI moderation, `ERROR_WEBHOOK_URL`, Android signing fingerprint.
 
 ## Known gaps / next ideas

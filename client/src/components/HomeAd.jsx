@@ -1,12 +1,15 @@
 import { useEffect, useRef } from 'react';
+import { isStoreApp } from '../shell.js';
 
 const SCRIPT_ID = 'adsbygoogle-js';
 
 // One AdSense unit, shown only on the home screen (never inside conversations).
 // Ads are requested non-personalized: people here are often having a hard time,
 // and their visits shouldn't feed an ad profile.
-export default function HomeAd({ ads }) {
+export default function HomeAd({ ads: configured }) {
   const ref = useRef(null);
+  // AdSense isn't allowed inside store apps' web views (they'd need AdMob), so web only.
+  const ads = isStoreApp() ? null : configured;
 
   useEffect(() => {
     if (!ads) return;

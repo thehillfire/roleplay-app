@@ -5,6 +5,7 @@ import './styles.css';
 import { registerServiceWorker } from './notifications.js';
 import { applyTextSize } from './textSize.js';
 import { applyAccent } from './accent.js';
+import './shell.js'; // tags <html data-shell> before the first render
 
 registerServiceWorker();
 applyTextSize();

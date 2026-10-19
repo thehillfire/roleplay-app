@@ -19,6 +19,8 @@ function Privacy() {
         <li><strong>Messages for the next listener:</strong> if you leave one while nobody is around, it waits up to a day and becomes the first message of your conversation with whoever picks it up. You can withdraw it until then.</li>
         <li><strong>Kind words:</strong> short notes people leave for you after a conversation. Shown only to you, not next to who wrote them.</li>
         <li><strong>Notifications:</strong> if you turn them on, a push address for your device. Notifications never include message text.</li>
+        <li><strong>Sign in with Google or Apple:</strong> if you use one, we keep that provider's account id and the email it confirms, nothing else from your Google or Apple account. Your anonymous name stays the only thing other people see.</li>
+        <li><strong>Camera (Don't Smile game, optional):</strong> if you turn it on, your camera is read only by your own phone to notice when you smile. No picture or video is stored or sent to us, the other player, or anyone else.</li>
       </ul>
       <h2>How long we keep things</h2>
       <p>Messages are deleted automatically after one year. When a conversation is reported, moderators get a copy of its recent messages; that copy is erased 90 days after the report is resolved. Deleted accounts are erased as described below.</p>
@@ -62,11 +64,36 @@ function Terms() {
   );
 }
 
+// Public page (Google Play requires one, reachable without the app): how to delete an
+// account, and what is erased or kept. Mirrors "Your choices" in the privacy policy.
+function DeleteAccount() {
+  return (
+    <>
+      <h1 className="find-title">Delete your Kindred account</h1>
+      <p>Kindred is the anonymous texting app published as "Kindred" on Google Play and the App Store.</p>
+      <h2>From the app or website</h2>
+      <ol>
+        <li>Sign in, and open <strong>Account</strong> (top right of the home screen).</li>
+        <li>Tap <strong>Delete account</strong> at the bottom.</li>
+        <li>Confirm with your password (or with Google or Apple, if that's how you sign in).</li>
+      </ol>
+      <h2>If you can't sign in</h2>
+      <p>Email [support email] from the address on your account and ask us to delete it. We confirm the request with that address, then delete the account within 30 days.</p>
+      <h2>What is deleted and what is kept</h2>
+      <ul>
+        <li>Erased immediately: your email, password, birthdate, sign-in links, daily check-ins, notification addresses, and anything you revealed through Connect.</li>
+        <li>Kept for 90 days, then permanently deleted: your messages and any reports involving you, so moderators can finish safety reviews.</li>
+        <li>Kept as required by law: records that a payment happened (amount and date, never card details).</li>
+      </ul>
+    </>
+  );
+}
+
 export default function Legal({ doc, onBack }) {
   return (
     <main className="screen legal">
       <button className="back" onClick={onBack}>← Back</button>
-      {doc === 'privacy' ? <Privacy /> : <Terms />}
+      {doc === 'privacy' ? <Privacy /> : doc === 'delete-account' ? <DeleteAccount /> : <Terms />}
     </main>
   );
 }

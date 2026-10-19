@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../api.js';
 import { TEXT_SIZES, getTextSize, setTextSize } from '../textSize.js';
 import { ACCENTS, getAccent, setAccent } from '../accent.js';
+import { isStoreApp } from '../shell.js';
 import { enablePush, pushBlocked, pushSupported } from '../notifications.js';
 import Support from '../components/Support.jsx';
 
@@ -121,13 +122,20 @@ export default function Account({ user, billing, pushKey, onUserChanged, onBack,
         {billing?.enabled && (
           <div className="row">
             <span>Connect credits</span>
-            <span className="row-end"><strong>{user.connectCredits}</strong><button className="link" onClick={buy} disabled={busy}>Buy one</button></span>
+            <span className="row-end"><strong>{user.connectCredits}</strong>{!isStoreApp() && <button className="link" onClick={buy} disabled={busy}>Buy one</button>}</span>
           </div>
         )}
         <div className="row"><span>Member since</span><span>{new Date(user.createdAt).toLocaleDateString()}</span></div>
       </section>
 
-      {billing?.enabled && (
+      {/* Store apps can't sell or link to purchases; members keep what they bought on the website. */}
+      {billing?.enabled && isStoreApp() && user.plus && (
+        <section className="card plus">
+          <h2>Kindred Plus 💙</h2>
+          <p className="hint">Active until {new Date(user.plusUntil).toLocaleDateString()}.</p>
+        </section>
+      )}
+      {billing?.enabled && !isStoreApp() && (
         <section className="card plus">
           {user.plus ? (
             <>

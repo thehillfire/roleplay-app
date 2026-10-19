@@ -172,7 +172,12 @@ function createApp({
     // Social previews need absolute URLs, so the page gets PUBLIC_URL filled in once at startup.
     const indexHtml = fs.readFileSync(path.join(staticDir, 'index.html'), 'utf8')
       .replaceAll('__PUBLIC_URL__', (publicUrl || '').replace(/\/$/, ''));
-    app.use(express.static(staticDir, { index: false, maxAge: '1h' }));
+    app.use(express.static(staticDir, {
+      index: false,
+      maxAge: '1h',
+      // The service worker must always be re-checked, or a fix to it waits on the cache.
+      setHeaders: (res, file) => { if (file.endsWith(`${path.sep}sw.js`)) res.set('Cache-Control', 'no-cache'); },
+    }));
     app.get('/{*splat}', (req, res) => res.type('html').set('Cache-Control', 'no-cache').send(indexHtml));
   }
 

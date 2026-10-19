@@ -443,7 +443,7 @@ export default function App() {
   // (instead of replacing it) so the live connection and current screen survive.
   const legalFromPath = () => {
     const path = window.location.pathname.replace(/\/$/, '');
-    return path === '/privacy' || path === '/terms' ? path.slice(1) : null;
+    return path === '/privacy' || path === '/terms' || path === '/delete-account' ? path.slice(1) : null;
   };
   const [legal, setLegal] = useState(legalFromPath);
   // Reset links look like /reset#<token>; the token stays out of server logs and referrers.

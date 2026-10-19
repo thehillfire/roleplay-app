@@ -51,6 +51,27 @@ await visitor.goBack();
 await visitor.getByRole('button', { name: 'Get started' }).waitFor();
 step('privacy and terms pages');
 
+// Store readiness: the public deletion page, store-shell detection, and the offline page.
+await visitor.goto(`${BASE}/delete-account`);
+await visitor.getByRole('heading', { name: 'Delete your Kindred account' }).waitFor();
+assert.equal(await visitor.evaluate(() => document.documentElement.dataset.shell), 'web', 'a plain visit is the website');
+const storeApp = await person('store-app');
+await storeApp.goto(`${BASE}/?app=android`);
+await storeApp.getByRole('button', { name: 'Get started' }).waitFor();
+await storeApp.goto(`${BASE}/privacy`); // in-app navigation drops the query string
+assert.equal(await storeApp.evaluate(() => document.documentElement.dataset.shell), 'android', 'the Play app is remembered for the session');
+// The service worker caches the offline page on install. (Playwright's offline switch doesn't
+// reach service-worker fetches, so the fallback itself can't be triggered here; check the cache.)
+await storeApp.evaluate(() => navigator.serviceWorker.ready);
+await storeApp.waitForFunction(async () => Boolean(await caches.match('/offline.html')));
+const cached = await storeApp.evaluate(async () => (await caches.match('/offline.html')).text());
+assert.match(cached, /You're offline/);
+await storeApp.goto(`${BASE}/offline.html`);
+await storeApp.getByRole('heading', { name: "You're offline" }).waitFor();
+await storeApp.getByRole('link', { name: 'Try again' }).click();
+await storeApp.getByRole('button', { name: 'Get started' }).waitFor();
+step('store readiness: deletion page, store-app detection, offline page');
+
 // Minors are turned away at signup
 const kid = await person('kid');
 await signUp(kid, { birthdate: `${new Date().getUTCFullYear() - 15}-03-03`, expectOnboarding: false });

@@ -1,8 +1,29 @@
-// Kindred service worker: push notifications only. No caching, so a new deploy
-// is picked up immediately and nobody gets stuck on an old version.
+// Kindred service worker: push notifications, plus one offline page. Nothing else is
+// cached, so a new deploy is picked up immediately and nobody gets stuck on an old version.
+// The offline page matters for the store apps: without it a lost connection shows the
+// browser's own error screen, which Play's quality checks treat as a broken app.
+const OFFLINE = 'kindred-offline-v1';
+const OFFLINE_FILES = ['/offline.html', '/icon-192.png'];
 
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(OFFLINE).then((c) => c.addAll(OFFLINE_FILES)).then(() => self.skipWaiting()));
+});
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    for (const key of await caches.keys()) if (key !== OFFLINE) await caches.delete(key);
+    await self.clients.claim();
+  })());
+});
+
+// Pages load from the network as always; only when that fails does the offline page show.
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.mode === 'navigate') {
+    event.respondWith(fetch(req).catch(() => caches.match('/offline.html')));
+  } else if (OFFLINE_FILES.includes(new URL(req.url).pathname) && new URL(req.url).origin === self.location.origin) {
+    event.respondWith(fetch(req).catch(() => caches.match(req)));
+  }
+});
 
 self.addEventListener('push', (event) => {
   let data = {};

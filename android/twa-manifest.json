@@ -9,11 +9,14 @@
   "navigationColor": "#0b0a10",
   "backgroundColor": "#0b0a10",
   "enableNotifications": true,
-  "startUrl": "/",
+  "startUrl": "/?app=android",
   "iconUrl": "https://REPLACE-WITH-YOUR-DOMAIN/icon-512.png",
   "maskableIconUrl": "https://REPLACE-WITH-YOUR-DOMAIN/icon-512.png",
   "splashScreenFadeOutDuration": 300,
-  "signingKey": { "path": "./android.keystore", "alias": "kindred" },
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "kindred"
+  },
   "appVersionName": "1.0.0",
   "appVersionCode": 1,
   "minSdkVersion": 21,

@@ -26,6 +26,9 @@ Easiest: **PWABuilder** (Microsoft's free tool).
    - App name: Kindred · Launcher name: Kindred.
    - Theme and background color: `#0b0a10`. Navigation bar color: `#0b0a10`.
    - Display: standalone · Orientation: portrait.
+   - **Start URL: `/?app=android`.** This tells the site it's running as the Play app, so it hides
+     purchase buttons (Play's Payments policy: digital goods sold in a Play app must use Play
+     Billing). Credits bought on the website still work in the app.
    - **Signing key: "Create new".** Download the zip and **keep the `.keystore` file and its passwords
      somewhere safe.** Losing it means you can't update the app (Play App Signing softens this, but
      still back it up).
