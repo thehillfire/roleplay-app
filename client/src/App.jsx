@@ -8,6 +8,7 @@ import Home from './screens/Home.jsx';
 import Waiting from './screens/Waiting.jsx';
 import Chat from './screens/Chat.jsx';
 import Moderate from './screens/Moderate.jsx';
+import Practice from './screens/Practice.jsx';
 import Account from './screens/Account.jsx';
 import Legal from './screens/Legal.jsx';
 import ResetPassword from './screens/ResetPassword.jsx';
@@ -277,9 +278,11 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
         />
       )}
       {view.name === 'moderate' && <Moderate onBack={goHome} />}
+      {view.name === 'practice' && <Practice mode={view.mode} onBack={goHome} />}
       {view.name === 'account' && <Account user={user} billing={billing} pushKey={pushKey} onUserChanged={onRefreshMe} onBack={goHome} onSignOut={onSignOut} onSignOutEverywhere={onSignOutEverywhere} onDeleted={onDeleted} onOpenLegal={onOpenLegal} />}
       {view.name === 'waiting' && <Waiting
           onCancel={cancel}
+          onPractice={findMode === 'talk' ? undefined : () => navigate({ name: 'practice', mode: findMode }, { replace: true })}
           error={matchError}
           presence={presence}
           mode={findMode}

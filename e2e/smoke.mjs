@@ -440,11 +440,35 @@ await eve.getByText('You 1 · Them 0').waitFor();
 await finn.getByText('You 0 · Them 1').waitFor();
 await eve.getByRole('button', { name: 'Use my camera' }).click();
 await eve.getByRole('button', { name: 'Turn camera off' }).waitFor({ timeout: 30000 });
+await eve.waitForTimeout(1000);
+// The preview must show the live camera. (It once showed a black box: the stream was attached to a
+// different <video> than the visible one, and the buttons still toggled, so nothing else noticed.)
+const preview = await eve.evaluate(() => [...document.querySelectorAll('video')].map((v) => ({ shown: v.offsetParent !== null, stream: Boolean(v.srcObject), width: v.videoWidth, playing: !v.paused })));
+assert.deepEqual(preview, [{ shown: true, stream: true, width: 320, playing: true }], 'one visible, playing preview with the camera stream');
 await eve.shot('11-dont-smile');
 await eve.getByRole('button', { name: 'Turn camera off' }).click();
 await eve.getByRole('button', { name: 'Use my camera' }).waitFor();
+assert.equal(await eve.evaluate(() => Boolean(document.querySelector('video').srcObject)), false, 'turning the camera off releases it');
 pages.push(eve, finn);
 step("Don't Smile: smiles score for the other player; the on-device camera check starts and stops");
+
+// Alone in a game (nobody else is looking): say so plainly, and offer a practice round.
+const lone = await person('lone');
+await signUp(lone);
+await lone.getByRole('radio', { name: /Cringe Duel/ }).click();
+await lone.getByRole('button', { name: 'Find someone' }).click();
+// Other people are online here, so it says nobody is looking for *this game* (alone on the server it says "you're the only one here").
+await lone.getByText(/Games need a second person looking at the same time/).waitFor({ timeout: 20000 });
+await lone.getByRole('button', { name: 'Practice on my own' }).click();
+await lone.getByRole('heading', { name: /Practice: Cringe Duel/ }).waitFor();
+const dealt = await lone.locator('.game-card').innerText();
+await lone.getByRole('button', { name: 'Next card' }).click();
+assert.notEqual(await lone.locator('.game-card').innerText(), dealt, 'practice deals a new card');
+await lone.shot('11b-practice');
+await lone.getByRole('button', { name: '← Back' }).click();
+await lone.getByRole('radio', { name: /Cringe Duel/ }).waitFor();
+pages.push(lone);
+step('alone in a game: told so plainly, with a practice round');
 
 // Account: download data, then delete the account
 await bob.goto(BASE);

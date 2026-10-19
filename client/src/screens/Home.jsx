@@ -81,7 +81,7 @@ export default function Home({ user, conversations, listError, onRetry, onFind, 
             </button>
           ))}
         </div>
-        <p className="hint">{talking ? 'A random, anonymous match. Stay as long as you like.' : `${modeInfo(mode).blurb} You only meet people who picked this too.`}</p>
+        <p className="hint">{talking ? 'A random, anonymous match. Stay as long as you like.' : `${modeInfo(mode).blurb} You only meet people who picked this too, so it needs a second person looking at the same time. Nobody around? You can practice on your own.`}</p>
         {presence?.online > 1 && <p className="presence"><span className="dot" aria-hidden="true" /> {presence.online} people here now</p>}
         {talking && waitingForOthers > 0 && (
           <div className="need-listener">

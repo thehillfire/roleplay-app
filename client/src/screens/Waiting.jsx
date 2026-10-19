@@ -23,9 +23,11 @@ function readBreathe() {
 
 const GAME_LINES = ['Looking for a challenger…', 'Warming up your poker face…', 'Someone is about to get cringed at…', 'Still searching. Stretch those cheeks.'];
 
-export default function Waiting({ mode = 'talk', onCancel, error, presence, canLeaveMessage, onLeftMessage, listening, pushKey, onCall, onWentOnCall }) {
+export default function Waiting({ mode = 'talk', onCancel, onPractice, error, presence, canLeaveMessage, onLeftMessage, listening, pushKey, onCall, onWentOnCall }) {
   const [i, setI] = useState(0);
   const [slow, setSlow] = useState(false);
+  const [quiet, setQuiet] = useState(false); // games: nobody has joined yet
+  const [shareNote, setShareNote] = useState('');
   const [offer, setOffer] = useState(false); // "leave a message" after 20s
   const [breathe, setBreathe] = useState(readBreathe);
   const [phase, setPhase] = useState(0);
@@ -67,7 +69,8 @@ export default function Waiting({ mode = 'talk', onCancel, error, presence, canL
     const t = setInterval(() => setI((n) => (n + 1) % LINES.length), 4000);
     const s = setTimeout(() => setSlow(true), 45000);
     const o = setTimeout(() => setOffer(true), 20000);
-    return () => { clearInterval(t); clearTimeout(s); clearTimeout(o); };
+    const q = setTimeout(() => setQuiet(true), 6000);
+    return () => { clearInterval(t); clearTimeout(s); clearTimeout(o); clearTimeout(q); };
   }, []);
 
   useEffect(() => {
@@ -75,6 +78,20 @@ export default function Waiting({ mode = 'talk', onCancel, error, presence, canL
     const t = setTimeout(() => setPhase((p) => (p + 1) % BREATH.length), BREATH[phase].ms);
     return () => clearTimeout(t);
   }, [breathe, phase]);
+
+  const invite = async () => {
+    const url = window.location.origin;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Kindred', text: `Play ${modeInfo(mode).label} with me on Kindred (adults 18+ only).`, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setShareNote('Link copied. Send it to a friend (18+ only).');
+    } catch (err) {
+      if (err?.name !== 'AbortError') setShareNote(`Send this link to a friend (18+ only): ${url}`);
+    }
+  };
 
   const toggle = () => {
     const next = !breathe;
@@ -99,7 +116,16 @@ export default function Waiting({ mode = 'talk', onCancel, error, presence, canL
       <p className="loading" role="status">{error || (breathe ? BREATH[phase].label : (mode === 'talk' ? LINES : GAME_LINES)[i % LINES.length])}</p>
       {breathe && !error && <p className="hint">Still looking for someone. You'll see them the moment they're here.</p>}
       {presence?.online > 1 && <p className="presence"><span className="dot" aria-hidden="true" /> {presence.online} people here now</p>}
-      {slow && !error && mode !== 'talk' && <p className="hint">Nobody else is playing this one right now. Try another mode, or come back later.</p>}
+      {quiet && !error && mode !== 'talk' && (
+        <div className="card game-fallback">
+          <p><strong>{presence?.online > 1 ? 'Nobody else is looking for this game yet.' : "You're the only one here right now."}</strong> Games need a second person looking at the same time. Keep this screen open, or:</p>
+          <div className="stack">
+            {onPractice && <button className="btn primary" onClick={onPractice}>Practice on my own</button>}
+            <button className="btn" onClick={invite}>Invite a friend</button>
+          </div>
+          {shareNote && <p className="hint" role="status">{shareNote}</p>}
+        </div>
+      )}
       {slow && !error && mode === 'talk' && !listening && <p className="hint">It's quiet right now. Choosing <strong>Either</strong> or no topic widens the search.</p>}
       {slow && !error && listening && <p className="hint">It's quiet right now: nobody needs a listener this minute. Thank you for being here.</p>}
       {offer && !error && canLeaveMessage && !writing && (

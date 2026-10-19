@@ -477,6 +477,8 @@ input::placeholder, textarea::placeholder { color: #7d7a8e; }
 @keyframes breath-in { from { transform: scale(0.55); } to { transform: scale(1); } }
 @keyframes breath-out { from { transform: scale(1); } to { transform: scale(0.55); } }
 .waiting-actions { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.game-fallback { display: flex; flex-direction: column; gap: 14px; max-width: 420px; text-align: left; }
+.game-fallback p { margin: 0; font-size: 16px; line-height: 1.5; }
 
 /* Support: member form and history, moderator inbox. */
 .support { display: flex; flex-direction: column; gap: 12px; }
@@ -562,6 +564,7 @@ input::placeholder, textarea::placeholder { color: #7d7a8e; }
 .game-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .game-actions .hint { flex: 1 1 160px; font-size: 14px; }
 .selfcam { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1 1 100%; }
+.selfcam[hidden] { display: none; }
 .selfcam video { width: 96px; height: 72px; object-fit: cover; transform: scaleX(-1); background: #000; box-shadow: inset 0 0 0 2px var(--accent); }
 .selfcam .hint { flex: 1 1 140px; font-size: 13px; }
 .meter { width: 96px; height: 6px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); }
