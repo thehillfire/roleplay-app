@@ -26,7 +26,7 @@ const GAME_LINES = ['Looking for a challengerâ€¦', 'Warming up your poker faceâ€
 export default function Waiting({ mode = 'talk', onCancel, onPractice, error, presence, canLeaveMessage, onLeftMessage, listening, pushKey, onCall, onWentOnCall }) {
   const [i, setI] = useState(0);
   const [slow, setSlow] = useState(false);
-  const [quiet, setQuiet] = useState(false); // games: nobody has joined yet
+  const [quiet, setQuiet] = useState(false); // games: nobody has joined after a few seconds
   const [shareNote, setShareNote] = useState('');
   const [offer, setOffer] = useState(false); // "leave a message" after 20s
   const [breathe, setBreathe] = useState(readBreathe);
@@ -116,9 +116,13 @@ export default function Waiting({ mode = 'talk', onCancel, onPractice, error, pr
       <p className="loading" role="status">{error || (breathe ? BREATH[phase].label : (mode === 'talk' ? LINES : GAME_LINES)[i % LINES.length])}</p>
       {breathe && !error && <p className="hint">Still looking for someone. You'll see them the moment they're here.</p>}
       {presence?.online > 1 && <p className="presence"><span className="dot" aria-hidden="true" /> {presence.online} people here now</p>}
-      {quiet && !error && mode !== 'talk' && (
+      {/* Games need two people at once, so the way out is on screen from the start, not after a wait. */}
+      {!error && mode !== 'talk' && (
         <div className="card game-fallback">
-          <p><strong>{presence?.online > 1 ? 'Nobody else is looking for this game yet.' : "You're the only one here right now."}</strong> Games need a second person looking at the same time. Keep this screen open, or:</p>
+          <p>
+            {quiet && <strong>{presence?.online > 1 ? 'Nobody else is looking for this game yet. ' : "You're the only one here right now. "}</strong>}
+            Games need a second person looking at the same time. Keep this screen open, or:
+          </p>
           <div className="stack">
             {onPractice && <button className="btn primary" onClick={onPractice}>Practice on my own</button>}
             <button className="btn" onClick={invite}>Invite a friend</button>

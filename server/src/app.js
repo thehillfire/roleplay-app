@@ -129,6 +129,21 @@ function createApp({
     next();
   });
 
+  // The app crashed on someone's phone: log what broke so it shows up in the server logs (and
+  // the error webhook). Only the error text and the screen's path: nothing the person typed.
+  const clientErrorLimiter = createRateLimiter({ max: 5, windowMs: 60000 });
+  app.post('/api/client-error', clientErrorLimiter, (req, res) => {
+    const clip = (v, n) => (typeof v === 'string' ? v.replace(/[\r\n]+/g, ' | ').slice(0, n) : '');
+    const message = clip(req.body?.message, 300);
+    if (message) {
+      const where = clip(req.body?.where, 80);
+      const err = Object.assign(new Error(message), { name: 'ClientError' });
+      console.error(`[client error] ${message} @ ${where} :: ${clip(req.body?.stack, 600)} :: ${clip(req.get('user-agent'), 160)}`);
+      errorAlerts.report(err, `client ${where}`);
+    }
+    res.status(204).end();
+  });
+
   // Load balancers use this: it fails when the database is unreachable.
   app.get('/api/health', asyncRoute(async (req, res) => {
     try {

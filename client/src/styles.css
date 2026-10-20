@@ -682,3 +682,5 @@ input::placeholder, textarea::placeholder { color: #7d7a8e; }
   .selfcam .hint { display: none; }
   .game-panel { max-height: none; }
 }
+.crash { min-height: 100dvh; justify-content: center; align-items: center; text-align: center; gap: 18px; }
+.crash .btn.big { width: auto; padding-inline: 32px; }

@@ -83,6 +83,11 @@ TEST_DATABASE_URL=postgres://postgres@localhost:5433/loreforge_test npm run test
    - Threads: `store.openConversation` keys talk threads by the pair (as before) and game threads by pair + mode, so old threads keep working. A block ends every thread with that person and pushes `conversation.ended` for each. Connect is still per thread: connecting in Cringe Duel doesn't reveal names in the talk thread.
    - Live site: **https://break-web.onrender.com** (Render). This sandbox's network policy blocks it, so it hasn't been tested from here; allow the host in the environment's network settings to test it.
 
+7. **"Black screen when I tap a game mode" (2026-10-20, session 017tKMDq):** reported by Jav on the live site. Could not reproduce locally: production build, phone viewport, both modes, alone and with two people, all render. Two likely causes on his side: the waiting screen is mostly dark and he's alone on the server, or Render was still on an older build. What changed:
+   - In game modes the waiting screen now shows "Practice on my own" / "Invite a friend" at once, not after 6 s.
+   - A crash anywhere now shows a "Something broke · Reload" screen instead of a blank page (`components/CrashScreen.jsx`), and reports the error text, stack and browser to `POST /api/client-error`. It's logged as `[client error] …` in Render's logs (and the error webhook if set). Rate-limited: 5 a minute per IP, deduplicated per page load.
+   - **Next agent:** if Jav still sees it, read Render → Logs for `[client error]` lines, and check Render → Events for which commit is deployed.
+
 ## Decisions waiting on Jav
 
 - **Email-first signup:** today, signup reveals whether an email already has an account.

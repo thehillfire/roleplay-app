@@ -26,3 +26,21 @@ test('error alerts are off without an https webhook URL', () => {
   assert.equal(createErrorAlerts({ url: '' }).enabled, false);
   assert.equal(createErrorAlerts({ url: 'http://insecure.example' }).enabled, false);
 });
+
+test('a crash on a phone is logged and alerted, rate-limited, with nothing but the error text', async (t) => {
+  const posted = [];
+  const alerts = createErrorAlerts({ url: 'https://hooks.example/abc', fetchImpl: async (url, init) => { posted.push(JSON.parse(init.body)); return { ok: true }; } });
+  const s = await start({ errorAlerts: alerts });
+  t.after(s.stop);
+  const logged = [];
+  const real = console.error;
+  console.error = (...a) => logged.push(a.join(' '));
+  t.after(() => { console.error = real; });
+  const send = (body) => fetch(`${s.base}/api/client-error`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await send({ message: "Cannot read properties of undefined (reading 'tag')", stack: 'at Home\nat App', where: '/' })).status, 204);
+  assert.match(logged[0], /\[client error\] Cannot read properties of undefined \(reading 'tag'\) @ \/ :: at Home \| at App/);
+  assert.equal(posted[0].text, "Kindred server error on client /: ClientError: Cannot read properties of undefined (reading 'tag')");
+  assert.equal((await send({})).status, 204, 'nothing to log is fine');
+  for (let i = 0; i < 4; i += 1) await send({ message: `x${i}` });
+  assert.equal((await send({ message: 'one too many' })).status, 429);
+});

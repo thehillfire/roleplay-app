@@ -482,8 +482,8 @@ const lone = await person('lone');
 await signUp(lone);
 await lone.getByRole('radio', { name: /Cringe Duel/ }).click();
 await lone.getByRole('button', { name: 'Find someone' }).click();
-// Other people are online here, so it says nobody is looking for *this game* (alone on the server it says "you're the only one here").
-await lone.getByText(/Games need a second person looking at the same time/).waitFor({ timeout: 20000 });
+// The practice round and invite are offered from the start (a lone tester never stares at an empty screen).
+await lone.getByText(/Games need a second person looking at the same time/).waitFor({ timeout: 2000 }); // on screen at once, not after a wait
 await lone.getByRole('button', { name: 'Practice on my own' }).click();
 await lone.getByRole('heading', { name: /Practice: Cringe Duel/ }).waitFor();
 const dealt = await lone.locator('.game-card').innerText();
