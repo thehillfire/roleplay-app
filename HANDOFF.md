@@ -90,6 +90,8 @@ TEST_DATABASE_URL=postgres://postgres@localhost:5433/loreforge_test npm run test
 
 8. **Test sign-ins (2026-10-20, session 017tKMDq):** Jav asked for "a" / "a". `TEST_LOGINS=a:a,b:b` in Render turns it on (unset = off; the server logs a warning while it's on). Sign in → "Email or test name" → `a`, password `a`. Each name is one normal member account (`a@test-login.invalid`, never a moderator, email marked confirmed), created on first use. `.invalid` emails are refused at signup and email login, so nobody can claim one. Code: `server/src/testLogins.js`, the top of `/api/auth/login`. **Must be removed before launch** (it's on the DEPLOY checklist). For store review, swap it for names with long random passwords.
 
+9. **Google/Apple buttons always visible; "I keep getting logged out" (2026-10-20, session 017tKMDq):** `SOCIAL_PREVIEW` now defaults on in production, so the Sign in and Create account pages show "Google: coming soon" / "Apple: coming soon" with their logos until the keys exist (`SOCIAL_PREVIEW=0` hides them). They go live the moment `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (free) or the four `APPLE_*` keys ($99/yr) are set; steps in `docs/DEPLOY.md`. Jav keeps getting logged out because the Render service has no `DATABASE_URL`: the free plan sleeps after ~15 min idle, the container restarts, and the SQLite file with every account and session is gone. Sessions themselves already last 180 days. The fix is on Jav's side: add a Postgres database and set `DATABASE_URL`.
+
 ## Decisions waiting on Jav
 
 - **Email-first signup:** today, signup reveals whether an email already has an account.

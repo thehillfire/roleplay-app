@@ -36,8 +36,9 @@ function createApp({
   captcha = createCaptcha(),
   // "Continue with Google/Apple": each provider is on only when its keys are set.
   social = createSocial(),
-  // Shows the not-yet-configured providers as disabled buttons, so the layout can be previewed.
-  socialPreview = process.env.SOCIAL_PREVIEW === '1',
+  // Shows the not-yet-configured providers as disabled "coming soon" buttons. On by default in
+  // production (the owner wants Google and Apple visible on sign-in); SOCIAL_PREVIEW=0 hides them.
+  socialPreview = process.env.SOCIAL_PREVIEW ? process.env.SOCIAL_PREVIEW === '1' : process.env.NODE_ENV === 'production',
   errorAlerts = createErrorAlerts(),
   trustProxy = envInt('TRUST_PROXY', 1),
   emailCooldownMs = 2 * 60 * 1000, // per address, for reset/confirmation emails

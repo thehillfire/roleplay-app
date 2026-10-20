@@ -54,7 +54,7 @@ The signup form then shows the check, the server verifies every token, and the C
 
 ## Sign in with Google / Apple
 
-Each provider switches on when its keys are set; with none set, the buttons don't appear. `PUBLIC_URL` must be set too, because the provider sends people back to `PUBLIC_URL/auth/callback/<provider>`.
+Each provider switches on when its keys are set. Until then, production shows it as a disabled "coming soon" button with its logo (`SOCIAL_PREVIEW=0` hides those). `PUBLIC_URL` must be set too, because the provider sends people back to `PUBLIC_URL/auth/callback/<provider>`.
 
 **Google** (free)
 1. In [Google Cloud Console](https://console.cloud.google.com), create a project, then **APIs & Services → OAuth consent screen** (External; app name Kindred; your support email).
@@ -72,7 +72,7 @@ Kindred only ever stores the provider's account id and the verified email; never
 - **No moderator rights from a provider sign-in.** `ADMIN_EMAILS` are still only granted after a password reset.
 - **Deleting an account without a password** asks the person to confirm with the provider again first.
 
-`SOCIAL_PREVIEW=1` shows the providers that aren't set up yet as disabled "coming soon" buttons, to preview the layout. Leave it unset for real users. Not verified against the real Google and Apple services (they can't be reached from the test environment): the browser test `e2e/social.mjs` drives the whole flow against a fake provider, so the first real sign-in is the one thing left to try by hand.
+`SOCIAL_PREVIEW` controls the "coming soon" buttons for providers without keys: on by default in production, off elsewhere; `1` forces them on, `0` off. Not verified against the real Google and Apple services (they can't be reached from the test environment): the browser test `e2e/social.mjs` drives the whole flow against a fake provider, so the first real sign-in is the one thing left to try by hand.
 
 ## Payments
 
