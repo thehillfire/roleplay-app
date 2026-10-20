@@ -1,6 +1,6 @@
 # Handoff: Kindred
 
-**Repo:** `thehillfire/roleplay-app` · **Branch:** `ccr-2e9faa94-hbk5np` · **PR:** #1 (draft, CI green on `7e20a23`)
+**Repo:** `thehillfire/roleplay-app` · **Branch:** `ccr-2e9faa94-hbk5np` · **PR:** #1 (draft, CI green on `45ccad8`)
 `main` still holds the old roleplay app. All Kindred work lives on the branch above until PR #1 is merged.
 
 ## What it is
@@ -15,7 +15,7 @@ Kindred: anonymous 1:1 texting with strangers, 18+ only. The owner is Jav.
 
 ## Stack
 
-- **Server:** Node 22, Express 5, `ws`. Database is `node:sqlite` locally, or Postgres when `DATABASE_URL` is set; migrations 1–29 are in `server/src/db.js`.
+- **Server:** Node 22, Express 5, `ws`. Database is `node:sqlite` locally, or Postgres when `DATABASE_URL` is set; migrations 1–30 are in `server/src/db.js`.
 - **Client:** React 19 + Vite 6, a PWA. The MediaPipe wasm is served from `/mediapipe` (copied at build by `vite.config.js`); the model is at `client/public/models/`.
 - **Single process:** matchmaking and live delivery are in memory, so run **one instance only**. Scaling out needs Redis pub/sub.
 - **Docs:** `docs/DEPLOY.md`, `docs/ANDROID.md` (Play Store via Trusted Web Activity/PWABuilder), `docs/MODERATION.md`, `docs/LAUNCH.md`, `docs/ROADMAP.md`.
@@ -36,7 +36,7 @@ TEST_DATABASE_URL=postgres://postgres@localhost:5433/loreforge_test npm run test
   su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $D -o '-p 5433 -k /tmp' -l $D/log start"
   psql -h localhost -p 5433 -U postgres -c 'CREATE DATABASE loreforge_test'
   ```
-- Current state: 161 server tests pass on both SQLite and Postgres; e2e passes (26 steps); axe audit is clean.
+- Current state (45ccad8): 181 server tests pass on both SQLite and Postgres; smoke e2e, social e2e and the axe audit are clean.
 
 ## Where things stand right now
 
