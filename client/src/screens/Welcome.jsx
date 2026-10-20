@@ -12,7 +12,7 @@ const GUIDELINES = [
   'If someone is in danger, point them to real help (call or text 988 in the US).',
 ];
 
-export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey, social = { providers: [], soon: [] }, initialMode = null, farewell = false, notice = '' }) {
+export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey, social = { providers: [], soon: [] }, testLogin = false, initialMode = null, farewell = false, notice = '' }) {
   const [mode, setMode] = useState(initialMode); // null | 'signup' | 'login' | 'forgot'
   const [sent, setSent] = useState(false);
   const [email, setEmail] = useState('');
@@ -122,11 +122,13 @@ export default function Welcome({ onSignedIn, onOpenLegal, captchaSiteKey, socia
     );
   }
 
+  // With test sign-ins on (TEST_LOGINS on the server), Sign in also takes a test name like "a".
+  const testName = testLogin && !signup;
   const emailFields = (
     <>
       <label>
-        <span>Email</span>
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+        <span>{testName ? 'Email or test name' : 'Email'}</span>
+        <input type={testName ? 'text' : 'email'} inputMode="email" autoCapitalize="none" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete={testName ? 'username' : 'email'} required />
       </label>
       <label>
         <span>Password {signup && <em>(8+ characters)</em>}</span>

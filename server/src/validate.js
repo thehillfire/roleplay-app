@@ -43,7 +43,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function parseCredentials(body = {}, { signup, today } = {}) {
   const email = str(body.email, 'email', 254)?.toLowerCase();
-  if (!EMAIL_RE.test(email)) throw badRequest('Enter a valid email address');
+  // .invalid can never receive mail; it's also where test sign-ins keep their accounts (testLogins.js).
+  if (!EMAIL_RE.test(email) || email.endsWith('.invalid')) throw badRequest('Enter a valid email address');
   if (typeof body.password !== 'string' || body.password.length < (signup ? 8 : 1)) {
     throw badRequest(signup ? 'Password must be at least 8 characters' : 'password is required');
   }

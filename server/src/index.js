@@ -18,6 +18,9 @@ const staticDir = fs.existsSync(path.join(distDir, 'index.html')) ? distDir : un
 if (process.env.NODE_ENV === 'production' && !process.env.PUBLIC_URL) {
   console.warn('PUBLIC_URL is not set: links in emails are disabled until it is.');
 }
+if (process.env.TEST_LOGINS) {
+  console.warn('TEST_LOGINS is set: anyone who knows a test name and password can sign in with it. Remove it before launch.');
+}
 if (process.env.NODE_ENV === 'production' && !process.env.RESEND_API_KEY) {
   console.warn('RESEND_API_KEY is not set: no emails (password resets, confirmations, moderator alerts) will be sent.');
 }

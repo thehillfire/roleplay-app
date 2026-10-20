@@ -14,6 +14,7 @@ Kindred is one Node process: API, WebSocket and the built web app on one port. I
    - `ADMIN_EMAILS`: your email, so you can moderate. Sign up, then use **Forgot password?** once. Completing that reset makes you a moderator, so set up email (below) first. Without email, run `npm run make-admin -- you@example.com` from the server's shell instead.
    - `PUBLIC_URL`: your site's address, e.g. `https://kindred.example.com`. It's required in production. Emailed links never trust the request's Host header.
    - `VAPID_*`: run `npm run vapid` locally and paste the three lines (optional, enables notifications).
+   - `TEST_LOGINS` (testing only): e.g. `a:a,b:b` lets you sign in with the name `a` and password `a` (and `b`/`b` on a second phone, to match with yourself). Each name is an ordinary member account. Anyone who knows it can use it, so **delete this variable before launch**. Also handy for store reviewers' demo accounts, with long random passwords.
 4. Deploy. Tables are created on first start. Open the URL, sign up with your admin email, and you'll see **Moderate** on the home screen.
 
 Plan names and prices change. If Render rejects `plan: starter` or `plan: basic-256mb`, pick the current equivalents in the dashboard.
@@ -113,6 +114,7 @@ node scripts/load-test.js http://localhost:3000 200 10
 - [ ] HTTPS on your domain
 - [ ] Password reset email arrives (`RESEND_API_KEY`, `MAIL_FROM`, `PUBLIC_URL`)
 - [ ] `ADMIN_EMAILS` set, and you've signed in and seen **Moderate**
+- [ ] `TEST_LOGINS` removed (or only long random reviewer passwords left)
 - [ ] Someone is checking the moderation queue daily (reports of minors and threats first)
 - [ ] Database backups enabled (Render and Neon do daily backups on paid plans)
 - [ ] Privacy policy and terms published (age requirement, what's stored, 90-day retention for deleted accounts, how reports work)

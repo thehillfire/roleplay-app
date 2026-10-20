@@ -88,6 +88,8 @@ TEST_DATABASE_URL=postgres://postgres@localhost:5433/loreforge_test npm run test
    - A crash anywhere now shows a "Something broke · Reload" screen instead of a blank page (`components/CrashScreen.jsx`), and reports the error text, stack and browser to `POST /api/client-error`. It's logged as `[client error] …` in Render's logs (and the error webhook if set). Rate-limited: 5 a minute per IP, deduplicated per page load.
    - **Next agent:** if Jav still sees it, read Render → Logs for `[client error]` lines, and check Render → Events for which commit is deployed.
 
+8. **Test sign-ins (2026-10-20, session 017tKMDq):** Jav asked for "a" / "a". `TEST_LOGINS=a:a,b:b` in Render turns it on (unset = off; the server logs a warning while it's on). Sign in → "Email or test name" → `a`, password `a`. Each name is one normal member account (`a@test-login.invalid`, never a moderator, email marked confirmed), created on first use. `.invalid` emails are refused at signup and email login, so nobody can claim one. Code: `server/src/testLogins.js`, the top of `/api/auth/login`. **Must be removed before launch** (it's on the DEPLOY checklist). For store review, swap it for names with long random passwords.
+
 ## Decisions waiting on Jav
 
 - **Email-first signup:** today, signup reveals whether an email already has an account.

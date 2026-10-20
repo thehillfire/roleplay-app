@@ -10,6 +10,7 @@ const { createCaptcha } = require('./captcha');
 const { createSocial } = require('./social');
 const { createErrorAlerts } = require('./alerts');
 const { envInt } = require('./env');
+const { parseTestLogins } = require('./testLogins');
 
 const { AUTO_PAUSE, createRateLimiter, httpError, asyncRoute } = require('./routes/common');
 const routes = {
@@ -48,6 +49,9 @@ function createApp({
   ads = process.env.ADSENSE_CLIENT && process.env.ADSENSE_SLOT
     ? { client: process.env.ADSENSE_CLIENT, slot: process.env.ADSENSE_SLOT }
     : null,
+  // Throwaway test sign-ins ("a" / "a"), only when TEST_LOGINS is set, e.g. "a:a,b:b".
+  // Anyone who knows one can use it, so it's off unless the owner turns it on for testing.
+  testLogins = parseTestLogins(process.env.TEST_LOGINS),
   adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
   // The Android app (a Trusted Web Activity) proves it belongs to this site with these.
   android = process.env.ANDROID_PACKAGE_NAME && process.env.ANDROID_CERT_SHA256
@@ -166,7 +170,7 @@ function createApp({
   // Rough live numbers for the home screen ("12 people here now").
   app.get('/api/presence', member, (req, res) => res.json(hub.stats()));
 
-  const ctx = { store, hub, auth, classifier, push, mailer, captcha, social, socialPreview, emailCooldownMs, ads, adminEmails, autoPauseMinReporterAgeMs, authLimiter, messageLimiter, member, siteUrl, conversation };
+  const ctx = { store, hub, auth, testLogins, classifier, push, mailer, captcha, social, socialPreview, emailCooldownMs, ads, adminEmails, autoPauseMinReporterAgeMs, authLimiter, messageLimiter, member, siteUrl, conversation };
   routes.auth(app, ctx);
   routes.social(app, ctx);
   routes.account(app, ctx);

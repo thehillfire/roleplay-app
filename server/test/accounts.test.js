@@ -211,3 +211,37 @@ test('sessions slide: using the app keeps you signed in; a lapsed session still 
   await s.db.query('UPDATE sessions SET expires_at = $1', [Date.now() - 1000]);
   assert.equal((await phone('GET', '/api/auth/me')).body.user, null);
 });
+
+test('test sign-ins ("a" / "a") work only when TEST_LOGINS turns them on, and can\'t be claimed by signup', async (t) => {
+  const { parseTestLogins } = require('../src/testLogins');
+  assert.deepEqual([...parseTestLogins('a:a, B:b ,bad name:x,:nope,c:')], [['a', 'a'], ['b', 'b']]);
+
+  const off = await start();
+  t.after(off.stop);
+  const offApi = client(off.base);
+  assert.equal((await offApi('GET', '/api/auth/me')).body.testLogin, false);
+  assert.equal((await offApi('POST', '/api/auth/login', { email: 'a', password: 'a' })).status, 400, 'off by default');
+
+  const s = await start({ testLogins: parseTestLogins('a:a,b:b') });
+  t.after(s.stop);
+  const a = client(s.base);
+  assert.equal((await a('GET', '/api/auth/me')).body.testLogin, true);
+  assert.equal((await a('POST', '/api/auth/login', { email: 'a', password: 'wrong' })).status, 401);
+  const first = await a('POST', '/api/auth/login', { email: ' A ', password: 'a' });
+  assert.equal(first.status, 200);
+  assert.equal(first.body.user.role, 'member', 'never a moderator');
+  const me = (await a('GET', '/api/auth/me')).body.user;
+  assert.equal(me.status, 'active');
+  assert.equal(me.emailVerified, true, 'no "confirm your email" nag');
+
+  // The same name is the same account on every device.
+  const again = client(s.base);
+  assert.equal((await again('POST', '/api/auth/login', { email: 'a', password: 'a' })).body.user.handle, me.handle);
+  const b = client(s.base);
+  assert.notEqual((await b('POST', '/api/auth/login', { email: 'b', password: 'b' })).body.user.handle, me.handle);
+
+  // Nobody can sign up as the test account's address and take it over, or sign in to it with a password.
+  const squatter = client(s.base);
+  assert.equal((await squatter('POST', '/api/auth/signup', adult({ email: 'c@test-login.invalid' }))).status, 400);
+  assert.equal((await squatter('POST', '/api/auth/login', { email: 'a@test-login.invalid', password: 'a' })).status, 400);
+});

@@ -3,11 +3,12 @@ const crypto = require('crypto');
 const { hashPassword, verifyPassword, hashToken, deviceHash } = require('../auth');
 const { parseCredentials, badRequest } = require('../validate');
 const { httpError, asyncRoute, publicUser, RESET_TTL_MS } = require('./common');
+const { testEmail } = require('../testLogins');
 const { createSignup } = require('./signup');
 
 const SOCIAL_PROVIDERS = [{ id: 'google', label: 'Google' }, { id: 'apple', label: 'Apple' }];
 
-module.exports = function register(app, { store, hub, auth, push, mailer, captcha, social, socialPreview, emailCooldownMs, ads, adminEmails, authLimiter, member, siteUrl }) {
+module.exports = function register(app, { store, hub, auth, testLogins = new Map(), push, mailer, captcha, social, socialPreview, emailCooldownMs, ads, adminEmails, authLimiter, member, siteUrl }) {
   // Failed logins per account, whatever IPs they come from (slow down distributed guessing).
   const failedLogins = new Map(); // email -> { count, resetAt }
   const LOGIN_FAILS = { max: 10, windowMs: 15 * 60 * 1000 };
@@ -89,6 +90,23 @@ module.exports = function register(app, { store, hub, auth, push, mailer, captch
   }));
 
   app.post('/api/auth/login', authLimiter, asyncRoute(async (req, res) => {
+    // A test sign-in (TEST_LOGINS): the name instead of an email, its exact password.
+    const testName = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (testLogins.has(testName)) {
+      if (req.body.password !== testLogins.get(testName)) throw httpError(401, 'Email or password is incorrect.');
+      const email = testEmail(testName);
+      let user = await store.findUserByEmail(email);
+      if (!user) {
+        // No usable password: this account can only be reached through its test sign-in.
+        await store.createUser({ email, birthdate: '1990-01-01', passwordHash: '!' });
+        user = await store.findUserByEmail(email);
+        await store.markEmailVerified(user.id);
+      }
+      if (user.status === 'deleted') throw httpError(401, 'Email or password is incorrect.');
+      await store.noteDevice(user.id, deviceHash(req, res));
+      await auth.startSession(req, res, user.id);
+      return res.json({ user: publicUser(user) });
+    }
     const { email, password } = parseCredentials(req.body, { signup: false });
     if (loginLocked(email)) throw httpError(429, 'Too many attempts for this account. Try again in 15 minutes, or reset your password.');
     const found = await store.findUserByEmail(email);
@@ -180,6 +198,7 @@ module.exports = function register(app, { store, hub, auth, push, mailer, captch
         : null,
       push: { publicKey: push.publicKey },
       captcha: { siteKey: captcha.siteKey },
+      testLogin: testLogins.size > 0,
       social: { providers: social.list(), soon: socialPreview ? SOCIAL_PROVIDERS.filter((p) => !social.has(p.id)) : [] },
       ads,
     });

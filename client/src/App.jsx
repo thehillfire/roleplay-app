@@ -363,6 +363,7 @@ export default function App() {
   const [captchaSiteKey, setCaptchaSiteKey] = useState(null);
   const [arrival] = useState(takeArrival);
   const [social, setSocial] = useState({ providers: [], soon: [] });
+  const [testLogin, setTestLogin] = useState(false);
   // The lightning "you're in" after signing in or up ('new' | 'back' | null).
   const [entry, setEntry] = useState(arrival.entry || null);
   const endEntry = useCallback(() => setEntry(null), []);
@@ -386,6 +387,7 @@ export default function App() {
     setAds(d.ads || null);
     setCaptchaSiteKey(d.captcha?.siteKey || null);
     setSocial(d.social || { providers: [], soon: [] });
+    setTestLogin(Boolean(d.testLogin));
   }), []);
 
   const refreshMeQuietly = useCallback(() => { refreshMe().catch(() => {}); }, [refreshMe]);
@@ -513,7 +515,7 @@ export default function App() {
       <div hidden={Boolean(legal) || resetToken !== null}>
       {booting && <Loader label={unreachable ? "Can't reach Kindred. Trying again…" : undefined} />}
       {booting && unreachable && <p className="boot-offline" role="status">Can't reach Kindred right now. We'll keep trying.</p>}
-      {!booting && user === null && <Welcome key={welcomeMode || 'landing'} initialMode={welcomeMode === 'forgot' ? 'forgot' : welcomeMode === 'expired' || welcomeMode === 'verify' ? 'login' : arrival.socialNotice ? (arrival.tab === 'signup' ? 'signup' : 'login') : returning && !welcomeMode ? 'login' : null} farewell={welcomeMode === 'deleted'} notice={welcomeMode === 'expired' ? 'You were signed out. Sign in again to carry on.' : welcomeMode === 'verify' ? `${verifyNotice} Sign in to send a new confirmation link.` : arrival.socialNotice || ''} onSignedIn={(u, meta) => { setEntry(meta?.isNew ? 'new' : 'back'); refreshMe().catch(() => setUser(u)); }} onOpenLegal={openLegal} captchaSiteKey={captchaSiteKey} social={social} />}
+      {!booting && user === null && <Welcome key={welcomeMode || 'landing'} initialMode={welcomeMode === 'forgot' ? 'forgot' : welcomeMode === 'expired' || welcomeMode === 'verify' ? 'login' : arrival.socialNotice ? (arrival.tab === 'signup' ? 'signup' : 'login') : returning && !welcomeMode ? 'login' : null} farewell={welcomeMode === 'deleted'} notice={welcomeMode === 'expired' ? 'You were signed out. Sign in again to carry on.' : welcomeMode === 'verify' ? `${verifyNotice} Sign in to send a new confirmation link.` : arrival.socialNotice || ''} onSignedIn={(u, meta) => { setEntry(meta?.isNew ? 'new' : 'back'); refreshMe().catch(() => setUser(u)); }} onOpenLegal={openLegal} captchaSiteKey={captchaSiteKey} social={social} testLogin={testLogin} />}
       {!booting && user && user.status !== 'active' && <Paused onSignOut={signOut} onCheck={refreshMeQuietly} onOpenLegal={openLegal} />}
       {!booting && user && user.status === 'active' && (
         <Signedin
