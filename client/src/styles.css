@@ -311,7 +311,6 @@ input::placeholder, textarea::placeholder { color: #7d7a8e; }
 .sheet label { display: flex; flex-direction: column; gap: 8px; font-family: var(--label); font-weight: 600; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .sheet label > input, .sheet label > textarea { text-transform: none; letter-spacing: 0; font-family: var(--sans); font-weight: 400; }
 .sheet em { font-style: normal; opacity: 0.7; text-transform: none; letter-spacing: 0; }
-.price { margin: 0; font-size: 15px; color: var(--accent); line-height: 1.5; font-weight: 500; }
 
 /* --- moderation: a work tool, kept plain --- */
 .topbar-actions { display: flex; gap: 14px; }
@@ -440,9 +439,6 @@ input::placeholder, textarea::placeholder { color: #7d7a8e; }
 .bubble { cursor: default; }
 .need-listener { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; background: rgba(125, 255, 107, 0.07); box-shadow: inset 4px 0 0 var(--ok), inset 0 0 0 1px rgba(125, 255, 107, 0.35); }
 .need-listener p { margin: 0; font-size: 15px; flex: 1 1 200px; }
-.plus { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
-.plus h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 28px; text-transform: uppercase; color: var(--accent); transform: skewX(-9deg); }
-.plus .hint { line-height: 1.55; }
 
 /* Chat text size (Account → Chat text size). */
 :root[data-text-size="large"] .bubble p, :root[data-text-size="large"] .composer textarea { font-size: 19px; }

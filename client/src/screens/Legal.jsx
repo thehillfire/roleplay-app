@@ -12,7 +12,6 @@ function Privacy() {
         <li><strong>Conversations:</strong> the messages you send and receive, so you can continue chats later.</li>
         <li><strong>Safety records:</strong> reports, blocks, and messages our filters held back. If you unsend a message it disappears for both of you, but moderators can still see it if the conversation is reported.</li>
         <li><strong>Connect:</strong> the name and contact you chose to share with a specific person, only after you both agreed.</li>
-        <li><strong>Payments:</strong> handled by Stripe. We store that a payment happened and its amount, never your card.</li>
         <li><strong>Daily check-ins:</strong> the mood you log each day. Only you can see it; it's deleted immediately if you delete your account.</li>
         <li><strong>Support messages:</strong> what you write to us from the app and our replies. Moderators see your anonymous name, never your email; replies are sent to your email. Deleted with your account after the retention period.</li>
         <li><strong>Device cookie:</strong> a random id for your browser, stored only as a one-way hash, so that someone suspended for breaking the rules, or turned away as under 18, can't simply sign up again. It's never used for ads or tracking.</li>
@@ -56,8 +55,8 @@ function Terms() {
         <li>No spam, scams, selling, or recruiting.</li>
       </ul>
       <p>We may hold messages, pause accounts while we review reports, and suspend accounts that break these rules.</p>
-      <h2>Connect and payments</h2>
-      <p>A connect request uses one credit. Nothing is revealed unless the other person accepts. If they decline, or you cancel before they answer, the credit returns to your account. [Refund policy for unused credits.]</p>
+      <h2>Connect</h2>
+      <p>Talking and connecting are free. Nothing is revealed unless the other person accepts, and if they'd rather stay anonymous, that's final.</p>
       <h2>The service</h2>
       <p>Kindred is provided as is. [Limitation of liability, dispute resolution, governing law, and how changes to these terms are announced.]</p>
     </>
@@ -83,7 +82,6 @@ function DeleteAccount() {
       <ul>
         <li>Erased immediately: your email, password, birthdate, sign-in links, daily check-ins, notification addresses, and anything you revealed through Connect.</li>
         <li>Kept for 90 days, then permanently deleted: your messages and any reports involving you, so moderators can finish safety reviews.</li>
-        <li>Kept as required by law: records that a payment happened (amount and date, never card details).</li>
       </ul>
     </>
   );

@@ -2,12 +2,12 @@
 const crypto = require('crypto');
 const { hashPassword, verifyPassword, hashToken, deviceHash } = require('../auth');
 const { parseCredentials, badRequest } = require('../validate');
-const { httpError, asyncRoute, publicUser, RESET_TTL_MS, PLUS_MONTHLY_CREDITS } = require('./common');
+const { httpError, asyncRoute, publicUser, RESET_TTL_MS } = require('./common');
 const { createSignup } = require('./signup');
 
 const SOCIAL_PROVIDERS = [{ id: 'google', label: 'Google' }, { id: 'apple', label: 'Apple' }];
 
-module.exports = function register(app, { store, hub, auth, payments, push, mailer, captcha, social, socialPreview, emailCooldownMs, ads, adminEmails, authLimiter, member, siteUrl }) {
+module.exports = function register(app, { store, hub, auth, push, mailer, captcha, social, socialPreview, emailCooldownMs, ads, adminEmails, authLimiter, member, siteUrl }) {
   // Failed logins per account, whatever IPs they come from (slow down distributed guessing).
   const failedLogins = new Map(); // email -> { count, resetAt }
   const LOGIN_FAILS = { max: 10, windowMs: 15 * 60 * 1000 };
@@ -178,7 +178,6 @@ module.exports = function register(app, { store, hub, auth, payments, push, mail
           signIn: { hasPassword: await store.hasPassword(req.user.id), providers: await store.identityProviders(req.user.id) },
         }
         : null,
-      billing: { enabled: payments.enabled, priceCents: payments.priceCents, plusPriceCents: payments.plusPriceCents, plusCredits: PLUS_MONTHLY_CREDITS, currency: payments.currency },
       push: { publicKey: push.publicKey },
       captcha: { siteKey: captcha.siteKey },
       social: { providers: social.list(), soon: socialPreview ? SOCIAL_PROVIDERS.filter((p) => !social.has(p.id)) : [] },

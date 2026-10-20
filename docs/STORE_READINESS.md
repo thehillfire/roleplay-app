@@ -9,9 +9,6 @@ an account, money, a key or a legal decision only the owner can provide. How-to 
 - Both store apps open the live site, so one deploy updates web, Android and iPhone together.
 - They open it with `?app=android` / `?app=ios`. `client/src/shell.js` remembers that for the
   session and tags `<html data-shell>`. In a store app the site then:
-  - hides every purchase (connect credits, Kindred Plus, the Stripe portal): Play Payments policy
-    and App Store 3.1.1 require their own billing for digital goods. Credits and Plus bought on the
-    website still work inside the app; nothing in the app points people to the website to pay.
   - hides AdSense (not allowed inside app web views; ads in the apps would need AdMob).
 
 ## Both stores
@@ -27,12 +24,11 @@ an account, money, a key or a legal decision only the owner can provide. How-to 
 | User-generated content: report, block, moderation, removal | Done | chat menu, `docs/MODERATION.md` |
 | Age rating 18+ with an age gate | Done (birthdate check; under-18 refused and device-flagged) | signup |
 | Crisis resources | Done (988 + findahelpline on crisis language) | `components/Safety.jsx` |
-| No purchases outside store billing inside the apps | Done (hidden) | `shell.js` |
-| In-app purchases through store billing | Not built (decision for Jav: keep connect web-only, or add Play Billing / StoreKit) | n/a |
+| Purchases / store billing | Not needed: Kindred sells nothing (talking and connecting are free). Play Data safety and App Store: no purchases | n/a |
 | Camera permission explained before asking | Done in the game panel; the iOS Info.plist string is in `docs/IOS.md` | `NoSmile.jsx` |
 | Listing screenshots (Play 1080×1920, App Store 6.5" 1284×2778) and Play feature graphic | Script: `node e2e/store-shots.mjs` against a running server (`BASE_URL`, `OUT`) | `e2e/store-shots.mjs` |
 | Reviewer can test alone | Solo practice round in game modes; demo accounts go in the review notes | Practice screen |
-| Real keys: email, push, Turnstile, Stripe, moderation API | Jav | `docs/DEPLOY.md` |
+| Real keys: email, push, Turnstile, moderation API | Jav | `docs/DEPLOY.md` |
 
 ## Google Play only
 

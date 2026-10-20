@@ -16,7 +16,7 @@ const distDir = path.join(__dirname, '..', '..', 'dist');
 const staticDir = fs.existsSync(path.join(distDir, 'index.html')) ? distDir : undefined;
 
 if (process.env.NODE_ENV === 'production' && !process.env.PUBLIC_URL) {
-  console.warn('PUBLIC_URL is not set: password reset emails and Stripe checkout are disabled until it is.');
+  console.warn('PUBLIC_URL is not set: links in emails are disabled until it is.');
 }
 if (process.env.NODE_ENV === 'production' && !process.env.RESEND_API_KEY) {
   console.warn('RESEND_API_KEY is not set: no emails (password resets, confirmations, moderator alerts) will be sent.');

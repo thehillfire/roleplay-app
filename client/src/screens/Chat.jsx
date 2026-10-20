@@ -35,7 +35,7 @@ function formatTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-export default function Chat({ id, socket, unreadElsewhere = 0, onBack, onLeft, onPaused, billing, credits, onCreditsChanged }) {
+export default function Chat({ id, socket, unreadElsewhere = 0, onBack, onLeft, onPaused }) {
   const [convo, setConvo] = useState(null);
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState('');
@@ -150,7 +150,6 @@ export default function Chat({ id, socket, unreadElsewhere = 0, onBack, onLeft, 
         if (c && connection?.status === 'accepted' && c.connection?.status !== 'accepted') hype({ kind: 'connected', them: c.partner.handle });
         return c ? { ...c, connection } : c;
       });
-      onCreditsChanged(); // a declined request refunds the requester's credit
     });
     // After a reconnect, refetch in case messages arrived while offline.
     const offOpen = socket.on('open', load);
@@ -162,7 +161,7 @@ export default function Chat({ id, socket, unreadElsewhere = 0, onBack, onLeft, 
       document.removeEventListener('visibilitychange', onVisible);
       clearTimeout(typingTimer.current);
     };
-  }, [socket, id, load, onCreditsChanged]);
+  }, [socket, id, load]);
 
   // Follow the newest message (not older pages loaded above).
   const lastId = messages[messages.length - 1]?.id;
@@ -265,7 +264,6 @@ export default function Chat({ id, socket, unreadElsewhere = 0, onBack, onLeft, 
     const { connection } = await api.connect(id, name, contact);
     setConnection(connection);
     setConnectSheet(null);
-    onCreditsChanged();
   };
 
   const declineConnect = async () => {
@@ -279,7 +277,6 @@ export default function Chat({ id, socket, unreadElsewhere = 0, onBack, onLeft, 
   const cancelConnect = async () => {
     try {
       setConnection((await api.cancelConnect(id)).connection);
-      onCreditsChanged();
     } catch (err) {
       setSendError(err.message);
     }
@@ -554,8 +551,6 @@ export default function Chat({ id, socket, unreadElsewhere = 0, onBack, onLeft, 
         <ConnectSheet
           handle={convo.partner.handle}
           accepting={connectSheet === 'accept'}
-          billing={billing}
-          credits={credits}
           onSubmit={connect}
           onClose={() => setConnectSheet(null)}
         />

@@ -24,7 +24,7 @@ In Xcode (`ios/App/App/Info.plist`) add:
 | --- | --- |
 | 1.2 User-generated content: terms agreed at signup, filtering, report, block, timely moderation | Done (screener, report in every chat menu, block, moderator queue, `docs/MODERATION.md`) |
 | 1.4.1 / mental health: no medical claims | Copy says "peer support", 988 shown on crisis language. Keep it that way in the listing |
-| 3.1.1 In-app purchase: digital goods must use IAP | Purchase buttons are hidden when opened with `?app=ios` (`client/src/shell.js`). Credits/Plus bought on the web still apply |
+| 3.1.1 In-app purchase: digital goods must use IAP | Nothing is sold (talking and connecting are free), so no IAP is needed. AdSense is hidden when opened with `?app=ios` (`client/src/shell.js`) |
 | 4.8 Sign in with Apple when other social logins exist | Built (server side), turns on with Apple keys; see `docs/DEPLOY.md` |
 | 5.1.1(v) Account deletion in the app | Account → Delete account; public steps at `/delete-account` |
 | 5.1.2 Privacy: policy URL, App Privacy answers | `/privacy` (still marked Draft; needs a lawyer). Data list is in it |

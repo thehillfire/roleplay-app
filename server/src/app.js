@@ -4,7 +4,6 @@ const express = require('express');
 const helmet = require('helmet');
 const { createAuth } = require('./auth');
 const { createClassifier } = require('./classifier');
-const { createPayments } = require('./payments');
 const { createPush } = require('./push');
 const { createMailer } = require('./mailer');
 const { createCaptcha } = require('./captcha');
@@ -14,11 +13,9 @@ const { envInt } = require('./env');
 
 const { AUTO_PAUSE, createRateLimiter, httpError, asyncRoute } = require('./routes/common');
 const routes = {
-  webhook: require('./routes/webhook'),
   auth: require('./routes/auth'),
   social: require('./routes/social'),
   account: require('./routes/account'),
-  billing: require('./routes/billing'),
   conversations: require('./routes/conversations'),
   admin: require('./routes/admin'),
   bottles: require('./routes/bottles'),
@@ -31,7 +28,6 @@ function createApp({
   messageRateLimit = { max: 30, windowMs: 60000 },
   staticDir,
   log = process.env.NODE_ENV === 'test' || process.env.REQUEST_LOG === 'off' ? null : console,
-  payments = createPayments(),
   classifier = createClassifier(),
   autoPauseMinReporterAgeMs = AUTO_PAUSE.minReporterAgeMs,
   push = createPush(),
@@ -82,7 +78,6 @@ function createApp({
       },
     },
   }));
-  routes.webhook(app, { store, hub, payments });
 
   // One line per API request. Never bodies or query strings: they can hold message text or tokens.
   if (log) {
@@ -156,11 +151,10 @@ function createApp({
   // Rough live numbers for the home screen ("12 people here now").
   app.get('/api/presence', member, (req, res) => res.json(hub.stats()));
 
-  const ctx = { store, hub, auth, payments, classifier, push, mailer, captcha, social, socialPreview, emailCooldownMs, ads, adminEmails, autoPauseMinReporterAgeMs, authLimiter, messageLimiter, member, siteUrl, conversation };
+  const ctx = { store, hub, auth, classifier, push, mailer, captcha, social, socialPreview, emailCooldownMs, ads, adminEmails, autoPauseMinReporterAgeMs, authLimiter, messageLimiter, member, siteUrl, conversation };
   routes.auth(app, ctx);
   routes.social(app, ctx);
   routes.account(app, ctx);
-  routes.billing(app, ctx);
   routes.conversations(app, ctx);
   routes.bottles(app, ctx);
   routes.admin(app, ctx);

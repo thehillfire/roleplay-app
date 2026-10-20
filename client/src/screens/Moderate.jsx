@@ -120,7 +120,6 @@ export default function Moderate({ onBack }) {
             ['Members', stats.users],
             ['"Helped" this week', stats.helpfulWeek],
             ['Connections made', stats.connectsAccepted],
-            ['Revenue', new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(stats.revenueCents / 100)],
             ['Held to review', stats.heldToReview],
             ['Messages waiting for a listener', stats.messagesWaiting],
             ['Support requests open', stats.supportOpen],
@@ -293,7 +292,6 @@ export default function Moderate({ onBack }) {
             <span>Reports made: {found.reportsMade}</span>
             <span>Held messages: {found.held}</span>
             {found.role === 'admin' && <span>Moderator</span>}
-            {found.plus && <span>Kindred Plus</span>}
           </p>
           {found.actions.length > 0 && (
             <ol className="modlog">

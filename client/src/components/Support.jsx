@@ -3,7 +3,6 @@ import { api } from '../api.js';
 
 const TOPICS = [
   { id: 'account', label: 'My account' },
-  { id: 'billing', label: 'Payments' },
   { id: 'safety', label: 'Safety' },
   { id: 'feedback', label: 'Ideas & feedback' },
   { id: 'other', label: 'Something else' },

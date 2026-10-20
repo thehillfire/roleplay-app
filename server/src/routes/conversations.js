@@ -3,7 +3,7 @@ const { parseMessageBody, str, badRequest } = require('../validate');
 const { screenMessage } = require('../moderation');
 const { createRateLimiter, httpError, asyncRoute, connectionView, UNSEND_WINDOW_MS, REACTIONS, REPORT_REASONS, AUTO_PAUSE } = require('./common');
 
-module.exports = function register(app, { store, hub, payments, classifier, push, mailer, autoPauseMinReporterAgeMs, messageLimiter, member, conversation, siteUrl }) {
+module.exports = function register(app, { store, hub, classifier, push, mailer, autoPauseMinReporterAgeMs, messageLimiter, member, conversation, siteUrl }) {
   // Emails moderators about reports that can't wait (possible minors, people at risk).
   // Never includes message text: just what kind of report and where to look.
   const alertModerators = async (req, subject, line) => {
@@ -196,7 +196,7 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     res.json({ ok: true });
   }));
 
-  // --- Connect: mutual reveal. Requesting costs a credit (when payments are on); accepting is free. ---
+  // --- Connect: mutual reveal, free for both sides. ---
 
   const parseReveal = (body = {}) => ({
     name: str(body.name, 'name', 40),
@@ -214,8 +214,8 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     }
   };
 
-  // Asking, cancelling and asking again would ping the other person each time (free when payments
-  // are off, and a refund each cancel when they're on). A few asks a day per chat is plenty.
+  // Asking, cancelling and asking again would ping the other person each time. A few asks a day
+  // per chat is plenty.
   // Kept in the database, so a restart or a second server doesn't reset it.
   const CONNECT_ASKS_PER_DAY = 3;
 
@@ -238,14 +238,8 @@ module.exports = function register(app, { store, hub, payments, classifier, push
       const askId = await store.recordConnectAsk(req.user.id, id, { max: CONNECT_ASKS_PER_DAY, since: Date.now() - 24 * 60 * 60 * 1000 });
       if (!askId) throw httpError(429, "You've asked a few times today. Give them some room and try again tomorrow.");
       const unask = () => store.withdrawConnectAsk(askId);
-      const paid = payments.enabled;
-      if (paid && !(await store.spendCredit(req.user.id))) {
+      if (!(await store.createConnectRequest({ conversationId: id, requesterId: req.user.id, ...reveal }))) {
         await unask();
-        return res.status(402).json({ error: 'Connecting needs a credit.', needsCredit: true });
-      }
-      if (!(await store.createConnectRequest({ conversationId: id, requesterId: req.user.id, ...reveal, paid }))) {
-        await unask();
-        if (paid) await store.addCredits(req.user.id, 1); // lost a race with their request; refund
         throw httpError(409, 'They just sent you a request. Open it to accept.');
       }
     }
@@ -257,9 +251,7 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     const { id, partnerId } = req.conversation;
     const c = await store.getConnection(id);
     if (!c || c.status !== 'pending' || c.requesterId !== partnerId) throw httpError(404, 'No request to decline.');
-    // Only the request that actually flips it from pending refunds (no double refunds on races).
     if (!(await store.respondToConnect(id, { accept: false }))) throw httpError(409, 'That request was already answered.');
-    if (c.paid) await store.addCredits(partnerId, 1); // their credit comes back
     await pushConnection(id, [partnerId]);
     res.json({ connection: connectionView(await store.getConnection(id), req.user.id) });
   }));
@@ -268,7 +260,6 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     const { id, partnerId } = req.conversation;
     const c = await store.getConnection(id);
     if (!c || !(await store.cancelConnectRequest(id, req.user.id))) throw httpError(404, 'No request to cancel.');
-    if (c.paid) await store.addCredits(req.user.id, 1);
     await pushConnection(id, [partnerId]);
     res.json({ connection: { status: 'none' } });
   }));
@@ -286,9 +277,16 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     res.json({ ok: true });
   }));
 
+  // A block covers the person, so every thread with them ends (one per mode they played).
+  const blockAndEnd = async (userId, partnerId) => {
+    await store.block(userId, partnerId);
+    for (const conversationId of await store.conversationIdsBetween(userId, partnerId)) {
+      hub.push(partnerId, { type: 'conversation.ended', conversationId });
+    }
+  };
+
   app.post('/api/conversations/:id/block', member, conversation, asyncRoute(async (req, res) => {
-    await store.block(req.user.id, req.conversation.partnerId);
-    hub.push(req.conversation.partnerId, { type: 'conversation.ended', conversationId: req.conversation.id });
+    await blockAndEnd(req.user.id, req.conversation.partnerId);
     res.json({ ok: true });
   }));
 
@@ -303,8 +301,7 @@ module.exports = function register(app, { store, hub, payments, classifier, push
     const welfare = reason === 'self_harm';
     if (welfare) hub.push(partnerId, { type: 'support.resources', conversationId: id });
     if (req.body.block !== false && !welfare) {
-      await store.block(req.user.id, partnerId);
-      hub.push(partnerId, { type: 'conversation.ended', conversationId: id });
+      await blockAndEnd(req.user.id, partnerId);
     }
     const since = Date.now() - AUTO_PAUSE.window;
     const [all, minor] = await Promise.all([

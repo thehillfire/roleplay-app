@@ -15,8 +15,7 @@ module.exports = function register(app, { store, hub, classifier, messageLimiter
 
   app.post('/api/bottle', member, messageLimiter, asyncRoute(async (req, res) => {
     const body = str(req.body.body, 'message', 500);
-    const limit = req.user.plusUntil > Date.now() ? DAILY_MATCH_LIMIT * 3 : DAILY_MATCH_LIMIT;
-    if ((await store.conversationsStartedSince(req.user.id, Date.now() - DAY_MS)) >= limit) {
+    if ((await store.conversationsStartedSince(req.user.id, Date.now() - DAY_MS)) >= DAILY_MATCH_LIMIT) {
       throw httpError(429, "You've met a lot of new people today. You can keep talking with anyone in your list, and this opens again tomorrow.");
     }
     // No review queue for these, so anything a chat message would be held for is refused.

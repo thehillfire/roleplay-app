@@ -1,12 +1,11 @@
 // Which "shell" Kindred is running in: the plain website/PWA, or a store-installed app
-// (Google Play's Trusted Web Activity, or the iOS App Store wrapper). Store apps can't sell
-// digital goods through Stripe (Play Payments policy, App Store 3.1.1), so purchase buttons
-// are hidden there; anything bought on the website still works inside the app.
+// (Google Play's Trusted Web Activity, or the iOS App Store wrapper). Kindred sells nothing,
+// but AdSense isn't allowed inside app web views, so ads are hidden there.
 //
 // Store builds open the site with ?app=android or ?app=ios (see docs/ANDROID.md, docs/IOS.md).
 // That first launch is remembered for the session (in-app navigation drops the query string).
 // sessionStorage, not localStorage: Chrome shares storage between a TWA and the browser, and
-// the website itself should keep its purchase buttons.
+// the website itself should keep its ads.
 const KEY = 'kindred.shell';
 const SHELLS = ['android', 'ios'];
 

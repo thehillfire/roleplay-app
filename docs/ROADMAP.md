@@ -7,22 +7,22 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 ## 1. Core (tonight, first)
 - [x] Accounts with an anonymous handle (e.g. QuietHeron42), 18+ birthdate check and guidelines agreement at signup
 - [x] Matchmaking queue: "I need to talk" / "I can listen" / "Either", optional topic; never re-match blocked pairs
-- [x] Conversations + messages stored in the database; one thread per pair, so past matches can be continued
+- [x] Conversations + messages stored in the database; one thread per pair and game mode (talk, cringe, nosmile), so past matches can be continued
 - [x] Realtime delivery over WebSocket (messages, typing, match found); REST for sending and history
 - [x] Client: home, waiting room, chat, past conversations with unread counts
 
 ## 2. Safety
-- [x] Block (ends chat, never matched again) and report (reason + conversation snapshot)
+- [x] Block (ends every thread with that person, never matched again) and report (reason + conversation snapshot)
 - [x] Message screening before delivery: contact info (phones, emails, @handles, links) held back until connected; age probing flagged; self-disclosed under-18 suspends the account for review
 - [x] Crisis language shows the sender crisis resources (988 / findahelpline.com) without blocking them
 - [x] Auto-suspend after reports from several different people; rate limits on matching and messaging
 - [x] Moderator API (admin role): reports, held messages, suspend/restore; `npm run make-admin -- email`
 - [x] Moderator screen in the app (reports with transcripts, held messages, suspend/restore); `ADMIN_EMAILS` config
 
-## 3. Connect (the paid feature)
+## 3. Connect (free, mutual)
 - [x] Either person can request to connect; reveal only when both have
 - [x] Reveal shows a profile each person chose to share (name + optional contact), never email
-- [x] Payment behind an interface; Stripe Checkout when keys exist, free in development
+- [x] Free for everyone: Kindred sells nothing (Stripe, credits and Plus were removed)
 
 ## 4. Polish
 - [x] PWA: installable (manifest, icons, service worker) and web push for new messages and connect requests (handle only, never message text)
@@ -32,7 +32,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Deployment: Dockerfile (tested: production mode, non-root, clean SIGTERM), Render Blueprint, docs/DEPLOY.md
 
 ## 5. Community & launch readiness
-- [x] Kindred Plus subscription (monthly credits, more daily matches, Stripe customer portal); copy-paste spam detection
+- [x] Copy-paste spam detection
 - [x] Optional ML screening (OpenAI moderation endpoint, free): threats, hate, sexual+minors; fails open
 - [x] Link previews (Open Graph + share image); launch playbook (docs/LAUNCH.md)
 - [x] "N people are waiting for someone to listen" banner with one-tap Be a listener (balances the two sides)
@@ -43,7 +43,7 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 - [x] Unsend within 5 minutes (hidden for both; kept for moderators if reported)
 - [x] Per-account login lockout; database-aware health check
 - [x] First-run onboarding (3 cards, once per device) and listener tips
-- [x] Owner dashboard on the Moderate screen: here now, active today, messages, matches, signups, members, "helped", connections, revenue
+- [x] Owner dashboard on the Moderate screen: here now, active today, messages, matches, signups, members, "helped", connections
 - [x] Conversation openers, phone-friendly Enter, "End conversation", desktop chat layout
 - [x] Abuse resistance: daily cap on new matches; only reporters with day-old accounts count toward auto-pause
 - [x] Texting basics: "Seen" receipts, unread count in the tab title, wait-time hint
@@ -79,5 +79,5 @@ Rules that don't bend: 18+ only. Reveal is mutual. Safety tooling ships before g
 ## Decisions for the owner
 - **Email-first signup.** Signup still says when an email already has an account (the owner gets a heads-up email). Hiding it completely means confirming the email before the account exists: safer, but more friction at the moment someone needs to talk.
 - **Spanish UI.** The screener already handles Spanish, and the crisis card has Spanish 988 instructions. A Spanish interface plus language-aware matching would open the app to Spanish speakers.
-- **Real age assurance** (Yoti, Persona, Stripe Identity) once there's traction; see LAUNCH.md.
-- **Pricing** (LAUNCH.md recommends $4.99 connect and $4.99/month Plus).
+- **Real age assurance** (Yoti, Persona, or similar) once there's traction; see LAUNCH.md.
+- **Revenue.** Kindred is free and sells nothing; AdSense on the website home screen (hidden in the store apps) is the only income. Anything beyond that is open (see LAUNCH.md).

@@ -239,7 +239,6 @@ test('moderators see headline stats', async (t) => {
   assert.equal(stats.activeDay, 2);
   assert.equal(stats.messagesDay, 2);
   assert.equal(stats.matchesDay, 1);
-  assert.equal(stats.revenueCents, 0);
   assert.equal(stats.heldToReview, 1, '"send nudes" waits for review');
   assert.equal(stats.messagesWaiting, 0);
   assert.equal(stats.supportOpen, 0);

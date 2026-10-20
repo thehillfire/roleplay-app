@@ -1,9 +1,5 @@
 import { useState } from 'react';
 import useDialog from '../useDialog.js';
-import { api } from '../api.js';
-import { isStoreApp } from '../shell.js';
-
-const money = (cents, currency) => new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(cents / 100);
 
 // Shown above the messages: the state of a connect request in this conversation.
 const seenKey = (id) => `kd_declined_seen_${id}`;
@@ -55,40 +51,21 @@ export function ConnectBanner({ conversationId, connection, handle, onAccept, on
   return null;
 }
 
-// Collects what to reveal; buys a credit first when payments are on and none is left.
-export function ConnectSheet({ handle, accepting, billing, credits, onSubmit, onClose }) {
+// Collects what to reveal. Connecting is free.
+export function ConnectSheet({ handle, accepting, onSubmit, onClose }) {
   const dialog = useDialog(onClose);
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const needsPurchase = !accepting && billing?.enabled && credits < 1;
-  // In a store app purchases aren't offered (store payment rules), so no credit means no request.
-  const noCreditInApp = needsPurchase && isStoreApp();
-
-  const buy = async () => {
-    setBusy(true);
-    setError('');
-    try {
-      const { url } = await api.checkout();
-      window.location.assign(url);
-    } catch (err) {
-      setError(err.message);
-      setBusy(false);
-    }
-  };
-
   const submit = async (e) => {
     e.preventDefault();
-    if (noCreditInApp) return undefined;
-    if (needsPurchase) return buy();
     setBusy(true);
     setError('');
     try {
       await onSubmit(name.trim(), contact.trim());
     } catch (err) {
-      if (err.status === 402) setError('You need a connect credit first.');
-      else setError(err.message);
+      setError(err.message);
       setBusy(false);
     }
     return undefined;
@@ -112,20 +89,11 @@ export function ConnectSheet({ handle, accepting, billing, credits, onSubmit, on
           <span>A way to reach you <em>(optional: number, email, social)</em></span>
           <input value={contact} onChange={(e) => setContact(e.target.value)} maxLength={100} />
         </label>
-        {!accepting && billing?.enabled && (
-          <p className="price">
-            {credits > 0
-              ? `Uses 1 of your ${credits} connect ${credits === 1 ? 'credit' : 'credits'}. You get it back if they decline.`
-              : noCreditInApp
-              ? "A connect request uses a credit, and you don't have one right now."
-              : `A connect request costs ${money(billing.priceCents, billing.currency)}. If they decline, you keep the credit for someone else.`}
-          </p>
-        )}
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="sheet-actions">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn primary" disabled={busy || noCreditInApp || (!needsPurchase && !name.trim())}>
-            {busy ? 'One moment…' : noCreditInApp ? 'Send request' : needsPurchase ? `Buy for ${money(billing.priceCents, billing.currency)}` : accepting ? 'Accept and connect' : 'Send request'}
+          <button type="submit" className="btn primary" disabled={busy || !name.trim()}>
+            {busy ? 'One moment…' : accepting ? 'Accept and connect' : 'Send request'}
           </button>
         </div>
         </form>

@@ -151,9 +151,9 @@ test('support: members write in, moderators reply by email without seeing the ad
   const memberId = (await s.db.query('SELECT id FROM users WHERE email = $1', ['writer@example.com'])).rows[0].id;
   await s.store.markEmailVerified(memberId);
 
-  assert.equal((await member('POST', '/api/support', { topic: 'billing', message: '' })).status, 400);
-  assert.equal((await member('POST', '/api/support', { topic: 'billing', message: 'x' })).status, 400, 'too short to act on');
-  assert.equal((await member('POST', '/api/support', { topic: 'billing', message: 'I was charged twice this month.' })).status, 201);
+  assert.equal((await member('POST', '/api/support', { topic: 'feedback', message: '' })).status, 400);
+  assert.equal((await member('POST', '/api/support', { topic: 'feedback', message: 'x' })).status, 400, 'too short to act on');
+  assert.equal((await member('POST', '/api/support', { topic: 'feedback', message: 'I was charged twice this month.' })).status, 201);
   await new Promise((r) => setTimeout(r, 20));
   const alert = sent.find((m) => m.to === 'mod-support@example.com' && m.subject === '[Kindred] New support request');
   assert.ok(alert, 'moderators are told');

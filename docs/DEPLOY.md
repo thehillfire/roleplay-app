@@ -12,9 +12,8 @@ Kindred is one Node process: API, WebSocket and the built web app on one port. I
 2. In Render, choose **New → Blueprint** and select the repo. `render.yaml` creates the web service and a Postgres database and wires `DATABASE_URL` for you.
 3. When prompted, fill in:
    - `ADMIN_EMAILS`: your email, so you can moderate. Sign up, then use **Forgot password?** once. Completing that reset makes you a moderator, so set up email (below) first. Without email, run `npm run make-admin -- you@example.com` from the server's shell instead.
-   - `PUBLIC_URL`: your site's address, e.g. `https://kindred.example.com`. It's required in production. Emailed links and Stripe redirects never trust the request's Host header.
+   - `PUBLIC_URL`: your site's address, e.g. `https://kindred.example.com`. It's required in production. Emailed links never trust the request's Host header.
    - `VAPID_*`: run `npm run vapid` locally and paste the three lines (optional, enables notifications).
-   - `STRIPE_*`: see "Payments" below (optional; connecting is free without it).
 4. Deploy. Tables are created on first start. Open the URL, sign up with your admin email, and you'll see **Moderate** on the home screen.
 
 Plan names and prices change. If Render rejects `plan: starter` or `plan: basic-256mb`, pick the current equivalents in the dashboard.
@@ -74,15 +73,9 @@ Kindred only ever stores the provider's account id and the verified email; never
 
 `SOCIAL_PREVIEW=1` shows the providers that aren't set up yet as disabled "coming soon" buttons, to preview the layout. Leave it unset for real users. Not verified against the real Google and Apple services (they can't be reached from the test environment): the browser test `e2e/social.mjs` drives the whole flow against a fake provider, so the first real sign-in is the one thing left to try by hand.
 
-## Payments (Connect)
+## Payments
 
-1. Create a Stripe account and copy the **secret key** into `STRIPE_SECRET_KEY`.
-2. Stripe Dashboard → Developers → Webhooks → **Add endpoint**: `https://<your-domain>/api/billing/webhook`, events `checkout.session.completed`, `invoice.paid` and `customer.subscription.deleted`. Copy its **signing secret** into `STRIPE_WEBHOOK_SECRET`.
-   - For **Kindred Plus** (the monthly subscription), also turn on the **Customer portal** in Stripe (Settings → Billing → Customer portal) so subscribers can update their card or cancel. Price: `PLUS_PRICE_CENTS` (default `499`).
-3. Optional: `CONNECT_PRICE_CENTS` (default `999`) and `CONNECT_CURRENCY` (default `usd`).
-4. Test with Stripe's test keys and card `4242 4242 4242 4242` before switching to live keys.
-
-Both keys must be set for payments to turn on. Until then, connecting is free.
+None. Kindred sells nothing: talking and connecting are free, so there are no payment keys to set up. The only revenue is optional AdSense on the website's home screen (`ADSENSE_CLIENT` / `ADSENSE_SLOT`), which the store apps hide.
 
 ## Logs
 
@@ -123,4 +116,3 @@ node scripts/load-test.js http://localhost:3000 200 10
 - [ ] Someone is checking the moderation queue daily (reports of minors and threats first)
 - [ ] Database backups enabled (Render and Neon do daily backups on paid plans)
 - [ ] Privacy policy and terms published (age requirement, what's stored, 90-day retention for deleted accounts, how reports work)
-- [ ] Payments tested end to end in Stripe test mode

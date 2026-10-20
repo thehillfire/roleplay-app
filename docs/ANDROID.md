@@ -27,8 +27,8 @@ Easiest: **PWABuilder** (Microsoft's free tool).
    - Theme and background color: `#0b0a10`. Navigation bar color: `#0b0a10`.
    - Display: standalone · Orientation: portrait.
    - **Start URL: `/?app=android`.** This tells the site it's running as the Play app, so it hides
-     purchase buttons (Play's Payments policy: digital goods sold in a Play app must use Play
-     Billing). Credits bought on the website still work in the app.
+     AdSense (ads inside the app would need AdMob). Kindred sells nothing, so there's no Play
+     Billing to set up.
    - **Signing key: "Create new".** Download the zip and **keep the `.keystore` file and its passwords
      somewhere safe.** Losing it means you can't update the app (Play App Signing softens this, but
      still back it up).
@@ -63,7 +63,7 @@ Play Console asks for these. Kindred already has what the policies require; here
 | Content rating | Users can talk to each other; no sharing of photos or location; moderated |
 | User-generated content policy | In-app report (every chat menu), block, a moderation team, terms that ban abuse. All present |
 | Ads | "Yes, contains ads" only if you turn AdSense on |
-| Data safety | Collected: email, birthdate (age check), messages, hashed device ID (ban evasion), purchase history. Encrypted in transit. Users can request deletion. Not sold, not shared for ads |
+| Data safety | Collected: email, birthdate (age check), messages, hashed device ID (ban evasion). No purchases or financial info. Encrypted in transit. Users can request deletion. Not sold, not shared for ads |
 | Health/mental-health claims | Don't describe it as therapy or treatment. "Peer support", "someone to talk to" |
 
 Screenshots: phone screenshots 1080×1920 or similar. Run the app and capture the home screen, the

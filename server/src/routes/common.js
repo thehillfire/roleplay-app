@@ -4,7 +4,6 @@ const RESET_TTL_MS = 60 * 60 * 1000;
 const VERIFY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const UNSEND_WINDOW_MS = 5 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
-const PLUS_MONTHLY_CREDITS = 3;
 // A message left for the next listener waits this long, then quietly expires.
 const BOTTLE_TTL_MS = 24 * 60 * 60 * 1000;
 // Gentle on purpose: support, a hug, thanks. Nothing that could read as mocking.
@@ -37,8 +36,8 @@ function createRateLimiter({ max, windowMs, now = Date.now, key = (req) => req.i
 
 const httpError = (status, message) => Object.assign(new Error(message), { status, expose: true });
 const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-const publicUser = ({ id, handle, role, status, connectCredits, emailVerified, plusUntil, plusSubscriptionId, listenerAlerts, notice, createdAt }) => ({
-  id, handle, role, status, connectCredits, emailVerified, listenerAlerts: Boolean(listenerAlerts), plusUntil: plusUntil || 0, plus: (plusUntil || 0) > Date.now(), hasSubscription: Boolean(plusSubscriptionId), notice: notice || null, createdAt,
+const publicUser = ({ id, handle, role, status, emailVerified, listenerAlerts, notice, createdAt }) => ({
+  id, handle, role, status, emailVerified, listenerAlerts: Boolean(listenerAlerts), notice: notice || null, createdAt,
 });
 
 // What one side of a conversation may see about its connect state.
@@ -54,6 +53,6 @@ function connectionView(c, userId) {
 }
 
 module.exports = {
-  RESET_TTL_MS, VERIFY_TTL_MS, UNSEND_WINDOW_MS, DAY_MS, PLUS_MONTHLY_CREDITS, BOTTLE_TTL_MS, REACTIONS, REPORT_REASONS, AUTO_PAUSE,
+  RESET_TTL_MS, VERIFY_TTL_MS, UNSEND_WINDOW_MS, DAY_MS, BOTTLE_TTL_MS, REACTIONS, REPORT_REASONS, AUTO_PAUSE,
   createRateLimiter, httpError, asyncRoute, publicUser, connectionView,
 };

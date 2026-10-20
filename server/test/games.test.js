@@ -52,7 +52,7 @@ test("Don't Smile relays smiles; junk and other people's chats are ignored", asy
   assert.deepEqual(smile, { type: 'game', conversationId: g.id, kind: 'smiled' }, 'the bad card number is dropped');
 });
 
-test('matching again in another mode switches the chat to it', async (t) => {
+test('each mode gets its own thread with the same person; matching again in a mode reuses it', async (t) => {
   const s = await start();
   t.after(s.stop);
   const g = await playing(s, 'nosmile');
@@ -63,6 +63,20 @@ test('matching again in another mode switches the chat to it', async (t) => {
   a.send({ type: 'match.join', role: 'talk' });
   await a.next('match.waiting');
   b.send({ type: 'match.join', role: 'listen' });
-  assert.equal((await a.next('match.found')).conversationId, g.id, 'same pair, same thread');
-  assert.equal((await g.a('GET', `/api/conversations/${g.id}`)).body.conversation.mode, 'talk');
+  const talk = (await a.next('match.found')).conversationId;
+  assert.notEqual(talk, g.id, 'another mode, another thread');
+  assert.equal((await g.a('GET', `/api/conversations/${talk}`)).body.conversation.mode, 'talk');
+  assert.equal((await g.a('GET', `/api/conversations/${g.id}`)).body.conversation.mode, 'nosmile', 'the game thread keeps its mode');
+  await b.next('match.found');
+
+  a.send({ type: 'match.join', mode: 'nosmile' });
+  await a.next('match.waiting');
+  b.send({ type: 'match.join', mode: 'nosmile' });
+  assert.equal((await a.next('match.found')).conversationId, g.id, 'same mode again: same thread');
+  await b.next('match.found');
+
+  // Blocking ends every thread with them, and the other side hears about each one.
+  assert.equal((await g.a('POST', `/api/conversations/${talk}/block`)).status, 200);
+  const ended = [(await b.next('conversation.ended')).conversationId, (await b.next('conversation.ended')).conversationId].sort();
+  assert.deepEqual(ended, [talk, g.id].sort());
 });

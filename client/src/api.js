@@ -54,9 +54,6 @@ export const api = {
   sendSupport: (topic, message) => request('POST', '/api/support', { topic, message }),
   dismissNotice: () => request('POST', '/api/account/notice/dismiss', {}),
   deleteAccount: (password) => request('POST', '/api/account/delete', { password }),
-  checkout: () => request('POST', '/api/billing/checkout', {}),
-  subscribePlus: () => request('POST', '/api/billing/plus', {}),
-  billingPortal: () => request('POST', '/api/billing/portal', {}),
   appeal: () => request('GET', '/api/appeal').then((d) => d.appeal),
   sendAppeal: (message) => request('POST', '/api/appeal', { message }).then((d) => d.appeal),
   admin: {

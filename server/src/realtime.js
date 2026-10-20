@@ -159,8 +159,7 @@ function attachRealtime({
 
   // A listener nobody is waiting for live picks up the oldest message left for the next listener.
   const underDailyCap = async (userId) => {
-    const [today, u] = await Promise.all([store.conversationsStartedSince(userId, Date.now() - DAY_MS), store.getUser(userId)]);
-    return today < (u?.plusUntil > Date.now() ? dailyMatchLimit * 3 : dailyMatchLimit);
+    return (await store.conversationsStartedSince(userId, Date.now() - DAY_MS)) < dailyMatchLimit;
   };
   const answerBottle = async (listener, blocked) => {
     const candidates = await store.openBottleCandidates(listener.id, Date.now() - BOTTLE_TTL_MS);
@@ -269,10 +268,8 @@ function attachRealtime({
         store.conversationsStartedSince(user.id, Date.now() - DAY_MS),
         store.ageBand(user.id),
       ]);
-      // Kindred Plus members can meet more new people a day.
-      const fresh = await store.getUser(user.id);
-      const limit = fresh?.plusUntil > Date.now() ? dailyMatchLimit * 3 : dailyMatchLimit;
-      if (today >= limit) {
+      // A cap on new strangers a day (not on talking): it slows down anyone cycling through people.
+      if (today >= dailyMatchLimit) {
         ws.send(JSON.stringify({ type: 'match.error', error: "You've met a lot of new people today. You can keep talking with anyone in your list, and matching opens again tomorrow." }));
         return;
       }

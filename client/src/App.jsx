@@ -84,7 +84,7 @@ function Paused({ onSignOut, onCheck, onOpenLegal }) {
   );
 }
 
-function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere, onDeleted, onPaused, onRefreshMe, onCheckSession, onOpenLegal, initialNotice, externalNotice, reauthDone }) {
+function Signedin({ user, ads, pushKey, onSignOut, onSignOutEverywhere, onDeleted, onPaused, onRefreshMe, onCheckSession, onOpenLegal, externalNotice, reauthDone }) {
   // A reload mid-chat stays in the chat (the browser keeps history.state across reloads). Opening
   // the site afresh (typing the address, a link) starts at home even if the state survived.
   const restoreChat = () => {
@@ -123,7 +123,7 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
     if (window.history.state?.view && window.history.state.view.name !== 'home') window.history.back();
     else setView({ name: 'home' });
   }, []);
-  const [notice, setNotice] = useState(initialNotice || '');
+  const [notice, setNotice] = useState('');
   useEffect(() => {
     if (externalNotice) setNotice(externalNotice);
   }, [externalNotice]);
@@ -213,7 +213,6 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
         // looks like any other failure, so check after a couple of failed tries too.
         if (code === 4003 || attempt === 2) onCheckSession();
       }),
-      socket.on('credits.updated', onRefreshMe),
       socket.on('presence', ({ online, waiting, waitingToTalk }) => setPresence({ online, waiting, waitingToTalk })),
       socket.on('bottle.answered', ({ partner }) => {
         setNotice(`💙 ${partner.handle} picked up your message.`);
@@ -286,7 +285,7 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
       )}
       {view.name === 'moderate' && <Moderate onBack={goHome} />}
       {view.name === 'practice' && <Practice mode={view.mode} onBack={goHome} />}
-      {view.name === 'account' && <Account user={user} billing={billing} pushKey={pushKey} onUserChanged={onRefreshMe} onBack={goHome} onSignOut={onSignOut} onSignOutEverywhere={onSignOutEverywhere} onDeleted={onDeleted} onOpenLegal={onOpenLegal} reauthDone={reauthDone} />}
+      {view.name === 'account' && <Account user={user} pushKey={pushKey} onUserChanged={onRefreshMe} onBack={goHome} onSignOut={onSignOut} onSignOutEverywhere={onSignOutEverywhere} onDeleted={onDeleted} onOpenLegal={onOpenLegal} reauthDone={reauthDone} />}
       {view.name === 'waiting' && <Waiting
           onCancel={cancel}
           onPractice={findMode === 'talk' ? undefined : () => navigate({ name: 'practice', mode: findMode }, { replace: true })}
@@ -321,16 +320,12 @@ function Signedin({ user, billing, ads, pushKey, onSignOut, onSignOutEverywhere,
             goHome();
           }}
           onPaused={onPaused}
-          billing={billing}
-          credits={user.connectCredits}
-          onCreditsChanged={onRefreshMe}
         />
       )}
     </>
   );
 }
 
-// Returning from Stripe Checkout lands on /?checkout=success|cancelled.
 // Words for how a Google/Apple sign-in ended (the server sends only a short code, never text).
 const SOCIAL_MESSAGES = {
   cancelled: 'Sign-in was cancelled. No problem: try again whenever you like.',
@@ -359,25 +354,13 @@ function takeArrival() {
   };
 }
 
-function takeCheckoutNotice() {
-  const result = new URLSearchParams(window.location.search).get('checkout');
-  if (!result) return '';
-  window.history.replaceState(null, '', window.location.pathname);
-  if (result === 'plus') return 'Welcome to Kindred Plus! Your monthly credits will appear in a moment.';
-  return result === 'success'
-    ? 'Payment received. Your connect credit will be ready in a moment.'
-    : 'Checkout cancelled. Nothing was charged.';
-}
-
 export default function App() {
   const [user, setUser] = useState(undefined); // undefined while checking the session
   const userRef = useRef(user);
   userRef.current = user;
-  const [billing, setBilling] = useState(null);
   const [pushKey, setPushKey] = useState(null);
   const [ads, setAds] = useState(null);
   const [captchaSiteKey, setCaptchaSiteKey] = useState(null);
-  const [checkoutNotice] = useState(takeCheckoutNotice);
   const [arrival] = useState(takeArrival);
   const [social, setSocial] = useState({ providers: [], soon: [] });
   // The lightning "you're in" after signing in or up ('new' | 'back' | null).
@@ -399,7 +382,6 @@ export default function App() {
     // Signed in a moment ago and now not: the session ended elsewhere.
     if (!d.user && userRef.current) setWelcomeMode('expired');
     setUser(d.user);
-    setBilling(d.billing);
     setPushKey(d.push?.publicKey || null);
     setAds(d.ads || null);
     setCaptchaSiteKey(d.captcha?.siteKey || null);
@@ -537,10 +519,8 @@ export default function App() {
         <Signedin
           key={user.id}
           user={user}
-          billing={billing}
           ads={ads}
           pushKey={pushKey}
-          initialNotice={checkoutNotice}
           reauthDone={arrival.reauth}
           externalNotice={verifyNotice}
           onSignOut={signOut}

@@ -18,13 +18,9 @@ function userFromRow(row) {
     handle: row.handle,
     role: row.role,
     status: row.status,
-    connectCredits: num(row.connect_credits) || 0,
     emailVerified: Boolean(row.email_verified_at),
-    plusUntil: num(row.plus_until) || 0,
     listenerAlerts: Boolean(num(row.listener_alerts)),
     notice: row.notice || null,
-    stripeCustomerId: row.stripe_customer_id || null,
-    plusSubscriptionId: row.plus_subscription_id || null,
     createdAt: num(row.created_at),
   };
 }
@@ -70,7 +66,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       const exists = await db.query('SELECT 1 FROM users WHERE email = $1', [email]);
       if (exists.rows.length) return null;
       for (let attempt = 0; attempt < 8; attempt += 1) {
-        const user = { id: newId(), email, handle: randomHandle(rng), role: 'member', status: 'active', connectCredits: 0, emailVerified: false, createdAt: now() };
+        const user = { id: newId(), email, handle: randomHandle(rng), role: 'member', status: 'active', emailVerified: false, createdAt: now() };
         try {
           await db.query(
             'INSERT INTO users (id, email, handle, password_hash, birthdate, created_at) VALUES ($1, $2, $3, $4, $5, $6)',
@@ -234,19 +230,27 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
 
     // --- conversations ---
 
-    // One thread per pair: matching with someone again continues the same conversation.
+    // One thread per pair and mode: matching with someone again in the same mode continues that
+    // conversation; a different game mode gets its own thread. Talk threads keep the plain pair key
+    // (the key every thread had before modes were split).
     async openConversation(a, b, { mode = 'talk' } = {}) {
-      const key = pairKey(a, b);
+      const key = mode === 'talk' ? pairKey(a, b) : `${pairKey(a, b)}:${mode}`;
       const t = now();
       const inserted = await db.query(
         `INSERT INTO conversations (id, pair_key, user_a, user_b, created_at, last_message_at, mode)
          VALUES ($1, $2, $3, $4, $5, $5, $6) ON CONFLICT (pair_key) DO NOTHING`,
         [newId(), key, a < b ? a : b, a < b ? b : a, t, mode],
       );
-      // Matched again: the conversation comes back for anyone who had hidden it, in the new mode.
+      // Matched again: the conversation comes back for anyone who had hidden it.
       if (inserted.rowCount === 0) await db.query('UPDATE conversations SET hidden_a = 0, hidden_b = 0, mode = $2 WHERE pair_key = $1', [key, mode]);
       const { rows } = await db.query('SELECT id FROM conversations WHERE pair_key = $1', [key]);
       return { id: rows[0].id, isNew: inserted.rowCount === 1 };
+    },
+
+    // Every thread two people share (one per mode they've played together).
+    async conversationIdsBetween(a, b) {
+      const { rows } = await db.query('SELECT id FROM conversations WHERE user_a = $1 AND user_b = $2', [a < b ? a : b, a < b ? b : a]);
+      return rows.map((r) => r.id);
     },
 
     async muteConversation(userId, conversationId, muted) {
@@ -595,30 +599,16 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         requester: { name: r.requester_name, contact: r.requester_contact },
         accepter: { name: r.accepter_name, contact: r.accepter_contact },
         status: r.status,
-        paid: Number(r.paid) === 1,
         createdAt: num(r.created_at),
         respondedAt: num(r.responded_at),
       };
     },
 
-    // Spends one credit if the user has one. Returns false otherwise (atomic).
-    async spendCredit(userId) {
+    async createConnectRequest({ conversationId, requesterId, name, contact }) {
       const { rowCount } = await db.query(
-        'UPDATE users SET connect_credits = connect_credits - 1 WHERE id = $1 AND connect_credits > 0',
-        [userId],
-      );
-      return rowCount === 1;
-    },
-
-    async addCredits(userId, n) {
-      await db.query('UPDATE users SET connect_credits = connect_credits + $1 WHERE id = $2', [n, userId]);
-    },
-
-    async createConnectRequest({ conversationId, requesterId, name, contact, paid }) {
-      const { rowCount } = await db.query(
-        `INSERT INTO connections (conversation_id, requester_id, requester_name, requester_contact, paid, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (conversation_id) DO NOTHING`,
-        [conversationId, requesterId, name, contact || null, paid ? 1 : 0, now()],
+        `INSERT INTO connections (conversation_id, requester_id, requester_name, requester_contact, created_at)
+         VALUES ($1, $2, $3, $4, $5) ON CONFLICT (conversation_id) DO NOTHING`,
+        [conversationId, requesterId, name, contact || null, now()],
       );
       return rowCount === 1;
     },
@@ -637,16 +627,6 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
          WHERE conversation_id = $5 AND status = 'pending'`,
         [accept ? 'accepted' : 'declined', accept ? name : null, accept ? contact || null : null, now(), conversationId],
       );
-      return rowCount === 1;
-    },
-
-    // Records a completed payment once (webhooks can be retried) and grants its credits.
-    async recordPayment({ id, userId, amountCents, credits }) {
-      const { rowCount } = await db.query(
-        'INSERT INTO payments (id, user_id, amount_cents, credits, created_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING',
-        [id, userId, amountCents, credits, now()],
-      );
-      if (rowCount === 1) await store.addCredits(userId, credits);
       return rowCount === 1;
     },
 
@@ -816,7 +796,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       const checkins = await store.recentCheckins(userId, 10000);
       return {
         exportedAt: new Date(now()).toISOString(),
-        account: { handle: user.handle, email: user.email, birthdate: raw.birthdate, createdAt: new Date(user.createdAt).toISOString(), connectCredits: user.connectCredits },
+        account: { handle: user.handle, email: user.email, birthdate: raw.birthdate, createdAt: new Date(user.createdAt).toISOString() },
         conversations: threads,
         reportsYouFiled: reports.map((r) => ({ reason: r.reason, details: r.details, status: r.status, at: new Date(num(r.created_at)).toISOString() })),
         dailyCheckins: checkins,
@@ -877,7 +857,7 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       const day = t - 24 * 60 * 60 * 1000;
       const week = t - 7 * 24 * 60 * 60 * 1000;
       const one = async (sql, params = []) => Number(Object.values((await db.query(sql, params)).rows[0])[0]) || 0;
-      const [users, signupsDay, signupsWeek, activeDay, messagesDay, matchesDay, connectsAccepted, revenueCents, helpfulWeek, heldToReview, messagesWaiting, supportOpen] = await Promise.all([
+      const [users, signupsDay, signupsWeek, activeDay, messagesDay, matchesDay, connectsAccepted, helpfulWeek, heldToReview, messagesWaiting, supportOpen] = await Promise.all([
         one("SELECT COUNT(*) FROM users WHERE status <> 'deleted'"),
         one("SELECT COUNT(*) FROM users WHERE created_at >= $1 AND status <> 'deleted'", [day]),
         one("SELECT COUNT(*) FROM users WHERE created_at >= $1 AND status <> 'deleted'", [week]),
@@ -885,13 +865,12 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         one("SELECT COUNT(*) FROM messages WHERE created_at >= $1 AND status = 'delivered'", [day]),
         one('SELECT COUNT(*) FROM conversations WHERE created_at >= $1', [day]),
         one("SELECT COUNT(*) FROM connections WHERE status = 'accepted'"),
-        one('SELECT COALESCE(SUM(amount_cents), 0) FROM payments'),
         one('SELECT COUNT(*) FROM feedback WHERE helpful = 1 AND created_at >= $1', [week]),
         one("SELECT COUNT(*) FROM messages WHERE status = 'held' AND reviewed_at IS NULL"),
         one("SELECT COUNT(*) FROM bottles WHERE status = 'open' AND created_at >= $1", [day]),
         one("SELECT COUNT(*) FROM support_requests WHERE status = 'open'"),
       ]);
-      return { users, signupsDay, signupsWeek, activeDay, messagesDay, matchesDay, connectsAccepted, revenueCents, helpfulWeek, heldToReview, messagesWaiting, supportOpen };
+      return { users, signupsDay, signupsWeek, activeDay, messagesDay, matchesDay, connectsAccepted, helpfulWeek, heldToReview, messagesWaiting, supportOpen };
     },
 
     // --- moderation operations ---
@@ -925,7 +904,6 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
       );
       return {
         id: u.id, handle: u.handle, status: u.status, role: u.role, createdAt: num(u.created_at),
-        plus: (num(u.plus_until) || 0) > now(),
         reportsOpen, reportsTotal, reportsMade, held,
         actions: actions.map((r) => ({ id: r.id, action: r.action, detail: r.detail, createdAt: num(r.created_at), moderator: r.moderator_id ? r.moderator_handle || '(former moderator)' : 'system' })),
       };
@@ -1029,29 +1007,6 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
     async moderatorEmails() {
       const { rows } = await db.query("SELECT email FROM users WHERE role = 'admin' AND status = 'active' AND email_verified_at IS NOT NULL");
       return rows.map((r) => r.email);
-    },
-
-    // --- Kindred Plus ---
-
-    async linkSubscription(userId, { customerId, subscriptionId }) {
-      await db.query(
-        'UPDATE users SET stripe_customer_id = COALESCE($1, stripe_customer_id), plus_subscription_id = $2 WHERE id = $3',
-        [customerId || null, subscriptionId, userId],
-      );
-    },
-
-    async userBySubscription(subscriptionId) {
-      const { rows } = await db.query('SELECT * FROM users WHERE plus_subscription_id = $1', [subscriptionId]);
-      return userFromRow(rows[0]);
-    },
-
-    // Extends Plus to `until` (never shortens it, so out-of-order webhooks are harmless).
-    async extendPlus(userId, until) {
-      await db.query('UPDATE users SET plus_until = $1 WHERE id = $2 AND (plus_until IS NULL OR plus_until < $1)', [until, userId]);
-    },
-
-    async endPlus(userId, until) {
-      await db.query('UPDATE users SET plus_until = CASE WHEN plus_until > $1 THEN $1 ELSE plus_until END, plus_subscription_id = NULL WHERE id = $2', [until, userId]);
     },
 
     async listHeldMessages({ limit = 50 } = {}) {
