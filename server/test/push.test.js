@@ -45,8 +45,9 @@ test('offline partners get a push with the handle but never the message text', a
   // A subscription the push service reports gone is removed.
   failNext = 1;
   await alice('POST', `/api/conversations/${id}/messages`, { body: 'hello again' });
-  await new Promise((r) => setTimeout(r, 30));
   const bobId = (await s.db.query('SELECT id FROM users WHERE handle = $1', [bob.user.handle])).rows[0].id;
+  // The removal happens after the response, in the background: wait for it rather than a fixed delay.
+  for (let i = 0; i < 100 && (await s.store.pushSubscriptions(bobId)).length; i += 1) await new Promise((r) => setTimeout(r, 20));
   assert.deepEqual(await s.store.pushSubscriptions(bobId), []);
   await aws.close();
 });
