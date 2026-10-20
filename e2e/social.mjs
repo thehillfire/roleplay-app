@@ -168,8 +168,8 @@ step('sign up with Google: signed in with the lightning entry, anonymous name, n
 // 4. Sign out, then sign in with Google: same person, "welcome back".
 await sam.getByRole('button', { name: 'Account' }).click();
 await sam.getByRole('button', { name: 'Sign out', exact: true }).click();
-await sam.getByRole('button', { name: 'Get started' }).click();
-await sam.getByRole('tab', { name: 'Sign in' }).click();
+// A device that has had an account opens straight on Sign in.
+await sam.getByRole('tab', { name: 'Sign in', selected: true }).waitFor();
 await sam.getByRole('button', { name: 'Continue with Google' }).click();
 await sam.locator('.strike').waitFor({ timeout: 15000 });
 assert.match(await sam.locator('.strike-title').innerText(), /welcome back/i);

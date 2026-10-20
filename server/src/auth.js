@@ -4,7 +4,12 @@ const { promisify } = require('util');
 const scrypt = promisify(crypto.scrypt);
 const KEYLEN = 64;
 const COOKIE = 'lf_sid';
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+// Sessions slide: each day someone uses the app, their sign-in is pushed out to 180 days again,
+// so anyone who comes back at least twice a year never sees the sign-in screen. Signing out,
+// "sign out everywhere", a password reset or a suspension still end it at once.
+const DAY_MS = 24 * 60 * 60 * 1000;
+const SESSION_TTL_MS = 180 * DAY_MS;
+const RENEW_AFTER_MS = DAY_MS; // at most one renewal write per session per day
 
 async function hashPassword(password) {
   const salt = crypto.randomBytes(16);
@@ -73,6 +78,10 @@ function createAuth(store) {
         try {
           const token = readCookie(req, COOKIE);
           req.user = token ? await store.findSessionUser(hashToken(token)) : null;
+          if (req.user && req.user.sessionExpiresAt - Date.now() < SESSION_TTL_MS - RENEW_AFTER_MS) {
+            await store.renewSession(hashToken(token), SESSION_TTL_MS);
+            res.append('Set-Cookie', `${COOKIE}=${token}; ${cookieOptions(req, SESSION_TTL_MS / 1000)}`);
+          }
           next();
         } catch (err) {
           next(err);
@@ -88,4 +97,4 @@ function createAuth(store) {
   };
 }
 
-module.exports = { createAuth, hashPassword, verifyPassword, readCookie, hashToken, deviceHash, COOKIE };
+module.exports = { createAuth, hashPassword, verifyPassword, readCookie, hashToken, deviceHash, COOKIE, SESSION_TTL_MS };

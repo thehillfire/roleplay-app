@@ -147,7 +147,11 @@ function createStore(db, { now = Date.now, rng = Math.random } = {}) {
         await db.query('DELETE FROM sessions WHERE token_hash = $1', [tokenHash]);
         return null;
       }
-      return userFromRow(row);
+      return { ...userFromRow(row), sessionExpiresAt: num(row.expires_at) };
+    },
+
+    async renewSession(tokenHash, ttlMs) {
+      await db.query('UPDATE sessions SET expires_at = $1 WHERE token_hash = $2', [now() + ttlMs, tokenHash]);
     },
 
     async deleteAllSessions(userId) {

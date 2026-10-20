@@ -186,3 +186,28 @@ test('signup refuses the most common passwords', async (t) => {
   const named = await client(s.base)('POST', '/api/auth/signup', adult({ email: 'riverstone@example.com', password: 'riverstone' }));
   assert.equal(named.status, 400, 'not the email name either');
 });
+
+test('sessions slide: using the app keeps you signed in; a lapsed session still ends', async (t) => {
+  const s = await start();
+  t.after(s.stop);
+  const { SESSION_TTL_MS } = require('../src/auth');
+  const creds = adult();
+  const phone = client(s.base);
+  await phone('POST', '/api/auth/signup', creds);
+  const expiry = async () => Number((await s.db.query('SELECT expires_at FROM sessions')).rows[0].expires_at);
+
+  // A fresh session isn't rewritten on every request.
+  const first = await expiry();
+  await phone('GET', '/api/auth/me');
+  assert.equal(await expiry(), first, 'no write within the first day');
+
+  // Ten days later (as if): the next visit pushes it back out to the full length.
+  await s.db.query('UPDATE sessions SET expires_at = $1', [Date.now() + SESSION_TTL_MS - 10 * 24 * 60 * 60 * 1000]);
+  const res = await fetch(`${s.base}/api/auth/me`, { headers: { cookie: phone.cookie() } });
+  assert.match(res.headers.get('set-cookie') || '', /lf_sid=.*Max-Age=15552000/, 'cookie renewed for 180 days');
+  assert.ok(await expiry() > Date.now() + SESSION_TTL_MS - 60000, 'renewed in the database too');
+
+  // A session that already lapsed is gone, renewal or not.
+  await s.db.query('UPDATE sessions SET expires_at = $1', [Date.now() - 1000]);
+  assert.equal((await phone('GET', '/api/auth/me')).body.user, null);
+});

@@ -75,6 +75,8 @@ TEST_DATABASE_URL=postgres://postgres@localhost:5433/loreforge_test npm run test
      - A bad `/verify#…` link explains itself on the sign-in screen. The paused screen links to the community rules. The topic survives a cancelled search. Support needs 5+ characters. The moderator stats fold away so the queues are first, and the tabs wrap.
      - Left as is: re-matching the same person in another mode reuses one thread (by design: one thread per pair; ask Jav if modes should get separate threads). The strike-over-onboarding and preview-mode social copy went to the other session (fixed in 4d81c4d).
 
+5. **Staying signed in (2026-10-20, session 017tKMDq):** sessions now last 180 days and slide: the first request each day pushes the expiry back out (`server/src/auth.js`, `store.renewSession`). Sign out, sign out everywhere, a password reset or a suspension still end sessions at once. A device that has had an account (a `kindred.returning` flag in localStorage, never the email) opens on the Sign in tab after signing out; deleting the account clears the flag. **On Render, sessions only survive restarts with a real database (`DATABASE_URL`).** The free SQLite setup wipes accounts and sessions on every restart, which looks like being logged out.
+
 ## Decisions waiting on Jav
 
 - **Email-first signup:** today, signup reveals whether an email already has an account.

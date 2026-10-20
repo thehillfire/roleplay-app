@@ -298,7 +298,8 @@ if (process.env.MOD_EMAIL && process.env.MAIL_LOG) {
   // Moderator rights come from completing a password reset (proves the inbox, replaces the password).
   await mod.getByRole('button', { name: 'Account' }).click();
   await mod.getByRole('button', { name: 'Sign out', exact: true }).click();
-  await mod.getByRole('button', { name: 'I have an account' }).click();
+  // A device that has had an account opens straight on Sign in.
+  await mod.getByRole('tab', { name: 'Sign in', selected: true }).waitFor();
   await mod.getByRole('button', { name: 'Forgot password?' }).click();
   await mod.getByLabel('Email').fill(process.env.MOD_EMAIL);
   await mod.getByRole('button', { name: 'Send reset link' }).click();
@@ -383,7 +384,8 @@ if (process.env.MAIL_LOG) {
   await bob.goto(BASE);
   await bob.getByRole('button', { name: 'Account' }).click();
   await bob.getByRole('button', { name: 'Sign out', exact: true }).click();
-  await bob.getByRole('button', { name: 'I have an account' }).click();
+  // A device that has had an account opens straight on Sign in.
+  await bob.getByRole('tab', { name: 'Sign in', selected: true }).waitFor();
   await bob.getByRole('button', { name: 'Forgot password?' }).click();
   await bob.getByLabel('Email').fill(bobEmail);
   await bob.getByRole('button', { name: 'Send reset link' }).click();

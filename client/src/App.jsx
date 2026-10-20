@@ -391,7 +391,11 @@ export default function App() {
   }, []);
   const booting = user === undefined || bootHeld;
 
+  // A device that has had an account opens on Sign in after signing out, not the newcomer
+  // landing page. Only a flag: never the email (phones get shared; this is an anonymous app).
+  const [returning] = useState(() => { try { return localStorage.getItem('kindred.returning') === '1'; } catch { return false; } });
   const refreshMe = useCallback(() => api.me().then((d) => {
+    if (d.user) { try { localStorage.setItem('kindred.returning', '1'); } catch { /* private mode */ } }
     // Signed in a moment ago and now not: the session ended elsewhere.
     if (!d.user && userRef.current) setWelcomeMode('expired');
     setUser(d.user);
@@ -451,6 +455,7 @@ export default function App() {
   };
 
   const deleted = () => {
+    try { localStorage.removeItem('kindred.returning'); } catch { /* private mode */ }
     // A fresh page: the next person's Back button can't walk into the previous account's screens.
     window.location.replace('/?deleted=1');
   };
@@ -526,7 +531,7 @@ export default function App() {
       <div hidden={Boolean(legal) || resetToken !== null}>
       {booting && <Loader label={unreachable ? "Can't reach Kindred. Trying again…" : undefined} />}
       {booting && unreachable && <p className="boot-offline" role="status">Can't reach Kindred right now. We'll keep trying.</p>}
-      {!booting && user === null && <Welcome key={welcomeMode || 'landing'} initialMode={welcomeMode === 'forgot' ? 'forgot' : welcomeMode === 'expired' || welcomeMode === 'verify' ? 'login' : arrival.socialNotice ? (arrival.tab === 'signup' ? 'signup' : 'login') : null} farewell={welcomeMode === 'deleted'} notice={welcomeMode === 'expired' ? 'You were signed out. Sign in again to carry on.' : welcomeMode === 'verify' ? `${verifyNotice} Sign in to send a new confirmation link.` : arrival.socialNotice || ''} onSignedIn={(u, meta) => { setEntry(meta?.isNew ? 'new' : 'back'); refreshMe().catch(() => setUser(u)); }} onOpenLegal={openLegal} captchaSiteKey={captchaSiteKey} social={social} />}
+      {!booting && user === null && <Welcome key={welcomeMode || 'landing'} initialMode={welcomeMode === 'forgot' ? 'forgot' : welcomeMode === 'expired' || welcomeMode === 'verify' ? 'login' : arrival.socialNotice ? (arrival.tab === 'signup' ? 'signup' : 'login') : returning && !welcomeMode ? 'login' : null} farewell={welcomeMode === 'deleted'} notice={welcomeMode === 'expired' ? 'You were signed out. Sign in again to carry on.' : welcomeMode === 'verify' ? `${verifyNotice} Sign in to send a new confirmation link.` : arrival.socialNotice || ''} onSignedIn={(u, meta) => { setEntry(meta?.isNew ? 'new' : 'back'); refreshMe().catch(() => setUser(u)); }} onOpenLegal={openLegal} captchaSiteKey={captchaSiteKey} social={social} />}
       {!booting && user && user.status !== 'active' && <Paused onSignOut={signOut} onCheck={refreshMeQuietly} onOpenLegal={openLegal} />}
       {!booting && user && user.status === 'active' && (
         <Signedin
