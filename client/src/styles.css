@@ -569,18 +569,20 @@ input::placeholder, textarea::placeholder { color: #7d7a8e; }
 /* --- Boot loader: shown while the app finds out who you are. The bolt strikes, the name slams in. --- */
 .boot { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 24px; }
 .boot-stage { display: grid; justify-items: center; gap: 22px; }
-.boot-bolt { width: clamp(64px, 20vmin, 120px); height: auto; overflow: visible; color: var(--accent); filter: drop-shadow(0 0 14px var(--accent-glow)); animation: boot-strike 1.7s cubic-bezier(0.2, 0.8, 0.2, 1) infinite; }
-@keyframes boot-strike {
-  0% { clip-path: inset(-30px -30px 100% -30px); filter: drop-shadow(0 0 0 transparent); }
-  14% { clip-path: inset(-30px); filter: drop-shadow(0 0 30px var(--accent)) brightness(1.5); }
-  28% { filter: drop-shadow(0 0 14px var(--accent-glow)) brightness(1); }
-  78% { clip-path: inset(-30px); opacity: 1; }
-  100% { clip-path: inset(-30px); opacity: 0.25; }
-}
+.kmark { display: block; overflow: visible; }
+.kmark-face { fill: #f3f1f7; }
+.kmark-shadow { fill: var(--accent); }
+/* The K slams in, its yellow shadow kicks out after it, then it pulses with a glow while loading. */
+.boot-mark { width: clamp(96px, 28vmin, 150px); height: auto; filter: drop-shadow(0 0 18px var(--accent-glow)); animation: mark-in 0.55s cubic-bezier(0.2, 1.5, 0.4, 1) both, mark-pulse 1.6s ease-in-out 0.6s infinite; }
+.boot-mark .kmark-shadow { animation: mark-kick 0.4s 0.3s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+@keyframes mark-in { from { transform: scale(2.2) rotate(-8deg); opacity: 0; } }
+@keyframes mark-kick { from { transform: translate(0, 0); } }
+@keyframes mark-pulse { 50% { filter: drop-shadow(0 0 34px var(--accent)) brightness(1.15); } }
+/* The name lands just after the K. */
 .boot-word {
   font-family: var(--display); font-size: clamp(44px, 14vw, 72px); line-height: 0.9; text-transform: uppercase; letter-spacing: 0.01em;
   transform: skewX(-9deg); text-shadow: 3px 3px 0 var(--accent), 6px 6px 0 rgba(0, 0, 0, 0.6);
-  animation: boot-in 0.5s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+  animation: boot-in 0.5s 0.25s cubic-bezier(0.2, 1.5, 0.4, 1) both;
 }
 @keyframes boot-in { from { transform: skewX(-9deg) scale(1.7); opacity: 0; } }
 .boot-bar { width: min(220px, 56vw); height: 6px; background: rgba(255, 255, 255, 0.08); transform: skewX(-20deg); overflow: hidden; }
@@ -634,7 +636,7 @@ input::placeholder, textarea::placeholder { color: #7d7a8e; }
 
 /* Less motion: the loader and the strike keep their look but hold still; the strike shows plainly and fades. */
 @media (prefers-reduced-motion: reduce) {
-  .boot-bolt, .boot-word, .hero-bolt, .hero h1, .hero .tagline, .form-error { animation: none !important; }
+  .boot-mark, .boot-mark .kmark-shadow, .boot-word, .hero-bolt, .hero h1, .hero .tagline, .form-error { animation: none !important; }
   .boot-bar span { animation: none !important; width: 60%; transform: none; }
   .strike { animation: strike-life 1.4s linear forwards !important; }
   .strike-flash, .strike-bolts { display: none; }

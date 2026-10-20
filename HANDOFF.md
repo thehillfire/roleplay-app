@@ -92,6 +92,8 @@ TEST_DATABASE_URL=postgres://postgres@localhost:5433/loreforge_test npm run test
 
 9. **Google/Apple buttons always visible; "I keep getting logged out" (2026-10-20, session 017tKMDq):** `SOCIAL_PREVIEW` now defaults on in production, so the Sign in and Create account pages show "Google: coming soon" / "Apple: coming soon" with their logos until the keys exist (`SOCIAL_PREVIEW=0` hides them). They go live the moment `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (free) or the four `APPLE_*` keys ($99/yr) are set; steps in `docs/DEPLOY.md`. Jav keeps getting logged out because the Render service has no `DATABASE_URL`: the free plan sleeps after ~15 min idle, the container restarts, and the SQLite file with every account and session is gone. Sessions themselves already last 180 days. The fix is on Jav's side: add a Postgres database and set `DATABASE_URL`.
 
+10. **Logo on launch, at least 2 s (2026-10-20, session 017tKMDq):** Jav asked to see the Kindred logo and animation for at least 2 seconds whenever the app loads. The loader now shows the K logo (`components/KMark.jsx`, same shapes as `public/icon.svg`, also inlined in `index.html` so it's there before any script) with the name and charge bar. It's held until 2 s after the page started loading (`BOOT_MIN_MS` in `App.jsx`), also under reduced motion (still, no animation). Lower `BOOT_MIN_MS` if returning users find it slow.
+
 ## Decisions waiting on Jav
 
 - **Email-first signup:** today, signup reveals whether an email already has an account.

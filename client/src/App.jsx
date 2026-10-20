@@ -354,6 +354,8 @@ function takeArrival() {
   };
 }
 
+const BOOT_MIN_MS = 2000;
+
 export default function App() {
   const [user, setUser] = useState(undefined); // undefined while checking the session
   const userRef = useRef(user);
@@ -367,10 +369,11 @@ export default function App() {
   // The lightning "you're in" after signing in or up ('new' | 'back' | null).
   const [entry, setEntry] = useState(arrival.entry || null);
   const endEntry = useCallback(() => setEntry(null), []);
-  // The loader is on screen at least a moment, so the strike is seen; not at all for people who asked for less motion.
-  const [bootHeld, setBootHeld] = useState(() => !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+  // The logo and its animation stay on screen for at least 2 seconds from when the page started
+  // loading (the owner's call), however fast the session check is. Reduced motion sees it still.
+  const [bootHeld, setBootHeld] = useState(true);
   useEffect(() => {
-    const timer = setTimeout(() => setBootHeld(false), 650);
+    const timer = setTimeout(() => setBootHeld(false), Math.max(0, BOOT_MIN_MS - performance.now()));
     return () => clearTimeout(timer);
   }, []);
   const booting = user === undefined || bootHeld;
