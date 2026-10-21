@@ -94,6 +94,8 @@ TEST_DATABASE_URL=postgres://postgres@localhost:5433/loreforge_test npm run test
 
 10. **Logo on launch, at least 2 s (2026-10-20, session 017tKMDq):** Jav asked to see the Kindred logo and animation for at least 2 seconds whenever the app loads. The loader now shows the K logo (`components/KMark.jsx`, same shapes as `public/icon.svg`, also inlined in `index.html` so it's there before any script) with the name and charge bar. It's held until 2 s after the page started loading (`BOOT_MIN_MS` in `App.jsx`), also under reduced motion (still, no animation). Lower `BOOT_MIN_MS` if returning users find it slow.
 
+11. **Database: Supabase (2026-10-21, session 017tKMDq):** created Supabase project **kindred** (ref `oluwoieqrvawanhculxt`, us-west-1, org "LoreForge's projects") through the Supabase connector. Its database password can't be read through the connector, so Jav sets `DATABASE_URL` himself: Supabase → kindred → **Connect** → **Session pooler** URI (Render has no IPv6, so not the direct `db.…supabase.co` host), with the password from **Database settings → Reset database password**. Also set `DATABASE_SSL_NO_VERIFY=true` (encrypted, without checking Supabase's certificate chain) and leave `?sslmode=` out of the URL, because it would override that. Migrations run on boot. Free Supabase projects pause after about a week with no traffic.
+
 ## Decisions waiting on Jav
 
 - **Email-first signup:** today, signup reveals whether an email already has an account.
