@@ -1,0 +1,18 @@
+{
+  "id": "/",
+  "name": "Kindred",
+  "short_name": "Kindred",
+  "description": "Talk to someone. Nobody has to know. Anonymous 1:1 texting for adults.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0a10",
+  "theme_color": "#0b0a10",
+  "categories": ["social", "lifestyle"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,2 +1,13 @@
-.vercel
 node_modules
+dist
+.env
+.vercel
+data
+
+# Android signing keys and generated builds never go in git
+*.keystore
+*.jks
+android/*.apk
+android/*.aab
+android/app/
+android/build/

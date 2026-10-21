@@ -1,0 +1,14 @@
+{
+  "appId": "app.kindred.ios",
+  "appName": "Kindred",
+  "webDir": "dist",
+  "server": {
+    "url": "https://REPLACE-WITH-YOUR-DOMAIN/?app=ios",
+    "cleartext": false
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#0b0a10",
+    "limitsNavigationsToAppBoundDomains": true
+  }
+}

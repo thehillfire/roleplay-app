@@ -1,0 +1,26 @@
+{
+  "packageId": "app.kindred.twa",
+  "host": "REPLACE-WITH-YOUR-DOMAIN",
+  "name": "Kindred",
+  "launcherName": "Kindred",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#0b0a10",
+  "navigationColor": "#0b0a10",
+  "backgroundColor": "#0b0a10",
+  "enableNotifications": true,
+  "startUrl": "/?app=android",
+  "iconUrl": "https://REPLACE-WITH-YOUR-DOMAIN/icon-512.png",
+  "maskableIconUrl": "https://REPLACE-WITH-YOUR-DOMAIN/icon-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "kindred"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "minSdkVersion": 21,
+  "fallbackType": "customtabs",
+  "features": {},
+  "webManifestUrl": "https://REPLACE-WITH-YOUR-DOMAIN/manifest.webmanifest"
+}

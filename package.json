@@ -1,7 +1,38 @@
 {
+  "name": "kindred",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c magenta,cyan \"node --disable-warning=ExperimentalWarning --watch server/src/index.js\" \"vite\"",
+    "build": "vite build",
+    "start": "node --disable-warning=ExperimentalWarning server/src/index.js",
+    "test": "NODE_ENV=test node --disable-warning=ExperimentalWarning --test --test-concurrency=1 server/test/*.test.js",
+    "test:pg": "node -e \"if (!process.env.TEST_DATABASE_URL) { console.error('test:pg needs TEST_DATABASE_URL (a Postgres URL); without it the tests would quietly run on SQLite.'); process.exit(1) }\" && NODE_ENV=test node --disable-warning=ExperimentalWarning --test --test-concurrency=1 server/test/*.test.js",
+    "e2e": "node e2e/smoke.mjs",
+    "make-admin": "node --disable-warning=ExperimentalWarning server/scripts/make-admin.js",
+    "vapid": "node server/scripts/vapid.js",
+    "a11y": "node e2e/a11y.mjs",
+    "verify": "bash scripts/verify.sh"
+  },
   "dependencies": {
-    "@react-native-async-storage/async-storage": "^1.24.0",
-    "expo": "^54.0.12",
-    "firebase": "^12.3.0"
+    "dotenv": "^18.0.8",
+    "express": "^5.3.0",
+    "helmet": "^8.3.0",
+    "pg": "^8.23.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "web-push": "^3.6.7",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@mediapipe/tasks-vision": "1.0.1",
+    "@vitejs/plugin-react": "^4.7.0",
+    "axe-core": "^4.14.0",
+    "concurrently": "^10.0.6",
+    "playwright-core": "1.56",
+    "vite": "^6.4.4"
   }
 }

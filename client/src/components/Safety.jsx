@@ -1,0 +1,95 @@
+import { useState } from 'react';
+import useDialog from '../useDialog.js';
+
+export const HELD_NOTES = {
+  contact: "Not sent. Contact details (numbers, emails, socials, links) can't be shared unless you both choose to connect.",
+  age_probe: "Not sent. Kindred is 18+ only, so please don't ask people their age.",
+  location: "Not sent. To keep everyone anonymous, please don't ask where people live.",
+  meetup: "Not sent. Kindred stays anonymous and online: no meetups or photo requests unless you both choose to connect.",
+  sexual: "Not sent. Sexual content isn't allowed on Kindred.",
+  minor: 'Not sent.',
+  minor_maybe: 'Not sent. Kindred is for adults 18 and over.',
+  minor_sexual: 'Not sent.',
+  spam: 'Not sent. The same message went to several people. Kindred is for real conversations.',
+  threat: "Not sent. Threats aren't allowed on Kindred.",
+  hate: "Not sent. Hate isn't allowed on Kindred.",
+  harassment: 'Not sent. Please keep it kind, even when it\'s hard.',
+};
+
+export function heldNote(flags = []) {
+  const key = ['minor', 'minor_sexual', 'minor_maybe', 'threat', 'hate', 'sexual', 'harassment', 'spam', 'age_probe', 'meetup', 'location', 'contact'].find((f) => flags.includes(f));
+  return HELD_NOTES[key] || 'Not sent. This message breaks the community guidelines.';
+}
+
+export function CrisisCard({ role, onDismiss }) {
+  return (
+    <aside className="crisis" role="note">
+      {role === 'sender' ? (
+        <div className="crisis-text"><p><strong>You matter.</strong> If you're thinking about ending your life or hurting yourself, you can call or text <a href="tel:988">988</a> (US) any time, or find a line near you at <a href="https://findahelpline.com" target="_blank" rel="noreferrer">findahelpline.com</a>. You can keep talking here too.</p>
+        <p lang="es" className="crisis-es">En español: llama al <a href="tel:988">988</a> y oprime 2, o envía AYUDA por texto al 988.</p></div>
+      ) : (
+        <p><strong>They may be going through something heavy.</strong> Listen without judging. Gently mention that they can call or text <a href="tel:988">988</a> (US) or visit <a href="https://findahelpline.com" target="_blank" rel="noreferrer">findahelpline.com</a>. If they're in immediate danger, encourage them to contact emergency services.</p>
+      )}
+      <button className="icon-btn" aria-label="Dismiss" onClick={onDismiss}>×</button>
+    </aside>
+  );
+}
+
+const REASONS = [
+  ['harassment', 'Harassment or bullying'],
+  ['sexual', 'Sexual messages'],
+  ['minor', 'I think they are under 18'],
+  ['hate', 'Hate or threats'],
+  ['spam', 'Spam or scam'],
+  ['self_harm', "I'm worried about their safety"],
+  ['other', 'Something else'],
+];
+
+export function ReportSheet({ handle, onSubmit, onClose }) {
+  const dialog = useDialog(onClose);
+  const [reason, setReason] = useState('');
+  const [details, setDetails] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await onSubmit(reason, details.trim() || undefined);
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label={`Report ${handle}`} ref={dialog} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+        <form className="sheet-form" onSubmit={submit}>
+        <h2>Report {handle}</h2>
+        <p className="hint">{reason === 'self_harm'
+          ? "A moderator will check on them, and they'll be shown support resources. Your chat stays open: staying with them can help."
+          : "A moderator will review the recent messages. You won't be matched with them again."}</p>
+        <fieldset className="reasons">
+          {REASONS.map(([id, label]) => (
+            <label key={id} className={reason === id ? 'reason active' : 'reason'}>
+              <input type="radio" name="reason" value={id} checked={reason === id} onChange={() => setReason(id)} autoFocus={id === 'harassment'} />
+              <span>{label}</span>
+            </label>
+          ))}
+        </fieldset>
+        <textarea value={details} onChange={(e) => setDetails(e.target.value)} maxLength={1000} rows={3} placeholder="Anything else we should know? (optional)" aria-label="Details" />
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <div className="sheet-actions">
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          <button type="submit" className={reason === 'self_harm' ? 'btn primary' : 'btn danger'} disabled={!reason || busy}>
+            {busy ? 'Sending…' : reason === 'self_harm' ? 'Let a moderator know' : 'Report and block'}
+          </button>
+        </div>
+        </form>
+      </div>
+    </div>
+  );
+}
